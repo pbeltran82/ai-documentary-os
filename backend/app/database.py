@@ -47,6 +47,13 @@ def migrate_sqlite_schema() -> None:
         "license_name": "VARCHAR(200) NOT NULL DEFAULT ''",
         "license_url": "TEXT NOT NULL DEFAULT ''",
         "attribution": "TEXT NOT NULL DEFAULT ''",
+        "remote_download_url": "TEXT NOT NULL DEFAULT ''",
+        "local_path": "TEXT NOT NULL DEFAULT ''",
+        "local_preview_path": "TEXT NOT NULL DEFAULT ''",
+        "content_type": "VARCHAR(120) NOT NULL DEFAULT ''",
+        "file_size_bytes": "INTEGER NOT NULL DEFAULT 0",
+        "checksum_sha256": "VARCHAR(64) NOT NULL DEFAULT ''",
+        "downloaded_at": "DATETIME",
     }
 
     with engine.begin() as connection:
