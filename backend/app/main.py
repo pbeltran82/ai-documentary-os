@@ -10,13 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
 from .routers.projects import router as projects_router
+from .routers.scenes import router as scenes_router
 from .schemas import HealthResponse
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.add_middleware(
 )
 
 app.include_router(projects_router, prefix="/api")
+app.include_router(scenes_router, prefix="/api")
 
 
 @app.get("/")
