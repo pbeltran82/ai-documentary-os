@@ -6,7 +6,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -36,6 +36,35 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 class Base(DeclarativeBase):
     pass
+
+
+def migrate_sqlite_schema() -> None:
+    """Apply small additive migrations for existing local SQLite databases."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    additions = {
+        "license_name": "VARCHAR(200) NOT NULL DEFAULT ''",
+        "license_url": "TEXT NOT NULL DEFAULT ''",
+        "attribution": "TEXT NOT NULL DEFAULT ''",
+    }
+
+    with engine.begin() as connection:
+        table_exists = connection.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='assets'")
+        ).scalar_one_or_none()
+        if not table_exists:
+            return
+
+        existing = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(assets)").fetchall()
+        }
+        for column, definition in additions.items():
+            if column not in existing:
+                connection.exec_driver_sql(
+                    f"ALTER TABLE assets ADD COLUMN {column} {definition}"
+                )
 
 
 def get_db() -> Generator[Session, None, None]:
