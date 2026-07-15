@@ -1,73 +1,199 @@
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
-from app.routers.assets import normalize_photo, normalize_video, public_search_url
+from app.schemas import AssetCandidate
+from app.services.assets import PROVIDERS
+from app.services.assets.common import clean_html, public_search_url
+from app.services.assets.nasa import normalize_item as normalize_nasa
+from app.services.assets.pixabay import (
+    normalize_photo as normalize_pixabay_photo,
+    normalize_video as normalize_pixabay_video,
+)
+from app.services.assets.unsplash import normalize_photo as normalize_unsplash_photo
+from app.services.assets.wikimedia import normalize_photo as normalize_wikimedia_photo
 
 
-class AssetPlannerTests(unittest.TestCase):
-    def test_video_normalizer_prefers_landscape_hd_file(self) -> None:
-        candidate = normalize_video(
+class MultiProviderAssetTests(unittest.TestCase):
+    def test_pixabay_video_prefers_landscape_full_hd_file(self) -> None:
+        candidate = normalize_pixabay_video(
             {
                 "id": 42,
-                "url": "https://www.pexels.com/video/42/",
-                "image": "https://images.example/preview.jpg",
+                "pageURL": "https://pixabay.com/videos/id-42/",
                 "duration": 8,
-                "user": {
-                    "name": "Creator",
-                    "url": "https://www.pexels.com/@creator",
-                },
-                "video_files": [
-                    {
-                        "quality": "sd",
-                        "file_type": "video/mp4",
+                "user": "Creator",
+                "user_id": 12,
+                "videos": {
+                    "tiny": {
+                        "url": "https://cdn.example/tiny.mp4",
                         "width": 640,
                         "height": 360,
-                        "link": "https://files.example/sd.mp4",
+                        "thumbnail": "https://cdn.example/tiny.jpg",
                     },
-                    {
-                        "quality": "hd",
-                        "file_type": "video/mp4",
+                    "large": {
+                        "url": "https://cdn.example/hd.mp4",
                         "width": 1920,
                         "height": 1080,
-                        "link": "https://files.example/hd.mp4",
+                        "thumbnail": "https://cdn.example/hd.jpg",
                     },
+                    "portrait": {
+                        "url": "https://cdn.example/portrait.mp4",
+                        "width": 1080,
+                        "height": 1920,
+                        "thumbnail": "https://cdn.example/portrait.jpg",
+                    },
+                },
+            }
+        )
+
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        self.assertEqual(candidate.provider, "pixabay")
+        self.assertEqual(candidate.download_url, "https://cdn.example/hd.mp4")
+        self.assertEqual(candidate.preview_url, "https://cdn.example/hd.jpg")
+        self.assertEqual(candidate.width, 1920)
+        self.assertEqual(candidate.license_name, "Pixabay Content License")
+
+    def test_pixabay_photo_preserves_source_creator_and_rights(self) -> None:
+        candidate = normalize_pixabay_photo(
+            {
+                "id": 7,
+                "pageURL": "https://pixabay.com/photos/id-7/",
+                "largeImageURL": "https://cdn.example/original.jpg",
+                "webformatURL": "https://cdn.example/preview.jpg",
+                "imageWidth": 2400,
+                "imageHeight": 1600,
+                "user": "Photo Person",
+                "user_id": 99,
+            }
+        )
+
+        self.assertEqual(candidate.creator, "Photo Person")
+        self.assertEqual(candidate.source_url, "https://pixabay.com/photos/id-7/")
+        self.assertEqual(candidate.download_url, "https://cdn.example/original.jpg")
+        self.assertIn("Photo Person", candidate.attribution)
+
+    def test_unsplash_photo_adds_required_attribution_links(self) -> None:
+        candidate = normalize_unsplash_photo(
+            {
+                "id": "abc",
+                "width": 3000,
+                "height": 2000,
+                "urls": {
+                    "regular": "https://images.unsplash.com/preview",
+                    "full": "https://images.unsplash.com/full",
+                },
+                "links": {"html": "https://unsplash.com/photos/abc"},
+                "user": {
+                    "name": "Annie Example",
+                    "username": "annie",
+                    "links": {"html": "https://unsplash.com/@annie"},
+                },
+            }
+        )
+
+        self.assertEqual(candidate.provider, "unsplash")
+        self.assertIn("utm_source=ai_documentary_os", candidate.source_url)
+        self.assertIn("utm_source=ai_documentary_os", candidate.creator_url)
+        self.assertEqual(candidate.attribution, "Photo by Annie Example on Unsplash")
+        self.assertEqual(candidate.license_name, "Unsplash License")
+
+    def test_wikimedia_normalizer_cleans_creator_and_license_html(self) -> None:
+        candidate = normalize_wikimedia_photo(
+            {
+                "pageid": 123,
+                "title": "File:Historic map.jpg",
+                "imageinfo": [
+                    {
+                        "mime": "image/jpeg",
+                        "url": "https://upload.wikimedia.org/original.jpg",
+                        "thumburl": "https://upload.wikimedia.org/thumb.jpg",
+                        "width": 2000,
+                        "height": 1400,
+                        "extmetadata": {
+                            "Artist": {"value": "<b>Jane Cartographer</b>"},
+                            "LicenseShortName": {"value": "CC BY-SA 4.0"},
+                            "LicenseUrl": {
+                                "value": "https://creativecommons.org/licenses/by-sa/4.0/"
+                            },
+                        },
+                    }
                 ],
             }
         )
 
         self.assertIsNotNone(candidate)
         assert candidate is not None
-        self.assertEqual(candidate.download_url, "https://files.example/hd.mp4")
-        self.assertEqual(candidate.width, 1920)
-        self.assertEqual(candidate.media_type, "video")
+        self.assertEqual(candidate.creator, "Jane Cartographer")
+        self.assertEqual(candidate.license_name, "CC BY-SA 4.0")
+        self.assertTrue(candidate.source_url.startswith("https://commons.wikimedia.org/wiki/"))
+        self.assertEqual(clean_html("<i>Hello</i> &amp; goodbye"), "Hello & goodbye")
 
-    def test_photo_normalizer_preserves_creator_and_original_file(self) -> None:
-        candidate = normalize_photo(
+    def test_nasa_normalizer_records_usage_guidelines_without_manifest(self) -> None:
+        candidate = normalize_nasa(
             {
-                "id": 7,
-                "url": "https://www.pexels.com/photo/7/",
-                "width": 2400,
-                "height": 1600,
-                "photographer": "Photo Person",
-                "photographer_url": "https://www.pexels.com/@photo-person",
-                "src": {
-                    "large": "https://images.example/preview.jpg",
-                    "original": "https://images.example/original.jpg",
-                },
-            }
+                "data": [
+                    {
+                        "nasa_id": "NASA-1",
+                        "title": "Earth from orbit",
+                        "center": "NASA Johnson",
+                    }
+                ],
+                "links": [{"href": "https://images-assets.nasa.gov/preview.jpg"}],
+            },
+            "photo",
         )
 
-        self.assertEqual(candidate.creator, "Photo Person")
-        self.assertEqual(candidate.preview_url, "https://images.example/preview.jpg")
-        self.assertEqual(candidate.download_url, "https://images.example/original.jpg")
-        self.assertEqual(candidate.media_type, "photo")
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        self.assertEqual(candidate.provider, "nasa")
+        self.assertEqual(candidate.creator, "NASA Johnson")
+        self.assertEqual(candidate.preview_url, "https://images-assets.nasa.gov/preview.jpg")
+        self.assertEqual(candidate.license_name, "NASA Media Usage Guidelines")
 
-    def test_public_search_url_handles_video_queries(self) -> None:
+    def test_provider_registry_capabilities_and_key_status(self) -> None:
+        self.assertEqual(PROVIDERS["pixabay"].media_types, ("video", "photo"))
+        self.assertEqual(PROVIDERS["unsplash"].media_types, ("photo",))
+        self.assertTrue(PROVIDERS["wikimedia"].configured)
+        self.assertTrue(PROVIDERS["nasa"].configured)
+
+        with patch.dict(os.environ, {"PIXABAY_API_KEY": "saved-key"}, clear=False):
+            self.assertTrue(PROVIDERS["pixabay"].configured)
+
+        with patch.dict(os.environ, {"PIXABAY_API_KEY": ""}, clear=False):
+            self.assertFalse(PROVIDERS["pixabay"].configured)
+
+    def test_manual_search_urls_are_provider_specific(self) -> None:
         self.assertEqual(
-            public_search_url("compound growth", "video"),
-            "https://www.pexels.com/search/videos/compound%20growth/",
+            public_search_url("pixabay", "compound growth", "video"),
+            "https://pixabay.com/videos/search/compound%20growth/",
         )
+        self.assertIn(
+            "commons.wikimedia.org",
+            public_search_url("wikimedia", "historic map", "photo"),
+        )
+        self.assertIn(
+            "images.nasa.gov/search",
+            public_search_url("nasa", "moon landing", "video"),
+        )
+
+    def test_asset_candidate_accepts_rights_metadata(self) -> None:
+        candidate = AssetCandidate(
+            provider="wikimedia",
+            provider_asset_id="123",
+            media_type="photo",
+            source_url="https://example.com/source",
+            preview_url="https://example.com/preview.jpg",
+            download_url="https://example.com/file.jpg",
+            creator="Creator",
+            creator_url="https://example.com/creator",
+            license_name="CC BY 4.0",
+            license_url="https://creativecommons.org/licenses/by/4.0/",
+            attribution="Creator · CC BY 4.0",
+        )
+        self.assertEqual(candidate.license_name, "CC BY 4.0")
 
 
 if __name__ == "__main__":
