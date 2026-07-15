@@ -172,6 +172,60 @@ class TimelineManifestResponse(BaseModel):
     manifest: dict[str, Any]
 
 
+class TimelineMissingScene(BaseModel):
+    scene_id: int
+    scene_number: int
+    reason: str
+
+
+class TimelineClipRead(BaseModel):
+    scene_id: int
+    scene_number: int
+    input_index: int
+    start_seconds: float
+    end_seconds: float
+    duration_seconds: float
+    narration: str
+    visual_intent: str
+    provider: str
+    provider_asset_id: str
+    media_type: str
+    local_path: str
+    local_url: str
+    preview_url: str
+    source_url: str
+    creator: str
+    license_name: str
+    attribution: str
+    source_file: str
+    assembly_action: str
+
+
+class TimelinePlanResponse(BaseModel):
+    schema_version: str
+    generated_at: str
+    project_id: int
+    project_title: str
+    ready: bool
+    ffmpeg_available: bool
+    runtime_seconds: float
+    clip_count: int
+    missing_scenes: list[TimelineMissingScene] = Field(default_factory=list)
+    settings: dict[str, Any]
+    clips: list[TimelineClipRead] = Field(default_factory=list)
+    command: list[str] = Field(default_factory=list)
+    output_relative_path: str
+    output_url: str
+    output_exists: bool
+    output_size_bytes: int
+    rendered_at: str | None = None
+    plan_relative_path: str
+    plan_url: str
+    script_relative_path: str
+    script_url: str
+    message: str | None = None
+
+
 class HealthResponse(BaseModel):
     status: str
     app: str
