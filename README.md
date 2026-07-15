@@ -7,7 +7,7 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.2 Scene Engine
+## Current milestone: v0.2.1 Smart Scene Import
 
 The working application now includes:
 
@@ -16,8 +16,10 @@ The working application now includes:
 - local SQLite project and scene storage,
 - documentary project creation, listing, and deletion,
 - a dedicated Scene Engine workspace,
-- narration-to-scene breakdown with estimated timing,
-- editable visual intent, search keywords, preferred asset type, and asset status,
+- plain-narration breakdown with estimated timing,
+- structured scene-plan import with labeled field detection,
+- supplied timecode, narration, visual-intent, keyword, asset-type, and status mapping,
+- editable scene production metadata,
 - automatic timestamp recalculation after edits and deletions,
 - the complete production pipeline at a bird's-eye view,
 - a living master plan and creator pain log.
@@ -67,12 +69,26 @@ Press `Control+C` in Terminal to stop both services.
 
 1. Create or open a documentary project.
 2. Select **Open Scene Engine**.
-3. Paste the narration or finished voiceover script.
-4. Choose the desired visual-slot duration—five seconds is a practical starting point.
-5. Generate the scene plan.
+3. Paste either plain narration or a structured scene plan.
+4. Choose the desired fallback visual-slot duration—five seconds is a practical starting point.
+5. Generate or import the scene plan.
 6. Review and edit timing, visual intent, search keywords, asset type, and asset status.
 
-The current splitter is deterministic and local. It estimates narration timing at roughly 150 words per minute and creates structured scene records without using a paid AI API.
+Plain narration is split deterministically and locally at roughly 150 spoken words per minute. Structured plans are detected and mapped into the correct fields instead of treating production labels as voiceover text.
+
+Supported structured format:
+
+```text
+Scene 01
+00:00–00:05
+Narration: Most people underestimate the power of time.
+Visual intent: Calendar pages and long-term market growth
+Search terms: calendar time lapse, investment growth, stock chart
+Preferred visual: Stock video
+Asset status: Missing
+```
+
+The importer also accepts `Voiceover`, `Search keywords`, `Asset type`, and simple Markdown headings or labels.
 
 ## Manual startup
 
