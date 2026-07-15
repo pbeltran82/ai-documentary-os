@@ -5,6 +5,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,9 +20,10 @@ from ..models import Asset, Project, Scene
 from ..schemas import AssetSelect
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-MEDIA_ROOT = Path(
-    os.getenv("MEDIA_ROOT", str(BACKEND_DIR / "data" / "projects"))
-).expanduser().resolve()
+_raw_media_root = Path(os.getenv("MEDIA_ROOT", "data/projects")).expanduser()
+MEDIA_ROOT = (
+    _raw_media_root if _raw_media_root.is_absolute() else BACKEND_DIR / _raw_media_root
+).resolve()
 PUBLIC_BACKEND_URL = os.getenv(
     "PUBLIC_BACKEND_URL", "http://localhost:8000"
 ).rstrip("/")
@@ -85,7 +87,16 @@ def extension_for(url: str, content_type: str, media_type: str) -> str:
         return CONTENT_TYPE_EXTENSIONS[normalized_type]
 
     suffix = Path(urlparse(url).path).suffix.lower()
-    if suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mov", ".webm"}:
+    if suffix in {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+        ".mp4",
+        ".mov",
+        ".webm",
+    }:
         return ".jpg" if suffix == ".jpeg" else suffix
 
     guessed = mimetypes.guess_extension(normalized_type) if normalized_type else None
@@ -109,6 +120,7 @@ def download_remote_file(
             "User-Agent": "AI-Documentary-OS/0.5",
         },
     )
+    temporary_path: Path | None = None
 
     try:
         with urlopen(request, timeout=120) as response:
@@ -140,7 +152,6 @@ def download_remote_file(
                         break
                     total += len(chunk)
                     if total > MAX_DOWNLOAD_BYTES:
-                        temporary_path.unlink(missing_ok=True)
                         raise HTTPException(
                             status_code=413,
                             detail="Selected asset exceeded the local download limit",
@@ -149,9 +160,14 @@ def download_remote_file(
                     temporary.write(chunk)
 
             temporary_path.replace(destination)
+            temporary_path = None
     except HTTPException:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
         raise
     except Exception as exc:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=502,
             detail=f"Could not download the selected media: {exc}",
@@ -200,11 +216,20 @@ def resolve_media_path(relative_path: str) -> Path | None:
 def remove_asset_files(asset: Asset | None) -> None:
     if asset is None:
         return
-    paths = {asset.local_path, asset.local_preview_path}
-    for relative_path in paths:
+    for relative_path in {asset.local_path, asset.local_preview_path}:
         path = resolve_media_path(relative_path)
         if path is not None and path.is_file():
             path.unlink(missing_ok=True)
+
+
+def remove_project_directory(project_id: int) -> None:
+    directory = (MEDIA_ROOT / project_relative_directory(project_id)).resolve()
+    try:
+        directory.relative_to(MEDIA_ROOT)
+    except ValueError:
+        return
+    if directory.is_dir():
+        shutil.rmtree(directory)
 
 
 def timeline_manifest(project: Project) -> dict[str, Any]:
