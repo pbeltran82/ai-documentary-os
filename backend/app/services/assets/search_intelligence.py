@@ -136,11 +136,15 @@ def build_search_plan(
     ]
     comma_joined_keywords = normalize_phrase(", ".join(keyword_phrases))
     space_joined_keywords = normalize_phrase(" ".join(keyword_phrases))
+    matched_keyword_phrases = [
+        phrase for phrase in keyword_phrases if phrase in normalized_query
+    ]
     has_separators = any(separator in query for separator in (",", ";", "|", "\n"))
     query_is_scene_bundle = bool(
         keyword_phrases
         and normalized_query in {comma_joined_keywords, space_joined_keywords}
     )
+    query_is_multi_keyword_bundle = len(matched_keyword_phrases) >= 2
     query_is_explicit_concept = normalized_query in keyword_phrases
 
     if query_is_explicit_concept:
@@ -149,7 +153,7 @@ def build_search_plan(
     elif has_separators:
         raw_phrases = [normalize_phrase(value) for value in SEPARATOR_RE.split(query)]
         expand_scene_context = True
-    elif query_is_scene_bundle:
+    elif query_is_scene_bundle or query_is_multi_keyword_bundle:
         raw_phrases = keyword_phrases
         expand_scene_context = True
     else:
