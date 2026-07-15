@@ -30,6 +30,7 @@ Reduce the time and friction required to produce documentaries by automating rep
 - **Automate repetition:** Search, file organization, timing, status tracking, and assembly are prime automation targets.
 - **Structured data:** Projects, scenes, assets, sources, and exports are stored as editable records rather than disposable chat output.
 - **Provider independence:** AI, stock-media, voice, and video providers should be replaceable.
+- **Rights-aware:** Preserve source, creator, attribution, license, and usage-guideline metadata with selected media.
 - **Working milestones:** Every sprint ends with a runnable, testable improvement.
 
 ## Roadmap
@@ -53,12 +54,17 @@ Reduce the time and friction required to produce documentaries by automating rep
 
 ### Phase 3 — Asset Planner 🚧
 
-- Search Pexels photos and videos from each scene
+- Search multiple replaceable media providers from each scene
+- Pixabay photo and video integration
+- Unsplash photography integration and download-event tracking
+- Wikimedia Commons historical-image integration
+- NASA image and video integration
+- Optional Pexels adapter
 - Preview and attach candidate assets
-- Persist provider, creator, attribution, source, preview, and media-file metadata
+- Persist provider, creator, attribution, source, media-file, and license metadata
 - Track visual coverage across the documentary
 - Download selected media into organized local project folders
-- Add provider-independent adapters and AI-generation fallbacks
+- Add AI-generation fallbacks when stock and archival sources are insufficient
 
 ### Phase 4 — Timeline Builder
 
@@ -77,17 +83,20 @@ Reduce the time and friction required to produce documentaries by automating rep
 
 ## Current sprint
 
-**Sprint 3: Asset Planner MVP**
+**Sprint 4: Multi-Provider Asset Planner**
 
 Definition of done:
 
-- A project can switch between the Scene Engine and Asset Planner.
-- Each scene opens with its narration, timing, visual intent, and suggested search query.
-- Pexels photo and video results can be searched and previewed with attribution.
-- A candidate visual can be selected, replaced, or removed.
-- Selected-asset metadata persists in SQLite.
-- The app works safely without an API key by showing setup guidance and a direct Pexels search link.
+- A provider registry separates the Asset Planner from any single stock-media API.
+- Pixabay and Unsplash use locally stored keys without exposing them to the frontend or GitHub.
+- Wikimedia Commons and NASA work without keys.
+- Pexels remains an optional adapter rather than a blocker.
+- Provider capabilities determine whether photo or video search is available.
+- Candidate cards display creator, source, provider, and rights information.
+- Selected-asset rights metadata persists in SQLite.
+- Existing local databases upgrade without losing projects or selections.
+- Automated backend tests and a frontend production build run in CI.
 
 ## Next priority
 
-Download selected media to a predictable local folder structure and generate a machine-readable timeline manifest for the first automatic assembly pass.
+Download selected media to a predictable local folder structure, create a per-project asset manifest, and generate the first machine-readable timeline assembly plan.
