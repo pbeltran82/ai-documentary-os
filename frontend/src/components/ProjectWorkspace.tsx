@@ -104,20 +104,20 @@ export function ProjectWorkspace({
         <div className="section-heading">
           <div>
             <p className="eyebrow">NARRATION → VISUAL SLOTS</p>
-            <h3>Generate a timed scene plan</h3>
+            <h3>Generate or import a timed scene plan</h3>
           </div>
-          <span className="status-pill">Deterministic v0.2</span>
+          <span className="status-pill">Smart Import v0.2.1</span>
         </div>
 
         <form className="narration-form" onSubmit={submitNarration}>
           <label className="wide-field">
-            Paste narration or a finished script
+            Paste plain narration or a structured scene plan
             <textarea
               required
               minLength={5}
-              rows={9}
+              rows={11}
               value={narration}
-              placeholder="Paste the voiceover script here. The Scene Engine will split it into timed visual slots, create visual intent, and propose stock-media search keywords."
+              placeholder={`Plain narration is split automatically. Structured plans are imported field-by-field, for example:\n\nScene 01\n00:00–00:05\nNarration: Most people underestimate the power of time.\nVisual intent: Calendar pages and long-term market growth\nSearch terms: calendar time lapse, investment growth, stock chart\nPreferred visual: Stock video\nAsset status: Missing`}
               onChange={(event) => setNarration(event.target.value)}
             />
           </label>
@@ -138,12 +138,16 @@ export function ProjectWorkspace({
           </label>
 
           <div className="generation-note">
-            <strong>What it creates</strong>
-            <span>Timing · narration · visual intent · keywords · asset status</span>
+            <strong>Accepted input</strong>
+            <span>Plain narration · scene headings · timecodes · labeled production fields</span>
           </div>
 
           <button className="primary-button wide-field" disabled={generating || loading}>
-            {generating ? "Building scene plan…" : project.scenes.length > 0 ? "Replace scene plan" : "Generate scene plan"}
+            {generating
+              ? "Building scene plan…"
+              : project.scenes.length > 0
+                ? "Replace scene plan"
+                : "Generate / import scene plan"}
           </button>
         </form>
       </section>
@@ -163,7 +167,7 @@ export function ProjectWorkspace({
           <div className="empty-state compact-empty">
             <div className="empty-icon">🎞️</div>
             <h4>No scenes yet.</h4>
-            <p>Paste narration above to create the first timed visual plan.</p>
+            <p>Paste narration or a structured scene plan above to create timed visual slots.</p>
           </div>
         ) : (
           <div className="scene-list">
