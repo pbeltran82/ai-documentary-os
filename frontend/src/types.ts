@@ -18,6 +18,7 @@ export type AssetType =
 export type AssetStatus = "missing" | "searching" | "selected" | "ready";
 export type MediaType = "video" | "photo";
 export type ProviderName = "pixabay" | "unsplash" | "wikimedia" | "nasa" | "pexels";
+export type NarrationAlignmentStatus = "missing" | "aligned" | "shorter" | "longer";
 
 export interface SelectedAsset {
   id: number;
@@ -185,6 +186,17 @@ export interface TimelineClip {
   assembly_action: string;
 }
 
+export interface Voiceover {
+  original_filename: string;
+  relative_path: string;
+  public_url: string;
+  content_type: string;
+  file_size_bytes: number;
+  checksum_sha256: string;
+  duration_seconds: number;
+  uploaded_at: string;
+}
+
 export interface TimelinePlan {
   schema_version: string;
   generated_at: string;
@@ -202,7 +214,14 @@ export interface TimelinePlan {
     video_codec: string;
     pixel_format: string;
     audio: string;
+    audio_codec: string | null;
+    audio_bitrate: string | null;
+    audio_sample_rate: number | null;
   };
+  voiceover: Voiceover | null;
+  alignment_status: NarrationAlignmentStatus;
+  duration_delta_seconds: number | null;
+  alignment_message: string;
   clips: TimelineClip[];
   command: string[];
   output_relative_path: string;
