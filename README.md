@@ -7,26 +7,31 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.3 Asset Planner MVP
+## Current milestone: v0.4 Multi-Provider Asset Planner
 
 The working application now includes:
 
 - a React + TypeScript mission-control dashboard,
 - a FastAPI backend,
 - local SQLite project, scene, and selected-asset storage,
-- documentary project creation, listing, and deletion,
 - plain-narration breakdown and smart structured scene import,
 - editable timing, visual intent, keywords, asset type, and status,
-- scene-by-scene Pexels photo and video search,
-- visual preview, creator attribution, and selection,
-- a direct Pexels-search fallback when no API key is configured,
-- automatic visual-coverage tracking across the documentary.
+- provider-independent visual search,
+- Pixabay photo and video search,
+- Unsplash photography search,
+- Wikimedia Commons historical and cultural image search,
+- NASA image and video search,
+- optional Pexels search when a key becomes available,
+- visual preview, creator attribution, source, license, and rights metadata,
+- selected-asset persistence and documentary-wide coverage tracking,
+- direct provider-search fallbacks when a keyed provider is unavailable.
 
 ## Architecture
 
 ```text
 ai-documentary-os/
 ├── backend/                 FastAPI + SQLAlchemy + SQLite
+│   └── app/services/assets  Replaceable media-provider adapters
 ├── frontend/                React + TypeScript + Vite
 ├── docs/                    Master plan and creator pain log
 ├── episode-001/             Existing production workspace
@@ -62,10 +67,10 @@ Press `Control+C` in Terminal to stop both services.
 ## Using the Scene Engine
 
 1. Create or open a documentary project.
-2. Paste either plain narration or a structured scene plan.
+2. Paste plain narration or a structured scene plan.
 3. Choose the fallback visual-slot duration.
 4. Generate or import the scene plan.
-5. Review and edit the resulting scene records.
+5. Review and edit the scene records.
 
 Supported structured format:
 
@@ -79,29 +84,43 @@ Preferred visual: Stock video
 Asset status: Missing
 ```
 
-## Connecting Pexels
+## Connecting visual providers
 
-Pexels requires an API key sent through the `Authorization` header. Keep that key only on your Mac.
-
-1. Create or open `backend/.env`.
-2. Add:
+Create or open `backend/.env`. The two currently useful keyed providers are:
 
 ```text
-PEXELS_API_KEY=your_key_here
+PIXABAY_API_KEY=your_pixabay_key
+UNSPLASH_ACCESS_KEY=your_unsplash_access_key
+PEXELS_API_KEY=
 ```
 
-3. Restart `./scripts/dev.sh`.
-4. Open a project, enter the Asset Planner, select a scene, and search.
+Restart the app after changing the file:
 
-The app displays a prominent Pexels link and creator attribution. Without a key, it still generates a direct Pexels search link for the scene.
+```bash
+./scripts/dev.sh
+```
 
-## Local data
+Provider roles:
 
-The SQLite database is created at:
+| Provider | Photos | Video | Key required | Primary role |
+|---|---:|---:|---:|---|
+| Pixabay | Yes | Yes | Yes | General stock media |
+| Unsplash | Yes | No | Yes | Cinematic photography |
+| Wikimedia Commons | Yes | No | No | History, maps, art, archives |
+| NASA Images | Yes | Yes | No | Space, science, aviation, climate |
+| Pexels | Yes | Yes | Optional | Additional general stock media |
+
+The planner stores the provider, creator, source page, media URL, license label, rights URL, and attribution text with every selected visual. Always review the original source page before publishing.
+
+## Existing local databases
+
+The database lives at:
 
 ```text
 backend/data/documentary_os.db
 ```
+
+On startup, v0.4 safely adds the new rights-metadata columns to an existing SQLite database. Existing projects, scenes, and selected assets are preserved.
 
 Secrets, the database, downloaded media, and generated exports are excluded from Git.
 
@@ -112,4 +131,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next major milestone is **asset downloading and local media organization**, followed by the first automatic timeline manifest.
+The next major milestone is **downloading selected media into predictable local project folders**, followed by a machine-readable timeline manifest for automatic first assembly.

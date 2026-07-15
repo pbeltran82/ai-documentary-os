@@ -17,11 +17,12 @@ export type AssetType =
 
 export type AssetStatus = "missing" | "searching" | "selected" | "ready";
 export type MediaType = "video" | "photo";
+export type ProviderName = "pixabay" | "unsplash" | "wikimedia" | "nasa" | "pexels";
 
 export interface SelectedAsset {
   id: number;
   scene_id: number;
-  provider: string;
+  provider: ProviderName;
   provider_asset_id: string;
   media_type: MediaType;
   source_url: string;
@@ -32,12 +33,15 @@ export interface SelectedAsset {
   width: number;
   height: number;
   duration_seconds: number | null;
+  license_name: string;
+  license_url: string;
+  attribution: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface AssetCandidate {
-  provider: string;
+  provider: ProviderName;
   provider_asset_id: string;
   media_type: MediaType;
   source_url: string;
@@ -48,16 +52,23 @@ export interface AssetCandidate {
   width: number;
   height: number;
   duration_seconds: number | null;
+  license_name: string;
+  license_url: string;
+  attribution: string;
 }
 
-export interface PexelsStatus {
-  provider: string;
+export interface ProviderStatus {
+  provider: ProviderName;
+  label: string;
   configured: boolean;
+  requires_key: boolean;
+  supports_media_types: MediaType[];
   setup_hint: string;
+  source_url: string;
 }
 
 export interface AssetSearchResponse {
-  provider: string;
+  provider: ProviderName;
   configured: boolean;
   query: string;
   media_type: MediaType;

@@ -26,8 +26,8 @@ class ProjectRead(ProjectCreate):
 
 
 class AssetBase(BaseModel):
-    provider: str = Field(default="pexels", max_length=40)
-    provider_asset_id: str = Field(min_length=1, max_length=100)
+    provider: str = Field(default="pixabay", max_length=40)
+    provider_asset_id: str = Field(min_length=1, max_length=200)
     media_type: str = Field(pattern="^(video|photo)$")
     source_url: str
     preview_url: str
@@ -37,6 +37,9 @@ class AssetBase(BaseModel):
     width: int = Field(default=0, ge=0)
     height: int = Field(default=0, ge=0)
     duration_seconds: float | None = Field(default=None, ge=0)
+    license_name: str = Field(default="", max_length=200)
+    license_url: str = ""
+    attribution: str = Field(default="", max_length=5000)
 
 
 class AssetCandidate(AssetBase):
@@ -134,14 +137,18 @@ class SceneGenerateResponse(BaseModel):
     scenes: list[SceneRead]
 
 
-class PexelsStatusResponse(BaseModel):
-    provider: str = "pexels"
+class ProviderStatusResponse(BaseModel):
+    provider: str
+    label: str
     configured: bool
+    requires_key: bool
+    supports_media_types: list[str]
     setup_hint: str
+    source_url: str
 
 
 class AssetSearchResponse(BaseModel):
-    provider: str = "pexels"
+    provider: str
     configured: bool
     query: str
     media_type: str

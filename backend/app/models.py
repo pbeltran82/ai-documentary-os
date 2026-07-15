@@ -84,8 +84,8 @@ class Asset(Base):
         index=True,
         nullable=False,
     )
-    provider: Mapped[str] = mapped_column(String(40), default="pexels", nullable=False)
-    provider_asset_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), default="pixabay", nullable=False)
+    provider_asset_id: Mapped[str] = mapped_column(String(200), nullable=False)
     media_type: Mapped[str] = mapped_column(String(20), nullable=False)
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     preview_url: Mapped[str] = mapped_column(Text, nullable=False)
@@ -95,6 +95,9 @@ class Asset(Base):
     width: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     height: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    license_name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    license_url: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    attribution: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
