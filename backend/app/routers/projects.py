@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import ProjectCreate, ProjectDetail, ProjectRead
+from ..services.media_library import remove_project_directory
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -47,4 +48,5 @@ def delete_project(project_id: int, db: Session = Depends(get_db)) -> Response:
 
     db.delete(project)
     db.commit()
+    remove_project_directory(project_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
