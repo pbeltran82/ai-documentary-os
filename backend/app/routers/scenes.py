@@ -61,9 +61,10 @@ FIELD_NAMES = (
 SCENE_HEADER_RE = re.compile(
     r"(?im)^\s*(?:#{1,6}\s*)?(?:\*\*)?scene\s+\d+\b[^\n]*$"
 )
-FIELD_RE = re.compile(
-    rf"(?ims)^\s*(?:[-*]\s*)?(?:\*\*)?(?P<label>{FIELD_NAMES})(?:\*\*)?\s*:\s*"
-    rf"(?P<value>.*?)(?=^\s*(?:[-*]\s*)?(?:\*\*)?(?:{FIELD_NAMES})(?:\*\*)?\s*:|\Z)"
+FIELD_LINE_RE = re.compile(
+    rf"^\s*(?:[-*]\s*)?(?:\*\*)?(?P<label>{FIELD_NAMES})"
+    rf"(?::\*\*|\*\*:|:)\s*(?P<value>.*)$",
+    re.IGNORECASE | re.MULTILINE,
 )
 TIMECODE_RE = re.compile(
     r"(?P<start>\d{1,2}:\d{2}(?::\d{2})?)\s*[–—-]\s*"
@@ -118,6 +119,36 @@ def clean_label(value: str) -> str:
     return " ".join(value.lower().strip().split())
 
 
+def clean_field_value(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value).strip()
+    return normalized.strip("*").strip()
+
+
+def parse_labeled_fields(block: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    current_label: str | None = None
+    current_lines: list[str] = []
+
+    def flush() -> None:
+        nonlocal current_label, current_lines
+        if current_label is not None:
+            fields[current_label] = clean_field_value(" ".join(current_lines))
+        current_label = None
+        current_lines = []
+
+    for raw_line in block.splitlines():
+        match = FIELD_LINE_RE.match(raw_line)
+        if match:
+            flush()
+            current_label = clean_label(match.group("label"))
+            current_lines = [match.group("value")]
+        elif current_label is not None:
+            current_lines.append(raw_line.strip())
+
+    flush()
+    return fields
+
+
 def timecode_to_seconds(value: str) -> float:
     parts = [int(part) for part in value.split(":")]
     if len(parts) == 2:
@@ -131,7 +162,7 @@ def split_keywords(value: str) -> list[str]:
     keywords: list[str] = []
     seen: set[str] = set()
     for part in re.split(r"[,;|\n]+", value):
-        keyword = clean_label(part)
+        keyword = clean_label(part.strip("* "))
         if keyword and keyword not in seen:
             keywords.append(keyword)
             seen.add(keyword)
@@ -226,12 +257,7 @@ def parse_structured_scene_plan(
     for index, header in enumerate(headers):
         block_end = headers[index + 1].start() if index + 1 < len(headers) else len(normalized)
         block = normalized[header.start():block_end].strip()
-        fields: dict[str, str] = {}
-
-        for match in FIELD_RE.finditer(block):
-            label = clean_label(match.group("label"))
-            value = re.sub(r"\s+", " ", match.group("value")).strip()
-            fields[label] = value
+        fields = parse_labeled_fields(block)
 
         narration = fields.get("narration") or fields.get("voiceover") or ""
         if not narration:
@@ -336,7 +362,10 @@ def generate_scenes(
     db: Session = Depends(get_db),
 ) -> SceneGenerateResponse:
     project = get_project_or_404(project_id, db)
-    structured_input = bool(SCENE_HEADER_RE.search(payload.narration))
+    structured_input = bool(
+        SCENE_HEADER_RE.search(payload.narration)
+        and FIELD_LINE_RE.search(payload.narration)
+    )
     imported_scenes = parse_structured_scene_plan(
         payload.narration, payload.target_scene_seconds
     )
