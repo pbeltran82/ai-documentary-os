@@ -164,20 +164,22 @@ def select_asset(
         raise HTTPException(status_code=422, detail="Unknown asset provider")
 
     local_files = download_candidate(scene, payload)
+    new_paths = {
+        local_files.media.relative_path,
+        local_files.preview.relative_path,
+    }
     try:
         if provider.track_selection is not None:
             provider.track_selection(payload.provider_asset_id)
     except Exception:
-        for relative_path in {
-            local_files.media.relative_path,
-            local_files.preview.relative_path,
-        }:
+        for relative_path in new_paths:
             path = resolve_media_path(relative_path)
             if path is not None:
                 path.unlink(missing_ok=True)
         raise
 
     asset = db.scalar(select(Asset).where(Asset.scene_id == scene_id))
+    old_paths: tuple[str, str] = ("", "")
     values = payload.model_dump()
     remote_download_url = values["download_url"]
     values.update(
@@ -196,14 +198,6 @@ def select_asset(
         for field, value in values.items():
             setattr(asset, field, value)
         scene.selected_asset = asset
-        for relative_path in set(old_paths):
-            if relative_path not in {
-                local_files.media.relative_path,
-                local_files.preview.relative_path,
-            }:
-                path = resolve_media_path(relative_path)
-                if path is not None:
-                    path.unlink(missing_ok=True)
 
     asset.remote_download_url = remote_download_url
     asset.local_path = local_files.media.relative_path
@@ -215,8 +209,23 @@ def select_asset(
 
     scene.asset_status = "ready"
     update_project_asset_status(scene.project)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        for relative_path in new_paths:
+            if relative_path not in set(old_paths):
+                path = resolve_media_path(relative_path)
+                if path is not None:
+                    path.unlink(missing_ok=True)
+        raise
+
     db.refresh(asset)
+    for relative_path in set(old_paths):
+        if relative_path and relative_path not in new_paths:
+            path = resolve_media_path(relative_path)
+            if path is not None:
+                path.unlink(missing_ok=True)
     write_timeline_manifest(scene.project)
     return asset
 
@@ -234,7 +243,6 @@ def remove_selected_asset(
     paths = None if asset is None else (asset.local_path, asset.local_preview_path)
     if asset is not None:
         scene.selected_asset = None
-        db.delete(asset)
     scene.asset_status = "missing"
     update_project_asset_status(scene.project)
     db.commit()
