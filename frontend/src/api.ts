@@ -12,6 +12,7 @@ import type {
   SceneGenerateResponse,
   SceneUpdate,
   SelectedAsset,
+  TimelineManifestResponse,
 } from "./types";
 
 const API_BASE_URL =
@@ -95,4 +96,8 @@ export const api = {
     }),
   removeSelectedAsset: (sceneId: number) =>
     request<void>(`/scenes/${sceneId}/selected-asset`, { method: "DELETE" }),
+  generateTimelineManifest: (projectId: number) =>
+    request<TimelineManifestResponse>(`/projects/${projectId}/timeline-manifest`, {
+      method: "POST",
+    }),
 };
