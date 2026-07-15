@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import Base, engine
+from .database import Base, engine, migrate_sqlite_schema
 from .routers.assets import router as assets_router
 from .routers.projects import router as projects_router
 from .routers.scenes import router as scenes_router
@@ -18,12 +18,13 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    migrate_sqlite_schema()
     yield
 
 
