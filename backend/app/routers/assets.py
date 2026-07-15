@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,6 +16,10 @@ from ..schemas import (
 )
 from ..services.assets import PROVIDERS
 from ..services.assets.common import public_search_url
+from ..services.assets.search_intelligence import (
+    build_search_plan,
+    merge_candidate_batches,
+)
 
 router = APIRouter(tags=["assets"])
 
@@ -28,7 +34,7 @@ def get_scene_or_404(scene_id: int, db: Session) -> Scene:
 def default_query(scene: Scene) -> str:
     keywords = [keyword.strip() for keyword in scene.search_keywords if keyword.strip()]
     if keywords:
-        return " ".join(keywords[:5])
+        return ", ".join(keywords[:5])
     if scene.visual_intent.strip():
         return scene.visual_intent.strip()
     return scene.narration.strip()
@@ -85,15 +91,34 @@ def search_asset_candidates(
             candidates=[],
         )
 
-    candidates, remaining = provider_spec.search(
+    search_plan = build_search_plan(
         search_query,
+        scene.search_keywords,
+        scene.visual_intent,
         media_type,
-        per_page,
+        max_queries=2,
     )
+    batch_size = max(3, min(15, math.ceil(per_page / len(search_plan)) + 3))
+    batches = []
+    remaining_values: list[int] = []
+
+    for focused_query in search_plan:
+        candidates, remaining = provider_spec.search(
+            focused_query,
+            media_type,
+            batch_size,
+        )
+        batches.append(candidates)
+        if remaining is not None:
+            remaining_values.append(remaining)
+
+    candidates = merge_candidate_batches(batches, per_page)
+    remaining = min(remaining_values) if remaining_values else None
+
     return AssetSearchResponse(
         provider=provider,
         configured=True,
-        query=search_query,
+        query=" · ".join(search_plan),
         media_type=media_type,
         source_url=source_url,
         rate_limit_remaining=remaining,
