@@ -11,6 +11,11 @@ from app.services.assets.nasa import normalize_item as normalize_nasa
 from app.services.assets.pixabay import (
     normalize_photo as normalize_pixabay_photo,
     normalize_video as normalize_pixabay_video,
+    rank_hits as rank_pixabay_hits,
+)
+from app.services.assets.search_intelligence import (
+    build_search_plan,
+    merge_candidate_batches,
 )
 from app.services.assets.unsplash import normalize_photo as normalize_unsplash_photo
 from app.services.assets.wikimedia import normalize_photo as normalize_wikimedia_photo
@@ -194,6 +199,56 @@ class MultiProviderAssetTests(unittest.TestCase):
             attribution="Creator · CC BY 4.0",
         )
         self.assertEqual(candidate.license_name, "CC BY 4.0")
+
+    def test_search_plan_turns_abstract_finance_terms_into_visual_queries(self) -> None:
+        plan = build_search_plan(
+            "calendar time lapse investment growth",
+            ["calendar time lapse", "investment growth", "stock chart"],
+            "Calendar pages and long-term market growth",
+            "video",
+            max_queries=2,
+        )
+
+        self.assertEqual(
+            plan,
+            ["stock market chart animation", "calendar time lapse"],
+        )
+
+    def test_pixabay_ranking_prefers_anchor_matches_over_generic_timelapses(self) -> None:
+        hits = [
+            {"id": 1, "tags": "clouds, sky, time lapse", "likes": 1000},
+            {"id": 2, "tags": "calendar, date, time lapse", "likes": 10},
+            {"id": 3, "tags": "calendar, pages, schedule", "likes": 5},
+            {"id": 4, "tags": "calendar, clock, deadline", "likes": 1},
+        ]
+
+        ranked = rank_pixabay_hits(hits, "calendar time lapse")
+
+        self.assertEqual([item["id"] for item in ranked], [2, 3, 4])
+
+    def test_candidate_batches_are_interleaved_and_deduplicated(self) -> None:
+        def candidate(asset_id: str) -> AssetCandidate:
+            return AssetCandidate(
+                provider="pixabay",
+                provider_asset_id=asset_id,
+                media_type="video",
+                source_url=f"https://example.com/{asset_id}",
+                preview_url=f"https://example.com/{asset_id}.jpg",
+                download_url=f"https://example.com/{asset_id}.mp4",
+            )
+
+        merged = merge_candidate_batches(
+            [
+                [candidate("chart-1"), candidate("shared")],
+                [candidate("calendar-1"), candidate("shared")],
+            ],
+            4,
+        )
+
+        self.assertEqual(
+            [item.provider_asset_id for item in merged],
+            ["chart-1", "calendar-1", "shared"],
+        )
 
 
 if __name__ == "__main__":
