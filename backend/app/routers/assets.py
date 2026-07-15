@@ -20,7 +20,6 @@ from ..services.assets.common import public_search_url
 from ..services.assets.search_intelligence import build_search_plan
 from ..services.media_library import (
     download_candidate,
-    remove_asset_files,
     resolve_media_path,
     write_timeline_manifest,
 )
@@ -179,7 +178,6 @@ def select_asset(
         raise
 
     asset = db.scalar(select(Asset).where(Asset.scene_id == scene_id))
-    old_asset = asset
     values = payload.model_dump()
     remote_download_url = values["download_url"]
     values.update(
@@ -191,11 +189,13 @@ def select_asset(
 
     if asset is None:
         asset = Asset(scene_id=scene_id, **values)
+        scene.selected_asset = asset
         db.add(asset)
     else:
         old_paths = (asset.local_path, asset.local_preview_path)
         for field, value in values.items():
             setattr(asset, field, value)
+        scene.selected_asset = asset
         for relative_path in set(old_paths):
             if relative_path not in {
                 local_files.media.relative_path,
@@ -233,6 +233,7 @@ def remove_selected_asset(
     asset = db.scalar(select(Asset).where(Asset.scene_id == scene_id))
     paths = None if asset is None else (asset.local_path, asset.local_preview_path)
     if asset is not None:
+        scene.selected_asset = None
         db.delete(asset)
     scene.asset_status = "missing"
     update_project_asset_status(scene.project)
