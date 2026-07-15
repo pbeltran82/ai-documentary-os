@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import type { Project, ProjectCreate } from "./types";
+import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import type { Project, ProjectCreate, ProjectDetail, Scene, SceneUpdate } from "./types";
 
 const emptyProject: ProjectCreate = {
   title: "",
@@ -30,9 +31,11 @@ function formatDate(value: string): string {
 
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
   const [form, setForm] = useState<ProjectCreate>(emptyProject);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [projectLoading, setProjectLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -52,6 +55,18 @@ function App() {
     }
   }
 
+  async function refreshSelectedProject(projectId: number) {
+    setProjectLoading(true);
+    try {
+      setError("");
+      setSelectedProject(await api.getProject(projectId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load project");
+    } finally {
+      setProjectLoading(false);
+    }
+  }
+
   useEffect(() => {
     void refreshProjects();
   }, []);
@@ -62,10 +77,11 @@ function App() {
     setError("");
 
     try {
-      await api.createProject(form);
+      const project = await api.createProject(form);
       setForm(emptyProject);
       setShowForm(false);
       await refreshProjects();
+      await refreshSelectedProject(project.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create project");
     } finally {
@@ -79,9 +95,59 @@ function App() {
 
     try {
       await api.deleteProject(project.id);
+      if (selectedProject?.id === project.id) setSelectedProject(null);
       await refreshProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete project");
+    }
+  }
+
+  async function openProject(project: Project) {
+    await refreshSelectedProject(project.id);
+  }
+
+  async function generateScenes(narration: string, targetSeconds: number) {
+    if (!selectedProject) return;
+    try {
+      setError("");
+      await api.generateScenes(selectedProject.id, {
+        narration,
+        target_scene_seconds: targetSeconds,
+        replace_existing: true,
+      });
+      await Promise.all([
+        refreshSelectedProject(selectedProject.id),
+        refreshProjects(),
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to generate scenes");
+      throw err;
+    }
+  }
+
+  async function updateScene(sceneId: number, payload: SceneUpdate) {
+    if (!selectedProject) return;
+    try {
+      setError("");
+      await api.updateScene(sceneId, payload);
+      await refreshSelectedProject(selectedProject.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update scene");
+      throw err;
+    }
+  }
+
+  async function deleteScene(scene: Scene) {
+    if (!selectedProject) return;
+    const confirmed = window.confirm(`Delete Scene ${scene.scene_number}?`);
+    if (!confirmed) return;
+
+    try {
+      setError("");
+      await api.deleteScene(scene.id);
+      await refreshSelectedProject(selectedProject.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete scene");
     }
   }
 
@@ -98,113 +164,138 @@ function App() {
         </div>
 
         <nav className="nav-list" aria-label="Primary navigation">
-          <button className="nav-item active">Mission Control</button>
-          <button className="nav-item" disabled>Research Library · Soon</button>
+          <button
+            className={`nav-item ${selectedProject ? "" : "active"}`}
+            onClick={() => setSelectedProject(null)}
+          >
+            Mission Control
+          </button>
+          <button className={`nav-item ${selectedProject ? "active" : ""}`} disabled={!selectedProject}>
+            Scene Engine {selectedProject ? "· Active" : ""}
+          </button>
           <button className="nav-item" disabled>Asset Planner · Soon</button>
           <button className="nav-item" disabled>Timeline Builder · Soon</button>
         </nav>
 
         <div className="sidebar-footer">
-          <span>v0.1.0</span>
-          <span>Foundation</span>
+          <span>v0.2.0</span>
+          <span>Scene Engine</span>
         </div>
       </aside>
 
-      <main className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">MISSION CONTROL</p>
-            <h2>What documentary are we making today?</h2>
-          </div>
-          <button className="primary-button" onClick={() => setShowForm(true)}>
-            + New documentary
-          </button>
-        </header>
-
-        {error && <div className="error-banner">{error}</div>}
-
-        <section className="stats-grid" aria-label="Project overview">
-          <article className="stat-card">
-            <span>Projects</span>
-            <strong>{projects.length}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Planned runtime</span>
-            <strong>{totalMinutes} min</strong>
-          </article>
-          <article className="stat-card accent">
-            <span>Current focus</span>
-            <strong>Foundation</strong>
-          </article>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
+      {selectedProject ? (
+        <ProjectWorkspace
+          project={selectedProject}
+          loading={projectLoading}
+          error={error}
+          onBack={() => setSelectedProject(null)}
+          onGenerate={generateScenes}
+          onUpdateScene={updateScene}
+          onDeleteScene={deleteScene}
+        />
+      ) : (
+        <main className="workspace">
+          <header className="topbar">
             <div>
-              <p className="eyebrow">BIRD’S-EYE VIEW</p>
-              <h3>The documentary production pipeline</h3>
+              <p className="eyebrow">MISSION CONTROL</p>
+              <h2>What documentary are we making today?</h2>
             </div>
-            <span className="status-pill">2 major pains identified</span>
-          </div>
+            <button className="primary-button" onClick={() => setShowForm(true)}>
+              + New documentary
+            </button>
+          </header>
 
-          <div className="pipeline-grid">
-            {pipeline.map((stage, index) => (
-              <article className="pipeline-card" key={stage.name}>
-                <span className="stage-number">{String(index + 1).padStart(2, "0")}</span>
-                <h4>{stage.name}</h4>
-                <p>{stage.description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+          {error && <div className="error-banner">{error}</div>}
 
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">PROJECTS</p>
-              <h3>Recent documentaries</h3>
+          <section className="stats-grid" aria-label="Project overview">
+            <article className="stat-card">
+              <span>Projects</span>
+              <strong>{projects.length}</strong>
+            </article>
+            <article className="stat-card">
+              <span>Planned runtime</span>
+              <strong>{totalMinutes} min</strong>
+            </article>
+            <article className="stat-card accent">
+              <span>Current focus</span>
+              <strong>Scene Engine</strong>
+            </article>
+          </section>
+
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">BIRD’S-EYE VIEW</p>
+                <h3>The documentary production pipeline</h3>
+              </div>
+              <span className="status-pill">Phase 2 active</span>
             </div>
-            <span className="subtle-text">
-              {loading ? "Loading…" : `${projects.length} total`}
-            </span>
-          </div>
 
-          {!loading && projects.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🎬</div>
-              <h4>Your production slate is empty.</h4>
-              <p>Create the first documentary project and begin building the workflow.</p>
-              <button className="secondary-button" onClick={() => setShowForm(true)}>
-                Create first project
-              </button>
-            </div>
-          ) : (
-            <div className="project-grid">
-              {projects.map((project) => (
-                <article className="project-card" key={project.id}>
-                  <div className="project-card-top">
-                    <span className="status-pill">{project.status}</span>
-                    <button
-                      className="icon-button"
-                      aria-label={`Delete ${project.title}`}
-                      onClick={() => void handleDelete(project)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <h4>{project.title}</h4>
-                  <p>{project.topic}</p>
-                  <div className="project-meta">
-                    <span>{project.target_minutes} min</span>
-                    <span>{project.tone}</span>
-                    <span>{formatDate(project.created_at)}</span>
-                  </div>
+            <div className="pipeline-grid">
+              {pipeline.map((stage, index) => (
+                <article
+                  className={`pipeline-card ${stage.name === "Scenes" ? "active-stage" : ""}`}
+                  key={stage.name}
+                >
+                  <span className="stage-number">{String(index + 1).padStart(2, "0")}</span>
+                  <h4>{stage.name}</h4>
+                  <p>{stage.description}</p>
                 </article>
               ))}
             </div>
-          )}
-        </section>
-      </main>
+          </section>
+
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">PROJECTS</p>
+                <h3>Recent documentaries</h3>
+              </div>
+              <span className="subtle-text">
+                {loading ? "Loading…" : `${projects.length} total`}
+              </span>
+            </div>
+
+            {!loading && projects.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🎬</div>
+                <h4>Your production slate is empty.</h4>
+                <p>Create the first documentary project and begin building the workflow.</p>
+                <button className="secondary-button" onClick={() => setShowForm(true)}>
+                  Create first project
+                </button>
+              </div>
+            ) : (
+              <div className="project-grid">
+                {projects.map((project) => (
+                  <article className="project-card" key={project.id}>
+                    <div className="project-card-top">
+                      <span className="status-pill">{project.status}</span>
+                      <button
+                        className="icon-button"
+                        aria-label={`Delete ${project.title}`}
+                        onClick={() => void handleDelete(project)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <h4>{project.title}</h4>
+                    <p>{project.topic}</p>
+                    <div className="project-meta">
+                      <span>{project.target_minutes} min</span>
+                      <span>{project.tone}</span>
+                      <span>{formatDate(project.created_at)}</span>
+                    </div>
+                    <button className="project-open-button" onClick={() => void openProject(project)}>
+                      Open Scene Engine →
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+      )}
 
       {showForm && (
         <div className="modal-backdrop" role="presentation">
