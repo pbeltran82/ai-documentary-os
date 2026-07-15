@@ -7,14 +7,18 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.1 Foundation
+## Current milestone: v0.2 Scene Engine
 
-The first working application includes:
+The working application now includes:
 
 - a React + TypeScript mission-control dashboard,
 - a FastAPI backend,
-- local SQLite project storage,
+- local SQLite project and scene storage,
 - documentary project creation, listing, and deletion,
+- a dedicated Scene Engine workspace,
+- narration-to-scene breakdown with estimated timing,
+- editable visual intent, search keywords, preferred asset type, and asset status,
+- automatic timestamp recalculation after edits and deletions,
 - the complete production pipeline at a bird's-eye view,
 - a living master plan and creator pain log.
 
@@ -59,6 +63,17 @@ Open:
 
 Press `Control+C` in Terminal to stop both services.
 
+## Using the Scene Engine
+
+1. Create or open a documentary project.
+2. Select **Open Scene Engine**.
+3. Paste the narration or finished voiceover script.
+4. Choose the desired visual-slot duration—five seconds is a practical starting point.
+5. Generate the scene plan.
+6. Review and edit timing, visual intent, search keywords, asset type, and asset status.
+
+The current splitter is deterministic and local. It estimates narration timing at roughly 150 words per minute and creates structured scene records without using a paid AI API.
+
 ## Manual startup
 
 Backend:
@@ -93,4 +108,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next major milestone is the **Scene Engine**, which will split narration into timed scene records and create the foundation for stock-media search and automatic timeline assembly.
+The next major milestone is the **Asset Planner**, which will use each scene's narration, visual intent, and keywords to find suitable stock-media candidates and prepare automatic timeline assembly.

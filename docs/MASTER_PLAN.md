@@ -34,7 +34,7 @@ Reduce the time and friction required to produce documentaries by automating rep
 
 ## Roadmap
 
-### Phase 1 — Foundation
+### Phase 1 — Foundation ✅
 
 - Local FastAPI backend
 - React mission-control dashboard
@@ -42,16 +42,17 @@ Reduce the time and friction required to produce documentaries by automating rep
 - Documentary project creation
 - Bird's-eye production pipeline
 
-### Phase 2 — Scene Engine
+### Phase 2 — Scene Engine 🚧
 
 - Import narration or script
 - Split narration into timed scenes
-- Store keywords, emotion, people, location, and visual intent per scene
-- Review and edit scene boundaries
+- Store search keywords, visual intent, preferred asset type, and asset status
+- Review and edit scene timing and metadata
+- Recalculate downstream timestamps after edits or deletion
 
 ### Phase 3 — Asset Planner
 
-- Generate search queries from each scene
+- Generate richer search queries from each scene
 - Search stock-media providers
 - Preview and attach candidate assets
 - Track license and attribution metadata
@@ -74,15 +75,16 @@ Reduce the time and friction required to produce documentaries by automating rep
 
 ## Current sprint
 
-**Sprint 1: Foundation**
+**Sprint 2: Scene Engine**
 
 Definition of done:
 
-- The backend starts locally and exposes `/health` and `/api/projects`.
-- The frontend starts locally at `http://localhost:5173`.
-- A documentary project can be created, saved in SQLite, listed, and deleted.
-- The dashboard displays the complete production pipeline and current priorities.
+- A project opens into a dedicated Scene Engine workspace.
+- Narration can be pasted and split into estimated visual slots.
+- Each scene stores timing, narration, visual intent, keywords, visual type, and asset status.
+- Scene edits persist in SQLite.
+- Changing duration or deleting a scene recalculates the remaining timeline.
 
 ## Next priority
 
-Build the Scene Engine around real narration timing, because scenes become the unit that connects audio, visuals, and timeline assembly.
+Connect the Scene Engine to a provider-independent Asset Planner, beginning with stock-media search suggestions and Pexels candidate results.

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Project
-from ..schemas import ProjectCreate, ProjectRead
+from ..schemas import ProjectCreate, ProjectDetail, ProjectRead
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -26,9 +26,14 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> Pro
     return project
 
 
-@router.get("/{project_id}", response_model=ProjectRead)
+@router.get("/{project_id}", response_model=ProjectDetail)
 def get_project(project_id: int, db: Session = Depends(get_db)) -> Project:
-    project = db.get(Project, project_id)
+    statement = (
+        select(Project)
+        .options(selectinload(Project.scenes))
+        .where(Project.id == project_id)
+    )
+    project = db.scalar(statement)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
