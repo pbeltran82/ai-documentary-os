@@ -7,24 +7,20 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.2.1 Smart Scene Import
+## Current milestone: v0.3 Asset Planner MVP
 
 The working application now includes:
 
 - a React + TypeScript mission-control dashboard,
 - a FastAPI backend,
-- local SQLite project and scene storage,
+- local SQLite project, scene, and selected-asset storage,
 - documentary project creation, listing, and deletion,
-- a dedicated Scene Engine workspace,
-- plain-narration breakdown with estimated timing,
-- structured scene-plan import with labeled field detection,
-- supplied timecode, narration, visual-intent, keyword, asset-type, and status mapping,
-- editable scene production metadata,
-- automatic timestamp recalculation after edits and deletions,
-- the complete production pipeline at a bird's-eye view,
-- a living master plan and creator pain log.
-
-The repository's existing prompts, templates, workflows, and Episode 1 workspace remain part of the project and will be integrated into the application over time.
+- plain-narration breakdown and smart structured scene import,
+- editable timing, visual intent, keywords, asset type, and status,
+- scene-by-scene Pexels photo and video search,
+- visual preview, creator attribution, and selection,
+- a direct Pexels-search fallback when no API key is configured,
+- automatic visual-coverage tracking across the documentary.
 
 ## Architecture
 
@@ -49,8 +45,6 @@ chmod +x scripts/setup.sh scripts/dev.sh
 ./scripts/setup.sh
 ```
 
-This creates `backend/.venv`, installs Python dependencies, and runs `npm install` in the frontend.
-
 ## Start the application
 
 ```bash
@@ -68,13 +62,10 @@ Press `Control+C` in Terminal to stop both services.
 ## Using the Scene Engine
 
 1. Create or open a documentary project.
-2. Select **Open Scene Engine**.
-3. Paste either plain narration or a structured scene plan.
-4. Choose the desired fallback visual-slot duration—five seconds is a practical starting point.
-5. Generate or import the scene plan.
-6. Review and edit timing, visual intent, search keywords, asset type, and asset status.
-
-Plain narration is split deterministically and locally at roughly 150 spoken words per minute. Structured plans are detected and mapped into the correct fields instead of treating production labels as voiceover text.
+2. Paste either plain narration or a structured scene plan.
+3. Choose the fallback visual-slot duration.
+4. Generate or import the scene plan.
+5. Review and edit the resulting scene records.
 
 Supported structured format:
 
@@ -88,24 +79,21 @@ Preferred visual: Stock video
 Asset status: Missing
 ```
 
-The importer also accepts `Voiceover`, `Search keywords`, `Asset type`, and simple Markdown headings or labels.
+## Connecting Pexels
 
-## Manual startup
+Pexels requires an API key sent through the `Authorization` header. Keep that key only on your Mac.
 
-Backend:
+1. Create or open `backend/.env`.
+2. Add:
 
-```bash
-cd backend
-source .venv/bin/activate
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```text
+PEXELS_API_KEY=your_key_here
 ```
 
-Frontend, in a second terminal:
+3. Restart `./scripts/dev.sh`.
+4. Open a project, enter the Asset Planner, select a scene, and search.
 
-```bash
-cd frontend
-npm run dev
-```
+The app displays a prominent Pexels link and creator attribution. Without a key, it still generates a direct Pexels search link for the scene.
 
 ## Local data
 
@@ -115,7 +103,7 @@ The SQLite database is created at:
 backend/data/documentary_os.db
 ```
 
-It is intentionally excluded from Git.
+Secrets, the database, downloaded media, and generated exports are excluded from Git.
 
 ## Product direction
 
@@ -124,4 +112,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next major milestone is the **Asset Planner**, which will use each scene's narration, visual intent, and keywords to find suitable stock-media candidates and prepare automatic timeline assembly.
+The next major milestone is **asset downloading and local media organization**, followed by the first automatic timeline manifest.
