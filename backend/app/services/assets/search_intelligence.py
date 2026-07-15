@@ -82,11 +82,11 @@ def rewrite_abstract_phrase(phrase: str, media_type: str) -> str:
     return phrase
 
 
-def phrase_score(phrase: str) -> tuple[int, int, int]:
+def phrase_score(phrase: str) -> tuple[int, int]:
     words = tokens(phrase)
     visual_count = len(words & VISUAL_WORDS)
     abstract_count = len(words & ABSTRACT_WORDS)
-    return visual_count - abstract_count, visual_count, -len(words)
+    return visual_count - abstract_count, visual_count
 
 
 def too_similar(left: str, right: str) -> bool:
