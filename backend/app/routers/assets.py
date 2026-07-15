@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Asset, Scene
+from ..models import Asset, Project, Scene
 from ..schemas import (
     AssetRead,
     AssetSearchResponse,
     AssetSelect,
     ProviderStatusResponse,
+    TimelineManifestResponse,
 )
 from ..services.assets import PROVIDERS
 from ..services.assets.common import public_search_url
 from ..services.assets.search_intelligence import build_search_plan
+from ..services.media_library import (
+    download_candidate,
+    resolve_media_path,
+    write_timeline_manifest,
+)
 
 router = APIRouter(tags=["assets"])
 
@@ -26,6 +34,13 @@ def get_scene_or_404(scene_id: int, db: Session) -> Scene:
     return scene
 
 
+def get_project_or_404(project_id: int, db: Session) -> Project:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
 def default_query(scene: Scene) -> str:
     keywords = [keyword.strip() for keyword in scene.search_keywords if keyword.strip()]
     if keywords:
@@ -33,6 +48,16 @@ def default_query(scene: Scene) -> str:
     if scene.visual_intent.strip():
         return scene.visual_intent.strip()
     return scene.narration.strip()
+
+
+def update_project_asset_status(project: Project) -> None:
+    if project.scenes and all(
+        scene.asset_status == "ready" and scene.selected_asset is not None
+        for scene in project.scenes
+    ):
+        project.status = "timeline"
+    else:
+        project.status = "assets"
 
 
 @router.get("/providers/status", response_model=list[ProviderStatusResponse])
@@ -137,22 +162,71 @@ def select_asset(
     provider = PROVIDERS.get(payload.provider)
     if provider is None:
         raise HTTPException(status_code=422, detail="Unknown asset provider")
-    if provider.track_selection is not None:
-        provider.track_selection(payload.provider_asset_id)
+
+    local_files = download_candidate(scene, payload)
+    new_paths = {
+        local_files.media.relative_path,
+        local_files.preview.relative_path,
+    }
+    try:
+        if provider.track_selection is not None:
+            provider.track_selection(payload.provider_asset_id)
+    except Exception:
+        for relative_path in new_paths:
+            path = resolve_media_path(relative_path)
+            if path is not None:
+                path.unlink(missing_ok=True)
+        raise
 
     asset = db.scalar(select(Asset).where(Asset.scene_id == scene_id))
+    old_paths: tuple[str, str] = ("", "")
     values = payload.model_dump()
+    remote_download_url = values["download_url"]
+    values.update(
+        {
+            "preview_url": local_files.preview.public_url,
+            "download_url": local_files.media.public_url,
+        }
+    )
+
     if asset is None:
         asset = Asset(scene_id=scene_id, **values)
+        scene.selected_asset = asset
         db.add(asset)
     else:
+        old_paths = (asset.local_path, asset.local_preview_path)
         for field, value in values.items():
             setattr(asset, field, value)
+        scene.selected_asset = asset
 
-    scene.asset_status = "selected"
-    scene.project.status = "assets"
-    db.commit()
+    asset.remote_download_url = remote_download_url
+    asset.local_path = local_files.media.relative_path
+    asset.local_preview_path = local_files.preview.relative_path
+    asset.content_type = local_files.media.content_type
+    asset.file_size_bytes = local_files.media.size_bytes
+    asset.checksum_sha256 = local_files.media.checksum_sha256
+    asset.downloaded_at = datetime.now(timezone.utc)
+
+    scene.asset_status = "ready"
+    update_project_asset_status(scene.project)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        for relative_path in new_paths:
+            if relative_path not in set(old_paths):
+                path = resolve_media_path(relative_path)
+                if path is not None:
+                    path.unlink(missing_ok=True)
+        raise
+
     db.refresh(asset)
+    for relative_path in set(old_paths):
+        if relative_path and relative_path not in new_paths:
+            path = resolve_media_path(relative_path)
+            if path is not None:
+                path.unlink(missing_ok=True)
+    write_timeline_manifest(scene.project)
     return asset
 
 
@@ -166,8 +240,35 @@ def remove_selected_asset(
 ) -> Response:
     scene = get_scene_or_404(scene_id, db)
     asset = db.scalar(select(Asset).where(Asset.scene_id == scene_id))
+    paths = None if asset is None else (asset.local_path, asset.local_preview_path)
     if asset is not None:
-        db.delete(asset)
+        scene.selected_asset = None
     scene.asset_status = "missing"
+    update_project_asset_status(scene.project)
     db.commit()
+
+    if paths is not None:
+        for relative_path in set(paths):
+            path = resolve_media_path(relative_path)
+            if path is not None:
+                path.unlink(missing_ok=True)
+    write_timeline_manifest(scene.project)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/projects/{project_id}/timeline-manifest",
+    response_model=TimelineManifestResponse,
+)
+def generate_timeline_manifest(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> TimelineManifestResponse:
+    project = get_project_or_404(project_id, db)
+    relative_path, public_url, manifest = write_timeline_manifest(project)
+    return TimelineManifestResponse(
+        project_id=project.id,
+        relative_path=relative_path,
+        public_url=public_url,
+        manifest=manifest,
+    )

@@ -90,6 +90,7 @@ class Asset(Base):
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     preview_url: Mapped[str] = mapped_column(Text, nullable=False)
     download_url: Mapped[str] = mapped_column(Text, nullable=False)
+    remote_download_url: Mapped[str] = mapped_column(Text, default="", nullable=False)
     creator: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     creator_url: Mapped[str] = mapped_column(Text, default="", nullable=False)
     width: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -98,6 +99,14 @@ class Asset(Base):
     license_name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     license_url: Mapped[str] = mapped_column(Text, default="", nullable=False)
     attribution: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    local_path: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    local_preview_path: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    checksum_sha256: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    downloaded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )

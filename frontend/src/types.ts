@@ -28,6 +28,7 @@ export interface SelectedAsset {
   source_url: string;
   preview_url: string;
   download_url: string;
+  remote_download_url: string;
   creator: string;
   creator_url: string;
   width: number;
@@ -36,6 +37,12 @@ export interface SelectedAsset {
   license_name: string;
   license_url: string;
   attribution: string;
+  local_path: string;
+  local_preview_path: string;
+  content_type: string;
+  file_size_bytes: number;
+  checksum_sha256: string;
+  downloaded_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -140,4 +147,11 @@ export interface SceneUpdate {
   search_keywords?: string[];
   preferred_asset_type?: AssetType;
   asset_status?: AssetStatus;
+}
+
+export interface TimelineManifestResponse {
+  project_id: number;
+  relative_path: string;
+  public_url: string;
+  manifest: Record<string, unknown>;
 }
