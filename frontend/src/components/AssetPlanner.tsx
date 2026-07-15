@@ -4,8 +4,9 @@ import type {
   AssetCandidate,
   AssetSearchResponse,
   MediaType,
-  PexelsStatus,
   ProjectDetail,
+  ProviderName,
+  ProviderStatus,
   Scene,
 } from "../types";
 
@@ -17,6 +18,14 @@ interface AssetPlannerProps {
   onOpenScenes: () => void;
   onRefreshProject: () => Promise<void>;
 }
+
+const providerFallbackLabels: Record<ProviderName, string> = {
+  pixabay: "Pixabay",
+  unsplash: "Unsplash",
+  wikimedia: "Wikimedia Commons",
+  nasa: "NASA Images",
+  pexels: "Pexels",
+};
 
 function sceneQuery(scene: Scene): string {
   if (scene.search_keywords.length > 0) {
@@ -32,6 +41,21 @@ function formatTime(seconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
 }
 
+function defaultProvider(mediaType: MediaType): ProviderName {
+  return mediaType === "video" ? "pixabay" : "unsplash";
+}
+
+function mediaLabel(mediaType: MediaType): string {
+  return mediaType === "video" ? "Stock video" : "Stock photo";
+}
+
+function dimensionsLabel(candidate: AssetCandidate): string {
+  if (candidate.width > 0 && candidate.height > 0) {
+    return `${candidate.width}×${candidate.height}`;
+  }
+  return "Source resolution";
+}
+
 export function AssetPlanner({
   project,
   loading,
@@ -45,7 +69,8 @@ export function AssetPlanner({
   );
   const [query, setQuery] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("video");
-  const [status, setStatus] = useState<PexelsStatus | null>(null);
+  const [provider, setProvider] = useState<ProviderName>("pixabay");
+  const [statuses, setStatuses] = useState<ProviderStatus[]>([]);
   const [results, setResults] = useState<AssetSearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
@@ -62,24 +87,45 @@ export function AssetPlanner({
       ? 0
       : Math.round((selectedCount / project.scenes.length) * 100);
 
+  const activeStatus = statuses.find((item) => item.provider === provider) ?? null;
+  const compatibleStatuses = statuses.filter((item) =>
+    item.supports_media_types.includes(mediaType),
+  );
+  const activeProviderLabel =
+    activeStatus?.label ?? providerFallbackLabels[provider];
+
   useEffect(() => {
     void api
-      .getPexelsStatus()
-      .then(setStatus)
+      .getProviderStatuses()
+      .then(setStatuses)
       .catch((err: unknown) =>
-        setLocalError(err instanceof Error ? err.message : "Unable to check Pexels"),
+        setLocalError(err instanceof Error ? err.message : "Unable to check providers"),
       );
   }, []);
 
   useEffect(() => {
     if (!activeScene) return;
+    const nextMediaType: MediaType =
+      activeScene.preferred_asset_type === "stock_image" ? "photo" : "video";
     setQuery(sceneQuery(activeScene));
-    setMediaType(
-      activeScene.preferred_asset_type === "stock_image" ? "photo" : "video",
-    );
+    setMediaType(nextMediaType);
+    setProvider(defaultProvider(nextMediaType));
     setResults(null);
     setLocalError("");
   }, [activeScene?.id]);
+
+  useEffect(() => {
+    const current = statuses.find((item) => item.provider === provider);
+    if (current && !current.supports_media_types.includes(mediaType)) {
+      const fallback = statuses.find(
+        (item) =>
+          item.supports_media_types.includes(mediaType) &&
+          (item.configured || !item.requires_key),
+      );
+      setProvider(fallback?.provider ?? defaultProvider(mediaType));
+      setResults(null);
+    }
+  }, [mediaType, provider, statuses]);
 
   async function search() {
     if (!activeScene || query.trim().length < 2) return;
@@ -88,12 +134,15 @@ export function AssetPlanner({
     try {
       setResults(
         await api.searchAssets(activeScene.id, {
+          provider,
           query: query.trim(),
           media_type: mediaType,
         }),
       );
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : "Unable to search Pexels");
+      setLocalError(
+        err instanceof Error ? err.message : `Unable to search ${activeProviderLabel}`,
+      );
     } finally {
       setSearching(false);
     }
@@ -101,7 +150,8 @@ export function AssetPlanner({
 
   async function selectCandidate(candidate: AssetCandidate) {
     if (!activeScene) return;
-    setSelectingId(candidate.provider_asset_id);
+    const candidateKey = `${candidate.provider}-${candidate.provider_asset_id}`;
+    setSelectingId(candidateKey);
     setLocalError("");
     try {
       await api.selectAsset(activeScene.id, candidate);
@@ -124,6 +174,19 @@ export function AssetPlanner({
     }
   }
 
+  function changeMediaType(nextMediaType: MediaType) {
+    setMediaType(nextMediaType);
+    setProvider(defaultProvider(nextMediaType));
+    setResults(null);
+    setLocalError("");
+  }
+
+  function changeProvider(nextProvider: ProviderName) {
+    setProvider(nextProvider);
+    setResults(null);
+    setLocalError("");
+  }
+
   if (!activeScene) {
     return (
       <main className="workspace">
@@ -139,20 +202,26 @@ export function AssetPlanner({
     );
   }
 
+  const selectedAsset = activeScene.selected_asset;
+  const selectedProviderLabel = selectedAsset
+    ? statuses.find((item) => item.provider === selectedAsset.provider)?.label ??
+      providerFallbackLabels[selectedAsset.provider]
+    : "";
+
   return (
     <main className="workspace asset-workspace">
       <header className="project-topbar">
         <div>
           <button className="back-button" onClick={onBack}>← Mission Control</button>
-          <p className="eyebrow">ASSET PLANNER</p>
+          <p className="eyebrow">MULTI-PROVIDER ASSET PLANNER</p>
           <h2>{project.title}</h2>
           <p className="project-summary">
-            Search, preview, attribute, and attach a visual to every timed scene.
+            Search multiple visual libraries, preserve source rights, and attach one approved visual to every timed scene.
           </p>
         </div>
         <div className="header-actions">
           <button className="ghost-button" onClick={onOpenScenes}>Scene Engine</button>
-          <span className="status-pill">Pexels MVP v0.3</span>
+          <span className="status-pill">Provider Hub v0.4</span>
         </div>
       </header>
 
@@ -177,6 +246,21 @@ export function AssetPlanner({
           <span>Coverage</span>
           <strong>{completionPercent}%</strong>
         </article>
+      </section>
+
+      <section className="provider-overview" aria-label="Connected asset providers">
+        {statuses.map((item) => (
+          <article
+            key={item.provider}
+            className={`provider-status-card ${item.configured ? "ready" : "waiting"}`}
+          >
+            <div>
+              <strong>{item.label}</strong>
+              <span>{item.supports_media_types.map(mediaLabel).join(" · ")}</span>
+            </div>
+            <span>{item.configured ? "Ready" : item.requires_key ? "Key needed" : "Available"}</span>
+          </article>
+        ))}
       </section>
 
       <div className="asset-layout">
@@ -232,12 +316,12 @@ export function AssetPlanner({
             </div>
           </article>
 
-          {activeScene.selected_asset && (
+          {selectedAsset && (
             <article className="panel selected-asset-panel">
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">SELECTED VISUAL</p>
-                  <h3>Attached to this scene</h3>
+                  <h3>{selectedProviderLabel} asset attached</h3>
                 </div>
                 <button className="danger-button" onClick={() => void removeSelection()}>
                   Remove
@@ -245,32 +329,43 @@ export function AssetPlanner({
               </div>
               <div className="selected-asset-card">
                 <img
-                  src={activeScene.selected_asset.preview_url}
-                  alt={`Selected ${activeScene.selected_asset.media_type}`}
+                  src={selectedAsset.preview_url}
+                  alt={`Selected ${selectedAsset.media_type} from ${selectedProviderLabel}`}
                 />
                 <div>
                   <strong>
-                    {activeScene.selected_asset.media_type === "video" ? "Video" : "Photo"} ·{" "}
-                    {activeScene.selected_asset.width}×{activeScene.selected_asset.height}
+                    {selectedAsset.media_type === "video" ? "Video" : "Photo"}
+                    {selectedAsset.width > 0
+                      ? ` · ${selectedAsset.width}×${selectedAsset.height}`
+                      : ""}
                   </strong>
                   <p>
                     By{" "}
-                    <a href={activeScene.selected_asset.creator_url} target="_blank" rel="noreferrer">
-                      {activeScene.selected_asset.creator || "Pexels creator"}
+                    <a href={selectedAsset.creator_url} target="_blank" rel="noreferrer">
+                      {selectedAsset.creator || selectedProviderLabel}
                     </a>
                   </p>
+                  <div className="license-note">
+                    <span>Rights record</span>
+                    <strong>{selectedAsset.attribution || selectedAsset.license_name}</strong>
+                    {selectedAsset.license_url && (
+                      <a href={selectedAsset.license_url} target="_blank" rel="noreferrer">
+                        {selectedAsset.license_name || "View usage terms"}
+                      </a>
+                    )}
+                  </div>
                   <div className="candidate-actions">
                     <a
                       className="ghost-link"
-                      href={activeScene.selected_asset.source_url}
+                      href={selectedAsset.source_url}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Open on Pexels
+                      Open source page
                     </a>
                     <a
                       className="ghost-link"
-                      href={activeScene.selected_asset.download_url}
+                      href={selectedAsset.download_url}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -285,17 +380,32 @@ export function AssetPlanner({
           <article className="panel">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">PEXELS SEARCH</p>
+                <p className="eyebrow">VISUAL SEARCH</p>
                 <h3>Find candidates for this scene</h3>
               </div>
-              <a
-                className="provider-link"
-                href="https://www.pexels.com"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Media provided by Pexels
-              </a>
+              {activeStatus && (
+                <a
+                  className="provider-link"
+                  href={activeStatus.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Visit {activeStatus.label}
+                </a>
+              )}
+            </div>
+
+            <div className="provider-picker">
+              {compatibleStatuses.map((item) => (
+                <button
+                  key={item.provider}
+                  className={`provider-choice ${provider === item.provider ? "active" : ""}`}
+                  onClick={() => changeProvider(item.provider)}
+                >
+                  <strong>{item.label}</strong>
+                  <span>{item.configured ? "Ready" : "Manual search"}</span>
+                </button>
+              ))}
             </div>
 
             <div className="asset-search-controls">
@@ -307,7 +417,7 @@ export function AssetPlanner({
                 Media type
                 <select
                   value={mediaType}
-                  onChange={(event) => setMediaType(event.target.value as MediaType)}
+                  onChange={(event) => changeMediaType(event.target.value as MediaType)}
                 >
                   <option value="video">Stock video</option>
                   <option value="photo">Stock photo</option>
@@ -318,34 +428,34 @@ export function AssetPlanner({
                 disabled={searching || loading || query.trim().length < 2}
                 onClick={() => void search()}
               >
-                {searching ? "Searching…" : "Search Pexels"}
+                {searching ? "Searching…" : `Search ${activeProviderLabel}`}
               </button>
             </div>
 
-            {status && !status.configured && (
+            {activeStatus && !activeStatus.configured && (
               <div className="setup-card">
                 <div>
-                  <p className="eyebrow">ONE-TIME SETUP</p>
-                  <h4>Connect your free Pexels API key</h4>
-                  <p>{status.setup_hint}</p>
+                  <p className="eyebrow">PROVIDER NOT CONNECTED</p>
+                  <h4>{activeStatus.label} will use manual-search mode</h4>
+                  <p>{activeStatus.setup_hint}</p>
                 </div>
-                <code>PEXELS_API_KEY=your_key_here</code>
-                <p>
-                  Until connected, the planner still creates a direct Pexels search link.
-                </p>
+                <p>The other connected and no-key providers remain fully usable.</p>
               </div>
             )}
 
             {results && !results.configured && (
               <div className="manual-search-card">
-                <p>The local API key is not configured yet.</p>
+                <div>
+                  <strong>{activeProviderLabel} is not connected locally.</strong>
+                  <p>Open the prepared provider search while the API remains optional.</p>
+                </div>
                 <a
                   className="secondary-button link-button"
                   href={results.source_url}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Search this scene directly on Pexels →
+                  Search directly →
                 </a>
               </div>
             )}
@@ -354,7 +464,7 @@ export function AssetPlanner({
               <>
                 <div className="result-summary">
                   <span>
-                    {results.candidates.length} candidates for “{results.query}”
+                    {results.candidates.length} {activeProviderLabel} candidates for “{results.query}”
                   </span>
                   {results.rate_limit_remaining !== null && (
                     <span>{results.rate_limit_remaining} API requests remaining</span>
@@ -363,58 +473,68 @@ export function AssetPlanner({
                 {results.candidates.length === 0 ? (
                   <div className="empty-state compact-empty">
                     <h4>No matching media found.</h4>
-                    <p>Try a shorter or more concrete search phrase.</p>
+                    <p>Try a shorter phrase or switch providers.</p>
                   </div>
                 ) : (
                   <div className="candidate-grid">
-                    {results.candidates.map((candidate) => (
-                      <article
-                        className="candidate-card"
-                        key={`${candidate.media_type}-${candidate.provider_asset_id}`}
-                      >
-                        <div className="candidate-preview">
-                          <img
-                            src={candidate.preview_url}
-                            alt={`Pexels candidate by ${candidate.creator}`}
-                            loading="lazy"
-                          />
-                          <span>{candidate.media_type}</span>
-                        </div>
-                        <div className="candidate-body">
-                          <strong>
-                            {candidate.width}×{candidate.height}
-                            {candidate.duration_seconds
-                              ? ` · ${Math.round(candidate.duration_seconds)}s`
-                              : ""}
-                          </strong>
-                          <p>
-                            By{" "}
-                            <a href={candidate.creator_url} target="_blank" rel="noreferrer">
-                              {candidate.creator || "Pexels creator"}
-                            </a>
-                          </p>
-                          <div className="candidate-actions">
-                            <a
-                              className="ghost-link"
-                              href={candidate.source_url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Preview
-                            </a>
-                            <button
-                              className="secondary-button"
-                              disabled={selectingId === candidate.provider_asset_id}
-                              onClick={() => void selectCandidate(candidate)}
-                            >
-                              {selectingId === candidate.provider_asset_id
-                                ? "Selecting…"
-                                : "Select visual"}
-                            </button>
+                    {results.candidates.map((candidate) => {
+                      const candidateKey = `${candidate.provider}-${candidate.provider_asset_id}`;
+                      const candidateProviderLabel =
+                        statuses.find((item) => item.provider === candidate.provider)?.label ??
+                        providerFallbackLabels[candidate.provider];
+                      return (
+                        <article className="candidate-card" key={candidateKey}>
+                          <div className="candidate-preview">
+                            <img
+                              src={candidate.preview_url}
+                              alt={`${candidateProviderLabel} candidate by ${candidate.creator}`}
+                              loading="lazy"
+                            />
+                            <span>{candidate.media_type}</span>
+                            <span className="provider-badge">{candidateProviderLabel}</span>
                           </div>
-                        </div>
-                      </article>
-                    ))}
+                          <div className="candidate-body">
+                            <strong>
+                              {dimensionsLabel(candidate)}
+                              {candidate.duration_seconds
+                                ? ` · ${Math.round(candidate.duration_seconds)}s`
+                                : ""}
+                            </strong>
+                            <p>
+                              By{" "}
+                              <a href={candidate.creator_url} target="_blank" rel="noreferrer">
+                                {candidate.creator || candidateProviderLabel}
+                              </a>
+                            </p>
+                            <div className="candidate-license">
+                              <span>{candidate.license_name || "Review source terms"}</span>
+                              {candidate.license_url && (
+                                <a href={candidate.license_url} target="_blank" rel="noreferrer">
+                                  Rights
+                                </a>
+                              )}
+                            </div>
+                            <div className="candidate-actions">
+                              <a
+                                className="ghost-link"
+                                href={candidate.source_url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Source
+                              </a>
+                              <button
+                                className="secondary-button"
+                                disabled={selectingId === candidateKey}
+                                onClick={() => void selectCandidate(candidate)}
+                              >
+                                {selectingId === candidateKey ? "Selecting…" : "Select visual"}
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
               </>
