@@ -7,7 +7,7 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.5 Local Asset Intake
+## Current milestone: v0.6 Timeline Builder
 
 The working application now includes:
 
@@ -24,10 +24,11 @@ The working application now includes:
 - optional Pexels search when a key becomes available,
 - strict visual-relevance filtering for stock results,
 - local downloading of every selected visual,
-- local video-poster storage,
-- SHA-256, content type, and file-size records,
-- source, creator, license, rights, and attribution preservation,
-- an automatically refreshed timeline manifest for first assembly.
+- SHA-256, content type, file size, source, creator, license, and attribution records,
+- an automatically refreshed timeline manifest,
+- scene-by-scene assembly planning,
+- reproducible FFmpeg render scripts,
+- a playable local 1080p silent first-cut preview.
 
 ## Architecture
 
@@ -35,7 +36,8 @@ The working application now includes:
 ai-documentary-os/
 ├── backend/                 FastAPI + SQLAlchemy + SQLite
 │   ├── app/services/assets  Replaceable media-provider adapters
-│   └── data/projects/       Local project media + timeline manifests
+│   ├── app/services/        Local intake + FFmpeg assembly engine
+│   └── data/projects/       Local media, manifests, plans, and renders
 ├── frontend/                React + TypeScript + Vite
 ├── docs/                    Master plan and creator pain log
 ├── episode-001/             Existing production workspace
@@ -54,6 +56,12 @@ chmod +x scripts/setup.sh scripts/dev.sh
 ./scripts/setup.sh
 ```
 
+The Timeline Builder requires FFmpeg:
+
+```bash
+brew install ffmpeg
+```
+
 ## Start the application
 
 ```bash
@@ -65,7 +73,7 @@ Open:
 - Dashboard: `http://localhost:5173`
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
-- Downloaded media: `http://localhost:8000/media/`
+- Downloaded media and renders: `http://localhost:8000/media/`
 
 Press `Control+C` in Terminal to stop both services.
 
@@ -121,7 +129,7 @@ The planner preserves the provider, creator, source page, original remote media 
 
 Selecting a visual downloads the media immediately and marks the scene `ready` only after the local copy succeeds.
 
-Files are organized predictably:
+The project workspace is organized predictably:
 
 ```text
 backend/data/projects/
@@ -130,21 +138,46 @@ backend/data/projects/
     │   ├── scene-001-pixabay-12345.mp4
     │   └── scene-001-pixabay-12345-poster.jpg
     └── timeline/
-        └── manifest.json
+        ├── manifest.json
+        ├── render-plan.json
+        ├── render.sh
+        └── first-cut.mp4
 ```
 
-The manifest includes scene timing, narration, local paths, checksums, source links, and rights metadata. It is refreshed whenever a selected asset is added or removed. It can also be regenerated through:
+The timeline manifest includes scene timing, narration, local paths, checksums, source links, and rights metadata. The render plan adds exact clip operations and the complete FFmpeg command.
+
+Timeline API endpoints:
 
 ```text
 POST /api/projects/{project_id}/timeline-manifest
+POST /api/projects/{project_id}/timeline/plan
+POST /api/projects/{project_id}/timeline/render
 ```
 
-Optional local-media settings in `backend/.env`:
+## Timeline Builder behavior
+
+For every ready scene, the assembly engine:
+
+1. loads the selected local media file,
+2. loops short video when needed,
+3. trims the source to the exact scene duration,
+4. scales and pads it to 1920×1080,
+5. converts it to 30 fps and `yuv420p`, and
+6. concatenates every scene in timeline order.
+
+The v0.6 first cut is intentionally silent. Narration, music, transitions, captions, and final export controls are later milestones.
+
+Optional local-media and render settings in `backend/.env`:
 
 ```text
 PUBLIC_BACKEND_URL=http://localhost:8000
 MEDIA_ROOT=./data/projects
 MAX_ASSET_DOWNLOAD_BYTES=524288000
+TIMELINE_OUTPUT_WIDTH=1920
+TIMELINE_OUTPUT_HEIGHT=1080
+TIMELINE_OUTPUT_FPS=30
+TIMELINE_RENDER_TIMEOUT_SECONDS=3600
+FFMPEG_BIN=ffmpeg
 ```
 
 ## Existing local databases
@@ -155,7 +188,7 @@ The database lives at:
 backend/data/documentary_os.db
 ```
 
-On startup, v0.5 safely adds the local-file metadata columns to an existing SQLite database. Existing projects, scenes, and rights records are preserved.
+Startup migrations remain additive. Existing projects, scenes, downloaded assets, and rights records are preserved.
 
 Secrets, the database, downloaded media, and generated exports are excluded from Git.
 
@@ -166,4 +199,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next major milestone is the **Timeline Builder**, which will consume the local manifest and create an automatic first assembly plan.
+The next milestone is **narration audio alignment**, followed by transitions, captions, music, and final export controls.

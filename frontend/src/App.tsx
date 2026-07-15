@@ -2,9 +2,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { AssetPlanner } from "./components/AssetPlanner";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { TimelineBuilder } from "./components/TimelineBuilder";
 import type { Project, ProjectCreate, ProjectDetail, Scene, SceneUpdate } from "./types";
 
-type WorkspaceMode = "scenes" | "assets";
+type WorkspaceMode = "scenes" | "assets" | "timeline";
 
 const emptyProject: ProjectCreate = {
   title: "",
@@ -164,7 +165,12 @@ function App() {
     setWorkspaceMode("scenes");
   }
 
-  const activePipelineStage = selectedProject && workspaceMode === "assets" ? "Assets" : "Scenes";
+  const activePipelineStage =
+    workspaceMode === "timeline"
+      ? "Timeline"
+      : workspaceMode === "assets"
+        ? "Assets"
+        : "Scenes";
 
   return (
     <div className="app-shell">
@@ -203,12 +209,20 @@ function App() {
           >
             Asset Planner {selectedProject && workspaceMode === "assets" ? "· Active" : ""}
           </button>
-          <button className="nav-item" disabled>Timeline Builder · Soon</button>
+          <button
+            className={`nav-item ${
+              selectedProject && workspaceMode === "timeline" ? "active" : ""
+            }`}
+            disabled={!selectedProject || selectedProject.scenes.length === 0}
+            onClick={() => setWorkspaceMode("timeline")}
+          >
+            Timeline Builder {selectedProject && workspaceMode === "timeline" ? "· Active" : ""}
+          </button>
         </nav>
 
         <div className="sidebar-footer">
-          <span>v0.3.0</span>
-          <span>Asset Planner</span>
+          <span>v0.6.0</span>
+          <span>Timeline Builder</span>
         </div>
       </aside>
 
@@ -221,6 +235,14 @@ function App() {
             onBack={returnToMissionControl}
             onOpenScenes={() => setWorkspaceMode("scenes")}
             onRefreshProject={() => refreshSelectedProject(selectedProject.id)}
+          />
+        ) : workspaceMode === "timeline" ? (
+          <TimelineBuilder
+            project={selectedProject}
+            loading={projectLoading}
+            error={error}
+            onBack={returnToMissionControl}
+            onOpenAssets={() => setWorkspaceMode("assets")}
           />
         ) : (
           <ProjectWorkspace
@@ -259,7 +281,7 @@ function App() {
             </article>
             <article className="stat-card accent">
               <span>Current focus</span>
-              <strong>Asset Planner</strong>
+              <strong>Timeline Builder</strong>
             </article>
           </section>
 
@@ -269,7 +291,7 @@ function App() {
                 <p className="eyebrow">BIRD’S-EYE VIEW</p>
                 <h3>The documentary production pipeline</h3>
               </div>
-              <span className="status-pill">Phase 3 active</span>
+              <span className="status-pill">Phase 4 active</span>
             </div>
 
             <div className="pipeline-grid">
