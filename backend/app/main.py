@@ -18,7 +18,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 
 @asynccontextmanager
