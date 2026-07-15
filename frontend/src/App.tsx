@@ -1,7 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
+import { AssetPlanner } from "./components/AssetPlanner";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import type { Project, ProjectCreate, ProjectDetail, Scene, SceneUpdate } from "./types";
+
+type WorkspaceMode = "scenes" | "assets";
 
 const emptyProject: ProjectCreate = {
   title: "",
@@ -32,6 +35,7 @@ function formatDate(value: string): string {
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("scenes");
   const [form, setForm] = useState<ProjectCreate>(emptyProject);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,11 +59,13 @@ function App() {
     }
   }
 
-  async function refreshSelectedProject(projectId: number) {
+  async function refreshSelectedProject(projectId?: number) {
+    const id = projectId ?? selectedProject?.id;
+    if (!id) return;
     setProjectLoading(true);
     try {
       setError("");
-      setSelectedProject(await api.getProject(projectId));
+      setSelectedProject(await api.getProject(id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load project");
     } finally {
@@ -80,6 +86,7 @@ function App() {
       const project = await api.createProject(form);
       setForm(emptyProject);
       setShowForm(false);
+      setWorkspaceMode("scenes");
       await refreshProjects();
       await refreshSelectedProject(project.id);
     } catch (err) {
@@ -103,6 +110,7 @@ function App() {
   }
 
   async function openProject(project: Project) {
+    setWorkspaceMode("scenes");
     await refreshSelectedProject(project.id);
   }
 
@@ -151,6 +159,13 @@ function App() {
     }
   }
 
+  function returnToMissionControl() {
+    setSelectedProject(null);
+    setWorkspaceMode("scenes");
+  }
+
+  const activePipelineStage = selectedProject && workspaceMode === "assets" ? "Assets" : "Scenes";
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -166,33 +181,59 @@ function App() {
         <nav className="nav-list" aria-label="Primary navigation">
           <button
             className={`nav-item ${selectedProject ? "" : "active"}`}
-            onClick={() => setSelectedProject(null)}
+            onClick={returnToMissionControl}
           >
             Mission Control
           </button>
-          <button className={`nav-item ${selectedProject ? "active" : ""}`} disabled={!selectedProject}>
-            Scene Engine {selectedProject ? "· Active" : ""}
+          <button
+            className={`nav-item ${
+              selectedProject && workspaceMode === "scenes" ? "active" : ""
+            }`}
+            disabled={!selectedProject}
+            onClick={() => setWorkspaceMode("scenes")}
+          >
+            Scene Engine {selectedProject && workspaceMode === "scenes" ? "· Active" : ""}
           </button>
-          <button className="nav-item" disabled>Asset Planner · Soon</button>
+          <button
+            className={`nav-item ${
+              selectedProject && workspaceMode === "assets" ? "active" : ""
+            }`}
+            disabled={!selectedProject || selectedProject.scenes.length === 0}
+            onClick={() => setWorkspaceMode("assets")}
+          >
+            Asset Planner {selectedProject && workspaceMode === "assets" ? "· Active" : ""}
+          </button>
           <button className="nav-item" disabled>Timeline Builder · Soon</button>
         </nav>
 
         <div className="sidebar-footer">
-          <span>v0.2.0</span>
-          <span>Scene Engine</span>
+          <span>v0.3.0</span>
+          <span>Asset Planner</span>
         </div>
       </aside>
 
       {selectedProject ? (
-        <ProjectWorkspace
-          project={selectedProject}
-          loading={projectLoading}
-          error={error}
-          onBack={() => setSelectedProject(null)}
-          onGenerate={generateScenes}
-          onUpdateScene={updateScene}
-          onDeleteScene={deleteScene}
-        />
+        workspaceMode === "assets" ? (
+          <AssetPlanner
+            project={selectedProject}
+            loading={projectLoading}
+            error={error}
+            onBack={returnToMissionControl}
+            onOpenScenes={() => setWorkspaceMode("scenes")}
+            onRefreshProject={() => refreshSelectedProject(selectedProject.id)}
+          />
+        ) : (
+          <ProjectWorkspace
+            project={selectedProject}
+            loading={projectLoading}
+            error={error}
+            onBack={returnToMissionControl}
+            onOpenAssets={() => setWorkspaceMode("assets")}
+            onGenerate={generateScenes}
+            onUpdateScene={updateScene}
+            onDeleteScene={deleteScene}
+          />
+        )
       ) : (
         <main className="workspace">
           <header className="topbar">
@@ -218,7 +259,7 @@ function App() {
             </article>
             <article className="stat-card accent">
               <span>Current focus</span>
-              <strong>Scene Engine</strong>
+              <strong>Asset Planner</strong>
             </article>
           </section>
 
@@ -228,13 +269,15 @@ function App() {
                 <p className="eyebrow">BIRD’S-EYE VIEW</p>
                 <h3>The documentary production pipeline</h3>
               </div>
-              <span className="status-pill">Phase 2 active</span>
+              <span className="status-pill">Phase 3 active</span>
             </div>
 
             <div className="pipeline-grid">
               {pipeline.map((stage, index) => (
                 <article
-                  className={`pipeline-card ${stage.name === "Scenes" ? "active-stage" : ""}`}
+                  className={`pipeline-card ${
+                    stage.name === activePipelineStage ? "active-stage" : ""
+                  }`}
                   key={stage.name}
                 >
                   <span className="stage-number">{String(index + 1).padStart(2, "0")}</span>
@@ -287,7 +330,7 @@ function App() {
                       <span>{formatDate(project.created_at)}</span>
                     </div>
                     <button className="project-open-button" onClick={() => void openProject(project)}>
-                      Open Scene Engine →
+                      Open production →
                     </button>
                   </article>
                 ))}
