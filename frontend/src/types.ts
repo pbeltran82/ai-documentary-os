@@ -155,3 +155,64 @@ export interface TimelineManifestResponse {
   public_url: string;
   manifest: Record<string, unknown>;
 }
+
+export interface TimelineMissingScene {
+  scene_id: number;
+  scene_number: number;
+  reason: string;
+}
+
+export interface TimelineClip {
+  scene_id: number;
+  scene_number: number;
+  input_index: number;
+  start_seconds: number;
+  end_seconds: number;
+  duration_seconds: number;
+  narration: string;
+  visual_intent: string;
+  provider: ProviderName;
+  provider_asset_id: string;
+  media_type: MediaType;
+  local_path: string;
+  local_url: string;
+  preview_url: string;
+  source_url: string;
+  creator: string;
+  license_name: string;
+  attribution: string;
+  source_file: string;
+  assembly_action: string;
+}
+
+export interface TimelinePlan {
+  schema_version: string;
+  generated_at: string;
+  project_id: number;
+  project_title: string;
+  ready: boolean;
+  ffmpeg_available: boolean;
+  runtime_seconds: number;
+  clip_count: number;
+  missing_scenes: TimelineMissingScene[];
+  settings: {
+    width: number;
+    height: number;
+    fps: number;
+    video_codec: string;
+    pixel_format: string;
+    audio: string;
+  };
+  clips: TimelineClip[];
+  command: string[];
+  output_relative_path: string;
+  output_url: string;
+  output_exists: boolean;
+  output_size_bytes: number;
+  rendered_at: string | null;
+  plan_relative_path: string;
+  plan_url: string;
+  script_relative_path: string;
+  script_url: string;
+  message: string | null;
+}
