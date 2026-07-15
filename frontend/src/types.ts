@@ -148,3 +148,10 @@ export interface SceneUpdate {
   preferred_asset_type?: AssetType;
   asset_status?: AssetStatus;
 }
+
+export interface TimelineManifestResponse {
+  project_id: number;
+  relative_path: string;
+  public_url: string;
+  manifest: Record<string, unknown>;
+}
