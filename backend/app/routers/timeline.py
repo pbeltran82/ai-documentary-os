@@ -45,7 +45,4 @@ def render_timeline(
     db: Session = Depends(get_db),
 ) -> dict:
     project = get_project_or_404(project_id, db)
-    result = render_first_cut(project)
-    project.status = "timeline"
-    db.commit()
-    return result
+    return render_first_cut(project)
