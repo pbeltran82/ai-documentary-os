@@ -20,12 +20,14 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (typeof options.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -104,6 +106,21 @@ export const api = {
   buildTimelinePlan: (projectId: number) =>
     request<TimelinePlan>(`/projects/${projectId}/timeline/plan`, {
       method: "POST",
+    }),
+  uploadNarration: (projectId: number, file: File) =>
+    request<TimelinePlan>(
+      `/projects/${projectId}/timeline/narration?filename=${encodeURIComponent(file.name)}`,
+      {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+      },
+    ),
+  removeNarration: (projectId: number) =>
+    request<TimelinePlan>(`/projects/${projectId}/timeline/narration`, {
+      method: "DELETE",
     }),
   renderTimeline: (projectId: number) =>
     request<TimelinePlan>(`/projects/${projectId}/timeline/render`, {
