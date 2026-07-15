@@ -9,9 +9,10 @@ from ...schemas import AssetCandidate
 from .common import ProviderSpec, json_request, rate_limit_remaining
 
 WORD_RE = re.compile(r"[a-z0-9]+")
-GENERIC_MOTION_WORDS = {
+GENERIC_WORDS = {
     "animation",
     "footage",
+    "growth",
     "lapse",
     "motion",
     "photo",
@@ -20,26 +21,134 @@ GENERIC_MOTION_WORDS = {
     "video",
 }
 
+TAG_GROUPS: dict[str, set[str]] = {
+    "calendar": {
+        "agenda",
+        "calendar",
+        "date",
+        "deadline",
+        "month",
+        "planner",
+        "schedule",
+        "year",
+    },
+    "clock": {
+        "clock",
+        "hourglass",
+        "stopwatch",
+        "timepiece",
+        "timer",
+        "watch",
+    },
+    "chart": {
+        "analytics",
+        "candlestick",
+        "chart",
+        "data",
+        "diagram",
+        "graph",
+        "statistics",
+    },
+    "finance": {
+        "business",
+        "economy",
+        "finance",
+        "financial",
+        "investing",
+        "investment",
+        "market",
+        "money",
+        "portfolio",
+        "stock",
+        "stocks",
+        "trade",
+        "trading",
+    },
+}
+
+NATURE_NOISE = {
+    "blossom",
+    "cloud",
+    "clouds",
+    "flower",
+    "flowers",
+    "forest",
+    "landscape",
+    "mountain",
+    "mountains",
+    "nature",
+    "plant",
+    "sky",
+    "tree",
+    "trees",
+}
+
 
 def word_set(value: str) -> set[str]:
     return set(WORD_RE.findall(value.lower()))
 
 
-def rank_hits(hits: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
-    query_words = word_set(query)
-    anchor_words = query_words - GENERIC_MOTION_WORDS
+def required_groups(query_words: set[str]) -> list[str]:
+    groups: list[str] = []
+    if query_words & TAG_GROUPS["calendar"]:
+        groups.append("calendar")
+    if query_words & TAG_GROUPS["clock"]:
+        groups.append("clock")
+    if query_words & {"chart", "graph", "analytics", "candlestick", "diagram"}:
+        groups.append("chart")
+    if query_words & TAG_GROUPS["finance"]:
+        groups.append("finance")
+    return groups
 
-    def relevance(item: dict[str, Any]) -> tuple[int, int, int, int]:
+
+def pixabay_filters(query: str, media_type: str) -> dict[str, str]:
+    words = word_set(query)
+    filters: dict[str, str] = {}
+
+    if words & TAG_GROUPS["finance"] or words & TAG_GROUPS["chart"]:
+        filters["category"] = "business"
+
+    if media_type == "video":
+        if words & {"animation", "chart", "graph", "diagram", "analytics"}:
+            filters["video_type"] = "animation"
+        elif words & {"calendar", "clock", "hourglass", "watch"}:
+            filters["video_type"] = "film"
+
+    return filters
+
+
+def rank_hits(hits: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    """Return only defensible matches; never backfill the grid with random media."""
+    query_words = word_set(query)
+    anchors = query_words - GENERIC_WORDS
+    groups = required_groups(query_words)
+
+    def metrics(item: dict[str, Any]) -> tuple[bool, int, int, int, int, int]:
         tag_words = word_set(str(item.get("tags") or ""))
-        anchor_overlap = len(anchor_words & tag_words)
-        total_overlap = len(query_words & tag_words)
+        matched_groups = sum(bool(tag_words & TAG_GROUPS[group]) for group in groups)
+        groups_satisfied = matched_groups == len(groups) if groups else True
+        exact_overlap = len(anchors & tag_words)
+        noise_count = len(tag_words & NATURE_NOISE)
         likes = int(item.get("likes") or 0)
         downloads = int(item.get("downloads") or 0)
-        return anchor_overlap, total_overlap, likes, downloads
+        return (
+            groups_satisfied,
+            matched_groups,
+            exact_overlap,
+            -noise_count,
+            likes,
+            downloads,
+        )
 
-    anchored = [item for item in hits if relevance(item)[0] > 0]
-    ranked_pool = anchored if len(anchored) >= 3 else hits
-    return sorted(ranked_pool, key=relevance, reverse=True)
+    strong: list[dict[str, Any]] = []
+    for item in hits:
+        groups_satisfied, _matched, exact_overlap, noise_score, _likes, _downloads = metrics(item)
+        has_semantic_anchor = groups_satisfied and (bool(groups) or exact_overlap > 0)
+        is_noise_only = noise_score < 0 and exact_overlap == 0
+        if has_semantic_anchor and not is_noise_only:
+            strong.append(item)
+
+    return sorted(strong, key=metrics, reverse=True)
 
 
 def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
@@ -55,7 +164,12 @@ def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
         provider_asset_id=str(item["id"]),
         media_type="photo",
         source_url=item.get("pageURL") or "",
-        preview_url=item.get("largeImageURL") or item.get("webformatURL") or item.get("previewURL") or "",
+        preview_url=(
+            item.get("largeImageURL")
+            or item.get("webformatURL")
+            or item.get("previewURL")
+            or ""
+        ),
         download_url=item.get("largeImageURL") or item.get("webformatURL") or "",
         creator=creator,
         creator_url=creator_url,
@@ -76,7 +190,10 @@ def choose_video(videos: dict[str, Any]) -> dict[str, Any] | None:
     def score(item: dict[str, Any]) -> tuple[int, int]:
         width = int(item.get("width") or 0)
         height = int(item.get("height") or 0)
-        return (1 if height > width else 0, abs(width - 1920) + abs(height - 1080))
+        return (
+            1 if height > width else 0,
+            abs(width - 1920) + abs(height - 1080),
+        )
 
     return min(candidates, key=score)
 
@@ -110,21 +227,38 @@ def normalize_video(item: dict[str, Any]) -> AssetCandidate | None:
     )
 
 
-def search(query: str, media_type: str, per_page: int) -> tuple[list[AssetCandidate], int | None]:
-    endpoint = "https://pixabay.com/api/videos/" if media_type == "video" else "https://pixabay.com/api/"
+def search(
+    query: str,
+    media_type: str,
+    per_page: int,
+) -> tuple[list[AssetCandidate], int | None]:
+    endpoint = (
+        "https://pixabay.com/api/videos/"
+        if media_type == "video"
+        else "https://pixabay.com/api/"
+    )
     params: dict[str, str | int] = {
         "key": os.getenv("PIXABAY_API_KEY", "").strip(),
         "q": query[:100],
-        "per_page": max(3, per_page),
+        "per_page": max(12, per_page * 3),
         "safesearch": "true",
         "order": "popular",
+        **pixabay_filters(query, media_type),
     }
     if media_type == "photo":
-        params.update({"image_type": "photo", "orientation": "horizontal"})
+        params.update(
+            {
+                "image_type": "photo",
+                "orientation": "horizontal",
+                "min_width": 1280,
+            }
+        )
+
     payload, headers = json_request(
-        f"{endpoint}?{urlencode(params)}", provider_label="Pixabay"
+        f"{endpoint}?{urlencode(params)}",
+        provider_label="Pixabay",
     )
-    hits = rank_hits(list(payload.get("hits", [])), query)
+    hits = rank_hits(list(payload.get("hits", [])), query)[:per_page]
     if media_type == "video":
         candidates = [
             candidate
