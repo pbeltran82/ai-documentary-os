@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,10 +14,7 @@ from ..schemas import (
 )
 from ..services.assets import PROVIDERS
 from ..services.assets.common import public_search_url
-from ..services.assets.search_intelligence import (
-    build_search_plan,
-    merge_candidate_batches,
-)
+from ..services.assets.search_intelligence import build_search_plan
 
 router = APIRouter(tags=["assets"])
 
@@ -96,31 +91,34 @@ def search_asset_candidates(
         scene.search_keywords,
         scene.visual_intent,
         media_type,
-        max_queries=2,
+        max_queries=3,
     )
-    batch_size = max(3, min(15, math.ceil(per_page / len(search_plan)) + 3))
-    batches = []
+    searched_batches: list[tuple[int, str, list]] = []
     remaining_values: list[int] = []
 
-    for focused_query in search_plan:
+    for position, focused_query in enumerate(search_plan):
         candidates, remaining = provider_spec.search(
             focused_query,
             media_type,
-            batch_size,
+            per_page,
         )
-        batches.append(candidates)
+        searched_batches.append((position, focused_query, candidates))
         if remaining is not None:
             remaining_values.append(remaining)
 
-    candidates = merge_candidate_batches(batches, per_page)
+    _position, selected_query, candidates = max(
+        searched_batches,
+        key=lambda item: (len(item[2]), -item[0]),
+    )
+    candidates = candidates[:per_page]
     remaining = min(remaining_values) if remaining_values else None
 
     return AssetSearchResponse(
         provider=provider,
         configured=True,
-        query=" · ".join(search_plan),
+        query=selected_query,
         media_type=media_type,
-        source_url=source_url,
+        source_url=public_search_url(provider, selected_query, media_type),
         rate_limit_remaining=remaining,
         candidates=candidates,
     )

@@ -38,6 +38,7 @@ VISUAL_WORDS = {
     "factory",
     "graph",
     "hands",
+    "hourglass",
     "laptop",
     "map",
     "market",
@@ -69,12 +70,31 @@ def rewrite_abstract_phrase(phrase: str, media_type: str) -> str:
     if "calendar" in words and ({"lapse", "timelapse", "time"} & words):
         return "calendar time lapse" if media_type == "video" else "calendar pages"
 
-    finance_words = {"compound", "finance", "financial", "investment", "market", "stock", "wealth"}
+    finance_words = {
+        "compound",
+        "finance",
+        "financial",
+        "investment",
+        "market",
+        "stock",
+        "wealth",
+    }
     if "growth" in words and words & finance_words:
+        return (
+            "stock market chart animation"
+            if media_type == "video"
+            else "stock market growth chart"
+        )
+
+    if "stock" in words and "chart" in words:
         return "stock market chart animation" if media_type == "video" else "stock market chart"
 
     if "investment" in words and not words & {"chart", "portfolio", "money", "coins"}:
-        return "investment portfolio desk" if media_type == "photo" else "investment portfolio screen"
+        return (
+            "investment portfolio screen"
+            if media_type == "video"
+            else "investment portfolio desk"
+        )
 
     if "time" in words and not words & VISUAL_WORDS:
         return "clock calendar" if media_type == "photo" else "clock time lapse"
@@ -107,22 +127,46 @@ def build_search_plan(
     *,
     max_queries: int = 3,
 ) -> list[str]:
+    """Build focused provider queries without diluting an explicit user concept."""
     normalized_query = normalize_phrase(query)
-    keyword_phrases = [normalize_phrase(value) for value in scene_keywords if normalize_phrase(value)]
-    joined_keywords = normalize_phrase(" ".join(keyword_phrases))
+    keyword_phrases = [
+        normalize_phrase(value)
+        for value in scene_keywords
+        if normalize_phrase(value)
+    ]
+    comma_joined_keywords = normalize_phrase(", ".join(keyword_phrases))
+    space_joined_keywords = normalize_phrase(" ".join(keyword_phrases))
+    matched_keyword_phrases = [
+        phrase for phrase in keyword_phrases if phrase in normalized_query
+    ]
+    has_separators = any(separator in query for separator in (",", ";", "|", "\n"))
+    query_is_scene_bundle = bool(
+        keyword_phrases
+        and normalized_query in {comma_joined_keywords, space_joined_keywords}
+    )
+    query_is_multi_keyword_bundle = len(matched_keyword_phrases) >= 2
+    query_is_explicit_concept = normalized_query in keyword_phrases
 
-    if any(separator in query for separator in (",", ";", "|", "\n")):
+    if query_is_explicit_concept:
+        raw_phrases = [normalized_query]
+        expand_scene_context = False
+    elif has_separators:
         raw_phrases = [normalize_phrase(value) for value in SEPARATOR_RE.split(query)]
-    elif keyword_phrases and normalized_query == joined_keywords:
+        expand_scene_context = True
+    elif query_is_scene_bundle or query_is_multi_keyword_bundle:
         raw_phrases = keyword_phrases
+        expand_scene_context = True
     else:
         raw_phrases = [normalized_query]
-        raw_phrases.extend(keyword_phrases)
+        expand_scene_context = False
 
-    if visual_intent.strip():
+    if expand_scene_context and visual_intent.strip():
         raw_phrases.extend(
             normalize_phrase(value)
-            for value in re.split(r"\s+(?:and|with|beside|into)\s+", visual_intent.lower())
+            for value in re.split(
+                r"\s+(?:and|with|beside|into)\s+",
+                visual_intent.lower(),
+            )
         )
 
     candidates: list[tuple[int, str]] = []
@@ -130,14 +174,16 @@ def build_search_plan(
     for position, raw_phrase in enumerate(raw_phrases):
         if not raw_phrase:
             continue
-        phrase = rewrite_abstract_phrase(raw_phrase, media_type)
-        phrase = normalize_phrase(phrase)[:100]
+        phrase = normalize_phrase(rewrite_abstract_phrase(raw_phrase, media_type))[:100]
         if len(phrase) < 2 or phrase in seen:
             continue
         seen.add(phrase)
         candidates.append((position, phrase))
 
-    candidates.sort(key=lambda item: (phrase_score(item[1]), -item[0]), reverse=True)
+    candidates.sort(
+        key=lambda item: (phrase_score(item[1]), -item[0]),
+        reverse=True,
+    )
 
     plan: list[str] = []
     for _position, phrase in candidates:
