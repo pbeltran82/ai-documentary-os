@@ -23,6 +23,10 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDuration(seconds: number): string {
+  return Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(1)}s`;
+}
+
 export function TimelineBuilder({
   project,
   loading,
@@ -128,7 +132,9 @@ export function TimelineBuilder({
               Videos are looped when necessary, trimmed to the scene slot, normalized to 1080p, and concatenated in scene order.
             </p>
             {plan && !plan.ffmpeg_available && (
-              <p className="timeline-warning">FFmpeg is not available. Install it with <code>brew install ffmpeg</code>.</p>
+              <p className="timeline-warning">
+                FFmpeg is not available. Install it with <code>brew install ffmpeg</code>.
+              </p>
             )}
           </div>
           <div className="timeline-actions">
@@ -185,7 +191,9 @@ export function TimelineBuilder({
             <p className="eyebrow">ASSEMBLY PLAN</p>
             <h3>Scene-by-scene edit decisions</h3>
           </div>
-          {plan && <span className="subtle-text">{plan.clip_count} clips · {plan.settings.fps} fps</span>}
+          {plan && (
+            <span className="subtle-text">{plan.clip_count} clips · {plan.settings.fps} fps</span>
+          )}
         </div>
 
         {!plan || planning ? (
@@ -210,7 +218,7 @@ export function TimelineBuilder({
                   <div className="clip-tags">
                     <span>{clip.media_type}</span>
                     <span>{clip.provider}</span>
-                    <span>{clip.duration_seconds:g}s</span>
+                    <span>{formatDuration(clip.duration_seconds)}</span>
                   </div>
                   <small>{clip.assembly_action}</small>
                 </div>
