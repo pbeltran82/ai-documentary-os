@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import Project
+from ..models import Project, Scene
 from ..schemas import ProjectCreate, ProjectDetail, ProjectRead
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -30,7 +30,7 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> Pro
 def get_project(project_id: int, db: Session = Depends(get_db)) -> Project:
     statement = (
         select(Project)
-        .options(selectinload(Project.scenes))
+        .options(selectinload(Project.scenes).selectinload(Scene.selected_asset))
         .where(Project.id == project_id)
     )
     project = db.scalar(statement)

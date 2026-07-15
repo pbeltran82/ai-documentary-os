@@ -67,3 +67,39 @@ class Scene(Base):
     )
 
     project: Mapped[Project] = relationship(back_populates="scenes")
+    selected_asset: Mapped[Asset | None] = relationship(
+        back_populates="scene",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    scene_id: Mapped[int] = mapped_column(
+        ForeignKey("scenes.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(String(40), default="pexels", nullable=False)
+    provider_asset_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    preview_url: Mapped[str] = mapped_column(Text, nullable=False)
+    download_url: Mapped[str] = mapped_column(Text, nullable=False)
+    creator: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    creator_url: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    width: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    scene: Mapped[Scene] = relationship(back_populates="selected_asset")

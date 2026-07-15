@@ -16,6 +16,55 @@ export type AssetType =
   | "text_animation";
 
 export type AssetStatus = "missing" | "searching" | "selected" | "ready";
+export type MediaType = "video" | "photo";
+
+export interface SelectedAsset {
+  id: number;
+  scene_id: number;
+  provider: string;
+  provider_asset_id: string;
+  media_type: MediaType;
+  source_url: string;
+  preview_url: string;
+  download_url: string;
+  creator: string;
+  creator_url: string;
+  width: number;
+  height: number;
+  duration_seconds: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetCandidate {
+  provider: string;
+  provider_asset_id: string;
+  media_type: MediaType;
+  source_url: string;
+  preview_url: string;
+  download_url: string;
+  creator: string;
+  creator_url: string;
+  width: number;
+  height: number;
+  duration_seconds: number | null;
+}
+
+export interface PexelsStatus {
+  provider: string;
+  configured: boolean;
+  setup_hint: string;
+}
+
+export interface AssetSearchResponse {
+  provider: string;
+  configured: boolean;
+  query: string;
+  media_type: MediaType;
+  source_url: string;
+  rate_limit_remaining: number | null;
+  candidates: AssetCandidate[];
+}
 
 export interface Scene {
   id: number;
@@ -29,6 +78,7 @@ export interface Scene {
   search_keywords: string[];
   preferred_asset_type: AssetType;
   asset_status: AssetStatus;
+  selected_asset: SelectedAsset | null;
   created_at: string;
   updated_at: string;
 }

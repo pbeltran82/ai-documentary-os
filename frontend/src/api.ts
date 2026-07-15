@@ -1,4 +1,8 @@
 import type {
+  AssetCandidate,
+  AssetSearchResponse,
+  MediaType,
+  PexelsStatus,
   Project,
   ProjectCreate,
   ProjectDetail,
@@ -6,6 +10,7 @@ import type {
   SceneGeneratePayload,
   SceneGenerateResponse,
   SceneUpdate,
+  SelectedAsset,
 } from "./types";
 
 const API_BASE_URL =
@@ -62,4 +67,26 @@ export const api = {
     }),
   deleteScene: (sceneId: number) =>
     request<void>(`/scenes/${sceneId}`, { method: "DELETE" }),
+  getPexelsStatus: () =>
+    request<PexelsStatus>("/providers/pexels/status"),
+  searchAssets: (
+    sceneId: number,
+    options: { query: string; media_type: MediaType; per_page?: number },
+  ) => {
+    const params = new URLSearchParams({
+      query: options.query,
+      media_type: options.media_type,
+      per_page: String(options.per_page ?? 12),
+    });
+    return request<AssetSearchResponse>(
+      `/scenes/${sceneId}/asset-candidates?${params.toString()}`,
+    );
+  },
+  selectAsset: (sceneId: number, candidate: AssetCandidate) =>
+    request<SelectedAsset>(`/scenes/${sceneId}/selected-asset`, {
+      method: "PUT",
+      body: JSON.stringify(candidate),
+    }),
+  removeSelectedAsset: (sceneId: number) =>
+    request<void>(`/scenes/${sceneId}/selected-asset`, { method: "DELETE" }),
 };

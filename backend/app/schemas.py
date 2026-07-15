@@ -25,6 +25,37 @@ class ProjectRead(ProjectCreate):
     updated_at: datetime
 
 
+class AssetBase(BaseModel):
+    provider: str = Field(default="pexels", max_length=40)
+    provider_asset_id: str = Field(min_length=1, max_length=100)
+    media_type: str = Field(pattern="^(video|photo)$")
+    source_url: str
+    preview_url: str
+    download_url: str
+    creator: str = Field(default="", max_length=200)
+    creator_url: str = ""
+    width: int = Field(default=0, ge=0)
+    height: int = Field(default=0, ge=0)
+    duration_seconds: float | None = Field(default=None, ge=0)
+
+
+class AssetCandidate(AssetBase):
+    pass
+
+
+class AssetSelect(AssetBase):
+    pass
+
+
+class AssetRead(AssetBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    scene_id: int
+    created_at: datetime
+    updated_at: datetime
+
+
 class SceneBase(BaseModel):
     narration: str = Field(min_length=1, max_length=5000)
     duration_seconds: float = Field(default=5, ge=1, le=60)
@@ -81,6 +112,7 @@ class SceneRead(SceneBase):
     scene_number: int
     start_seconds: float
     end_seconds: float
+    selected_asset: AssetRead | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -100,6 +132,22 @@ class SceneGenerateResponse(BaseModel):
     scene_count: int
     total_duration_seconds: float
     scenes: list[SceneRead]
+
+
+class PexelsStatusResponse(BaseModel):
+    provider: str = "pexels"
+    configured: bool
+    setup_hint: str
+
+
+class AssetSearchResponse(BaseModel):
+    provider: str = "pexels"
+    configured: bool
+    query: str
+    media_type: str
+    source_url: str
+    rate_limit_remaining: int | None = None
+    candidates: list[AssetCandidate] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):

@@ -7,6 +7,7 @@ interface ProjectWorkspaceProps {
   loading: boolean;
   error: string;
   onBack: () => void;
+  onOpenAssets: () => void;
   onGenerate: (narration: string, targetSeconds: number) => Promise<void>;
   onUpdateScene: (sceneId: number, payload: SceneUpdate) => Promise<void>;
   onDeleteScene: (scene: Scene) => Promise<void>;
@@ -23,6 +24,7 @@ export function ProjectWorkspace({
   loading,
   error,
   onBack,
+  onOpenAssets,
   onGenerate,
   onUpdateScene,
   onDeleteScene,
@@ -37,7 +39,7 @@ export function ProjectWorkspace({
     [project.scenes],
   );
   const missingAssets = useMemo(
-    () => project.scenes.filter((scene) => scene.asset_status === "missing").length,
+    () => project.scenes.filter((scene) => !scene.selected_asset).length,
     [project.scenes],
   );
 
@@ -76,7 +78,14 @@ export function ProjectWorkspace({
           <h2>{project.title}</h2>
           <p className="project-summary">{project.topic}</p>
         </div>
-        <span className="status-pill">{project.status}</span>
+        <div className="header-actions">
+          {project.scenes.length > 0 && (
+            <button className="primary-button" onClick={onOpenAssets}>
+              Open Asset Planner →
+            </button>
+          )}
+          <span className="status-pill">{project.status}</span>
+        </div>
       </header>
 
       {error && <div className="error-banner">{error}</div>}

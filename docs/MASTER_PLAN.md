@@ -42,21 +42,23 @@ Reduce the time and friction required to produce documentaries by automating rep
 - Documentary project creation
 - Bird's-eye production pipeline
 
-### Phase 2 — Scene Engine 🚧
+### Phase 2 — Scene Engine ✅
 
-- Import narration or script
+- Import plain narration or a structured scene plan
 - Split narration into timed scenes
+- Preserve supplied timecodes and labeled production fields
 - Store search keywords, visual intent, preferred asset type, and asset status
 - Review and edit scene timing and metadata
 - Recalculate downstream timestamps after edits or deletion
 
-### Phase 3 — Asset Planner
+### Phase 3 — Asset Planner 🚧
 
-- Generate richer search queries from each scene
-- Search stock-media providers
+- Search Pexels photos and videos from each scene
 - Preview and attach candidate assets
-- Track license and attribution metadata
-- Fall back to AI image or video generation when appropriate
+- Persist provider, creator, attribution, source, preview, and media-file metadata
+- Track visual coverage across the documentary
+- Download selected media into organized local project folders
+- Add provider-independent adapters and AI-generation fallbacks
 
 ### Phase 4 — Timeline Builder
 
@@ -75,16 +77,17 @@ Reduce the time and friction required to produce documentaries by automating rep
 
 ## Current sprint
 
-**Sprint 2: Scene Engine**
+**Sprint 3: Asset Planner MVP**
 
 Definition of done:
 
-- A project opens into a dedicated Scene Engine workspace.
-- Narration can be pasted and split into estimated visual slots.
-- Each scene stores timing, narration, visual intent, keywords, visual type, and asset status.
-- Scene edits persist in SQLite.
-- Changing duration or deleting a scene recalculates the remaining timeline.
+- A project can switch between the Scene Engine and Asset Planner.
+- Each scene opens with its narration, timing, visual intent, and suggested search query.
+- Pexels photo and video results can be searched and previewed with attribution.
+- A candidate visual can be selected, replaced, or removed.
+- Selected-asset metadata persists in SQLite.
+- The app works safely without an API key by showing setup guidance and a direct Pexels search link.
 
 ## Next priority
 
-Connect the Scene Engine to a provider-independent Asset Planner, beginning with stock-media search suggestions and Pexels candidate results.
+Download selected media to a predictable local folder structure and generate a machine-readable timeline manifest for the first automatic assembly pass.
