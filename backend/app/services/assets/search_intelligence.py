@@ -68,7 +68,7 @@ def rewrite_abstract_phrase(phrase: str, media_type: str) -> str:
     words = tokens(phrase)
 
     if "calendar" in words and ({"lapse", "timelapse", "time"} & words):
-        return "calendar pages flipping" if media_type == "video" else "calendar pages"
+        return "calendar time lapse" if media_type == "video" else "calendar pages"
 
     finance_words = {
         "compound",
