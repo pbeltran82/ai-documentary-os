@@ -192,13 +192,19 @@ def download_candidate(scene: Scene, payload: AssetSelect) -> LocalAssetFiles:
 
     media = download_remote_file(payload.download_url, stem, payload.media_type)
     if payload.media_type == "photo":
-        preview = media
-    else:
+        return LocalAssetFiles(media=media, preview=media)
+
+    try:
         preview = download_remote_file(
             payload.preview_url,
             Path(f"{stem}-poster"),
             "photo",
         )
+    except Exception:
+        path = resolve_media_path(media.relative_path)
+        if path is not None:
+            path.unlink(missing_ok=True)
+        raise
     return LocalAssetFiles(media=media, preview=preview)
 
 
@@ -297,8 +303,30 @@ def timeline_manifest(project: Project) -> dict[str, Any]:
     }
 
 
+def prune_unreferenced_assets(project_id: int, manifest: dict[str, Any]) -> None:
+    asset_directory = project_directory(project_id) / "assets"
+    if not asset_directory.is_dir():
+        return
+
+    referenced = {
+        path
+        for scene in manifest.get("scenes", [])
+        for asset in [scene.get("asset")]
+        if asset
+        for path in (asset.get("local_path"), asset.get("local_preview_path"))
+        if path
+    }
+    for candidate in asset_directory.iterdir():
+        if not candidate.is_file():
+            continue
+        relative_path = candidate.relative_to(MEDIA_ROOT).as_posix()
+        if relative_path not in referenced:
+            candidate.unlink(missing_ok=True)
+
+
 def write_timeline_manifest(project: Project) -> tuple[str, str, dict[str, Any]]:
     manifest = timeline_manifest(project)
+    prune_unreferenced_assets(project.id, manifest)
     manifest_directory = project_directory(project.id) / "timeline"
     manifest_directory.mkdir(parents=True, exist_ok=True)
     manifest_path = manifest_directory / "manifest.json"
