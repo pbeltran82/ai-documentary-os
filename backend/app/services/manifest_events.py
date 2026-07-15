@@ -5,7 +5,6 @@ import logging
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session, selectinload
 
-from ..database import SessionLocal
 from ..models import Asset, Project, Scene
 from .media_library import write_timeline_manifest
 
@@ -43,7 +42,8 @@ def refresh_timeline_manifests(session: Session) -> None:
         return
 
     try:
-        with SessionLocal() as manifest_db:
+        bind = session.get_bind()
+        with Session(bind=bind) as manifest_db:
             for project_id in sorted(project_ids):
                 statement = (
                     select(Project)
