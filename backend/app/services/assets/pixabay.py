@@ -1,11 +1,45 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 from urllib.parse import quote, urlencode
 
 from ...schemas import AssetCandidate
 from .common import ProviderSpec, json_request, rate_limit_remaining
+
+WORD_RE = re.compile(r"[a-z0-9]+")
+GENERIC_MOTION_WORDS = {
+    "animation",
+    "footage",
+    "lapse",
+    "motion",
+    "photo",
+    "time",
+    "timelapse",
+    "video",
+}
+
+
+def word_set(value: str) -> set[str]:
+    return set(WORD_RE.findall(value.lower()))
+
+
+def rank_hits(hits: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    query_words = word_set(query)
+    anchor_words = query_words - GENERIC_MOTION_WORDS
+
+    def relevance(item: dict[str, Any]) -> tuple[int, int, int, int]:
+        tag_words = word_set(str(item.get("tags") or ""))
+        anchor_overlap = len(anchor_words & tag_words)
+        total_overlap = len(query_words & tag_words)
+        likes = int(item.get("likes") or 0)
+        downloads = int(item.get("downloads") or 0)
+        return anchor_overlap, total_overlap, likes, downloads
+
+    anchored = [item for item in hits if relevance(item)[0] > 0]
+    ranked_pool = anchored if len(anchored) >= 3 else hits
+    return sorted(ranked_pool, key=relevance, reverse=True)
 
 
 def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
@@ -90,14 +124,15 @@ def search(query: str, media_type: str, per_page: int) -> tuple[list[AssetCandid
     payload, headers = json_request(
         f"{endpoint}?{urlencode(params)}", provider_label="Pixabay"
     )
+    hits = rank_hits(list(payload.get("hits", [])), query)
     if media_type == "video":
         candidates = [
             candidate
-            for candidate in (normalize_video(item) for item in payload.get("hits", []))
+            for candidate in (normalize_video(item) for item in hits)
             if candidate is not None
         ]
     else:
-        candidates = [normalize_photo(item) for item in payload.get("hits", [])]
+        candidates = [normalize_photo(item) for item in hits]
     return candidates, rate_limit_remaining(headers)
 
 
