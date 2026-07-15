@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..models import Asset, Project, Scene
 from .media_library import write_timeline_manifest
+from .render_invalidation import invalidate_render_artifacts
 
 logger = logging.getLogger(__name__)
 MANIFEST_PROJECT_IDS = "documentary_os_manifest_project_ids"
@@ -54,6 +55,7 @@ def refresh_timeline_manifests(session: Session) -> None:
                 )
                 project = manifest_db.scalar(statement)
                 if project is not None:
+                    invalidate_render_artifacts(project_id)
                     write_timeline_manifest(project)
     except Exception:
         logger.exception("Could not refresh timeline manifest after database commit")
