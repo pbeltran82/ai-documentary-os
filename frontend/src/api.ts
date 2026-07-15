@@ -2,10 +2,11 @@ import type {
   AssetCandidate,
   AssetSearchResponse,
   MediaType,
-  PexelsStatus,
   Project,
   ProjectCreate,
   ProjectDetail,
+  ProviderName,
+  ProviderStatus,
   Scene,
   SceneGeneratePayload,
   SceneGenerateResponse,
@@ -67,13 +68,18 @@ export const api = {
     }),
   deleteScene: (sceneId: number) =>
     request<void>(`/scenes/${sceneId}`, { method: "DELETE" }),
-  getPexelsStatus: () =>
-    request<PexelsStatus>("/providers/pexels/status"),
+  getProviderStatuses: () => request<ProviderStatus[]>("/providers/status"),
   searchAssets: (
     sceneId: number,
-    options: { query: string; media_type: MediaType; per_page?: number },
+    options: {
+      provider: ProviderName;
+      query: string;
+      media_type: MediaType;
+      per_page?: number;
+    },
   ) => {
     const params = new URLSearchParams({
+      provider: options.provider,
       query: options.query,
       media_type: options.media_type,
       per_page: String(options.per_page ?? 12),
