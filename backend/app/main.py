@@ -13,6 +13,7 @@ from .database import Base, engine, migrate_sqlite_schema
 from .routers.assets import router as assets_router
 from .routers.projects import router as projects_router
 from .routers.scenes import router as scenes_router
+from .routers.timeline import router as timeline_router
 from .schemas import HealthResponse
 from .services import manifest_events as _manifest_events
 from .services.media_library import MEDIA_ROOT
@@ -21,7 +22,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 
 
 @asynccontextmanager
@@ -57,6 +58,7 @@ app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 app.include_router(projects_router, prefix="/api")
 app.include_router(scenes_router, prefix="/api")
 app.include_router(assets_router, prefix="/api")
+app.include_router(timeline_router, prefix="/api")
 
 
 @app.get("/")
