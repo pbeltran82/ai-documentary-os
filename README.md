@@ -7,7 +7,7 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.4 Multi-Provider Asset Planner
+## Current milestone: v0.5 Local Asset Intake
 
 The working application now includes:
 
@@ -22,16 +22,20 @@ The working application now includes:
 - Wikimedia Commons historical and cultural image search,
 - NASA image and video search,
 - optional Pexels search when a key becomes available,
-- visual preview, creator attribution, source, license, and rights metadata,
-- selected-asset persistence and documentary-wide coverage tracking,
-- direct provider-search fallbacks when a keyed provider is unavailable.
+- strict visual-relevance filtering for stock results,
+- local downloading of every selected visual,
+- local video-poster storage,
+- SHA-256, content type, and file-size records,
+- source, creator, license, rights, and attribution preservation,
+- an automatically refreshed timeline manifest for first assembly.
 
 ## Architecture
 
 ```text
 ai-documentary-os/
 ├── backend/                 FastAPI + SQLAlchemy + SQLite
-│   └── app/services/assets  Replaceable media-provider adapters
+│   ├── app/services/assets  Replaceable media-provider adapters
+│   └── data/projects/       Local project media + timeline manifests
 ├── frontend/                React + TypeScript + Vite
 ├── docs/                    Master plan and creator pain log
 ├── episode-001/             Existing production workspace
@@ -61,6 +65,7 @@ Open:
 - Dashboard: `http://localhost:5173`
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
+- Downloaded media: `http://localhost:8000/media/`
 
 Press `Control+C` in Terminal to stop both services.
 
@@ -110,7 +115,37 @@ Provider roles:
 | NASA Images | Yes | Yes | No | Space, science, aviation, climate |
 | Pexels | Yes | Yes | Optional | Additional general stock media |
 
-The planner stores the provider, creator, source page, media URL, license label, rights URL, and attribution text with every selected visual. Always review the original source page before publishing.
+The planner preserves the provider, creator, source page, original remote media URL, license label, rights URL, and attribution text with every selected visual. Always review the original source page before publishing.
+
+## Local project files
+
+Selecting a visual downloads the media immediately and marks the scene `ready` only after the local copy succeeds.
+
+Files are organized predictably:
+
+```text
+backend/data/projects/
+└── project-0001/
+    ├── assets/
+    │   ├── scene-001-pixabay-12345.mp4
+    │   └── scene-001-pixabay-12345-poster.jpg
+    └── timeline/
+        └── manifest.json
+```
+
+The manifest includes scene timing, narration, local paths, checksums, source links, and rights metadata. It is refreshed whenever a selected asset is added or removed. It can also be regenerated through:
+
+```text
+POST /api/projects/{project_id}/timeline-manifest
+```
+
+Optional local-media settings in `backend/.env`:
+
+```text
+PUBLIC_BACKEND_URL=http://localhost:8000
+MEDIA_ROOT=./data/projects
+MAX_ASSET_DOWNLOAD_BYTES=524288000
+```
 
 ## Existing local databases
 
@@ -120,7 +155,7 @@ The database lives at:
 backend/data/documentary_os.db
 ```
 
-On startup, v0.4 safely adds the new rights-metadata columns to an existing SQLite database. Existing projects, scenes, and selected assets are preserved.
+On startup, v0.5 safely adds the local-file metadata columns to an existing SQLite database. Existing projects, scenes, and rights records are preserved.
 
 Secrets, the database, downloaded media, and generated exports are excluded from Git.
 
@@ -131,4 +166,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next major milestone is **downloading selected media into predictable local project folders**, followed by a machine-readable timeline manifest for automatic first assembly.
+The next major milestone is the **Timeline Builder**, which will consume the local manifest and create an automatic first assembly plan.
