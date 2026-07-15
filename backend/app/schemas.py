@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -55,6 +56,13 @@ class AssetRead(AssetBase):
 
     id: int
     scene_id: int
+    remote_download_url: str = ""
+    local_path: str = ""
+    local_preview_path: str = ""
+    content_type: str = ""
+    file_size_bytes: int = 0
+    checksum_sha256: str = ""
+    downloaded_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -155,6 +163,13 @@ class AssetSearchResponse(BaseModel):
     source_url: str
     rate_limit_remaining: int | None = None
     candidates: list[AssetCandidate] = Field(default_factory=list)
+
+
+class TimelineManifestResponse(BaseModel):
+    project_id: int
+    relative_path: str
+    public_url: str
+    manifest: dict[str, Any]
 
 
 class HealthResponse(BaseModel):
