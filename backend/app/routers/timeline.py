@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import TimelinePlanResponse
+from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.timeline_builder import render_first_cut, write_timeline_plan
+from ..services.voiceover import remove_voiceover, save_voiceover
 
 router = APIRouter(prefix="/projects", tags=["timeline"])
 
@@ -33,6 +35,37 @@ def create_timeline_plan(
     db: Session = Depends(get_db),
 ) -> dict:
     project = get_project_or_404(project_id, db)
+    return write_timeline_plan(project)
+
+
+@router.put(
+    "/{project_id}/timeline/narration",
+    response_model=TimelinePlanResponse,
+)
+async def upload_narration(
+    project_id: int,
+    request: Request,
+    filename: str = Query(min_length=1, max_length=255),
+    db: Session = Depends(get_db),
+) -> dict:
+    project = get_project_or_404(project_id, db)
+    content_type = request.headers.get("content-type", "application/octet-stream")
+    await save_voiceover(project_id, filename, content_type, request.stream())
+    invalidate_render_artifacts(project_id)
+    return write_timeline_plan(project)
+
+
+@router.delete(
+    "/{project_id}/timeline/narration",
+    response_model=TimelinePlanResponse,
+)
+def delete_narration(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    project = get_project_or_404(project_id, db)
+    remove_voiceover(project_id)
+    invalidate_render_artifacts(project_id)
     return write_timeline_plan(project)
 
 
