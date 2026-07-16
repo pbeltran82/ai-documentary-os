@@ -102,7 +102,7 @@ class TechBehaviorMotionTests(unittest.TestCase):
     def test_template_recommendations_match_the_script_concepts(self) -> None:
         cases = (
             ("A silent algorithm ranked this exact video for you today.", "algorithm_chose_you"),
-            ("AI predicts behavior from every scroll, pause, click, and deleted draft.", "behavior_prediction_engine"),
+            ("Artificial intelligence is predicting human behavior better than humans can.", "behavior_prediction_engine"),
             ("The model estimates job changes, health events, and mortality across a timeline.", "life_event_timeline"),
             ("Your digital footprint collects every scroll and click.", "digital_footprint_collector"),
             ("Those signals create a behavioral digital twin of you.", "behavioral_twin"),
