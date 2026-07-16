@@ -1,9 +1,9 @@
 .sidebar-footer::before {
-  content: "v1.9.0";
+  content: "v1.9.1";
 }
 
 .sidebar-footer::after {
-  content: "Expressive Character Studio";
+  content: "Animation Script Director";
 }
 
 .asset-workspace .project-topbar .status-pill,
@@ -13,7 +13,7 @@
 
 .asset-workspace .project-topbar .status-pill::after,
 .timeline-workspace .project-topbar .status-pill::after {
-  content: "Expressive Character Studio v1.9.0";
+  content: "Animation Script Director v1.9.1";
   font-size: 0.75rem;
 }
 
@@ -25,17 +25,17 @@
 }
 
 .finance-motion-header > div > span::after {
-  content: "Direct one rights-clean 1080p scene or manufacture the full project visual plan locally.";
+  content: "Direct one scene or the full project using saved animation performance plans and modular exact visuals.";
   font-size: 1rem;
 }
 
 .finance-motion-rule span::after {
-  content: "Human behavior gets expressive character performance. Money systems get finance motion. Algorithms and behavioral data get technology motion. Strong real footage remains valid.";
+  content: "Human behavior uses saved action, pose, expression, prop, and camera direction. Money systems get finance motion. Algorithms get technology motion. Strong real footage remains valid.";
   font-size: 0.9rem;
 }
 
 .exact-visual-family-recommendation + .finance-motion-section-heading p::after {
-  content: "The director preselects the strongest route, flags real-footage opportunities, and keeps every modular family available per scene.";
+  content: "The director preselects the strongest route, uses saved animation scripts for character scenes, and keeps every modular family available.";
   font-size: 0.78rem;
 }
 
