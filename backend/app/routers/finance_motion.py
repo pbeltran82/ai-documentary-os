@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Asset, Scene
 from ..schemas import AssetRead
-from ..services.finance_motion_polish import (
+from ..services.finance_motion_art import (
+    DEFAULT_STYLE_ID,
     render_finance_motion,
+    style_catalog,
     suggest_template,
     template_catalog,
 )
@@ -43,6 +45,8 @@ def finance_motion_suggestion(
             "reason": reason,
         },
         "templates": template_catalog(),
+        "styles": style_catalog(),
+        "default_style_id": DEFAULT_STYLE_ID,
     }
 
 
@@ -50,10 +54,11 @@ def finance_motion_suggestion(
 def generate_finance_motion(
     scene_id: int,
     template_id: str | None = Query(default=None, max_length=80),
+    style_id: str | None = Query(default=None, max_length=80),
     db: Session = Depends(get_db),
 ) -> Asset:
     scene = get_scene_or_404(scene_id, db)
-    generated = render_finance_motion(scene, template_id)
+    generated = render_finance_motion(scene, template_id, style_id)
     asset = db.scalar(select(Asset).where(Asset.scene_id == scene_id))
     old_paths: set[str] = set()
     if asset is None:
@@ -66,9 +71,13 @@ def generate_finance_motion(
     now = datetime.now(timezone.utc)
     values = {
         "provider": "generated",
-        "provider_asset_id": f"finance-{generated.template.template_id}-scene-{scene.id}",
+        "provider_asset_id": (
+            f"finance-{generated.template.template_id}-{generated.style.style_id}-scene-{scene.id}"
+        ),
         "media_type": "video",
-        "source_url": f"local://finance-motion/{generated.template.template_id}",
+        "source_url": (
+            f"local://finance-motion/{generated.template.template_id}/{generated.style.style_id}"
+        ),
         "preview_url": generated.preview_url,
         "download_url": generated.media_url,
         "remote_download_url": "",
@@ -79,7 +88,10 @@ def generate_finance_motion(
         "duration_seconds": generated.duration_seconds,
         "license_name": "Project-owned generated media",
         "license_url": "",
-        "attribution": "Generated locally by AI Documentary OS Finance Motion Studio",
+        "attribution": (
+            "Generated locally by AI Documentary OS Finance Motion Studio · "
+            f"{generated.style.label}"
+        ),
         "local_path": generated.media_relative_path,
         "local_preview_path": generated.preview_relative_path,
         "content_type": generated.content_type,
