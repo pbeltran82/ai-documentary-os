@@ -1,21 +1,36 @@
-name: Source Snapshot
+name: Apply Editorial Motion Patch
 
 on:
   push:
     branches: [editorial-still-motion-v092]
-  pull_request:
-    branches: [main]
+
+permissions:
+  contents: write
 
 jobs:
-  snapshot:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[patch-applied]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Package source
-        run: zip -qr source-snapshot.zip . -x '.git/*'
-      - name: Upload source snapshot
-        uses: actions/upload-artifact@v4
         with:
-          name: source-snapshot
-          path: source-snapshot.zip
-          retention-days: 1
+          ref: editorial-still-motion-v092
+          fetch-depth: 0
+      - name: Rebuild and apply tested patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/patches/editorial-motion/part-* > /tmp/editorial-motion.patch.gz.b64
+          base64 --decode /tmp/editorial-motion.patch.gz.b64 | gunzip > /tmp/editorial-motion.patch
+          patch -p1 < /tmp/editorial-motion.patch
+          rm -rf .github/patches/editorial-motion
+          rm -f .github/workflows/source-snapshot.yml
+      - name: Commit feature implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add universal visual feed and editorial still motion [patch-applied]"
+          git push origin HEAD:editorial-still-motion-v092
