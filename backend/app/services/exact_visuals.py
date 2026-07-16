@@ -37,6 +37,8 @@ STRONG_CHARACTER_PHRASES = (
     "buy groceries",
     "go out",
     "treat it like a bill",
+    "treat that ten percent like a bill",
+    "ten percent like a bill",
     "treating that 10 percent like a bill",
 )
 
