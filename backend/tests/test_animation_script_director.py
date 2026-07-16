@@ -3,9 +3,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+from PIL import Image, ImageChops
+
 from app.models import Scene
 from app.services import animation_script_director as director
 from app.services import animation_script_runtime as runtime
+from app.services import character_camera_director as camera_director
+from app.services import character_performance_library as library
 
 
 class AnimationScriptDirectorTests(unittest.TestCase):
@@ -79,7 +83,44 @@ class AnimationScriptDirectorTests(unittest.TestCase):
 
     def test_generated_plans_use_current_character_studio_version(self) -> None:
         plan = director.build_animation_plan(self.scene("A person considers a difficult choice."))
-        self.assertEqual(plan["version"], "1.9.3")
+        self.assertEqual(plan["version"], "1.9.4")
+
+    def test_reusable_performance_library_exposes_directing_patterns(self) -> None:
+        catalog = library.preset_catalog()
+        self.assertEqual(len(catalog), 7)
+        self.assertEqual(
+            {item["preset_id"] for item in catalog},
+            {"investigate", "research", "correct_myth", "uncertainty", "urgent_action", "welcome", "explain"},
+        )
+
+    def test_preset_plan_is_an_independent_editable_copy(self) -> None:
+        first = library.plan_from_preset("investigate")
+        first["pose_sequence"].append("celebrate")
+        second = library.plan_from_preset("investigate")
+        self.assertNotIn("celebrate", second["pose_sequence"])
+        self.assertEqual(second["preset_id"], "investigate")
+
+    def test_default_scene_uses_reusable_explain_preset(self) -> None:
+        plan = director.build_animation_plan(self.scene("A clear chronological account follows."))
+        self.assertEqual(plan["preset_id"], "explain")
+
+    def test_every_preset_has_executable_camera_direction(self) -> None:
+        for preset in library.preset_catalog():
+            with self.subTest(preset=preset["preset_id"]):
+                motion = preset["camera_motion"]
+                self.assertIn(motion["mode"], {"push_in", "pull_back", "track", "drift", "settle"})
+                self.assertGreater(motion["intensity"], 0)
+
+    def test_camera_direction_changes_framing_without_changing_dimensions(self) -> None:
+        source = Image.new("RGB", (320, 180))
+        source.putdata([(x % 256, y % 256, (x + y) % 256) for y in range(180) for x in range(320)])
+        directed = camera_director.apply_camera_direction(
+            source,
+            {"mode": "push_in", "intensity": 0.7, "focus": [0.65, 0.45]},
+            0.8,
+        )
+        self.assertEqual(directed.size, source.size)
+        self.assertIsNotNone(ImageChops.difference(source, directed).getbbox())
 
     def test_ensure_plan_preserves_manual_direction(self) -> None:
         scene = self.scene("Anything")

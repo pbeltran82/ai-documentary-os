@@ -9,13 +9,22 @@ type ProjectDetail = ProjectSummary & { scenes: SceneSummary[] };
 type AnimationPlan = {
   version: string;
   visual_strategy: string;
+  preset_id?: string | null;
   character_action: string;
   expression_sequence: string[];
   pose_sequence: string[];
   props: string[];
   camera_direction: string;
+  camera_motion?: { mode: string; intensity: number; focus: number[] };
   animation_beats: Record<string, number>;
   transition_intention: string;
+};
+type PerformancePreset = {
+  preset_id: string;
+  label: string;
+  description: string;
+  poses: string[];
+  camera_motion: { mode: string; intensity: number; focus: number[] };
 };
 
 const PERFORMANCE_METHODS = [
@@ -51,6 +60,7 @@ export function AnimationScriptLauncher() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [previewNonce, setPreviewNonce] = useState(0);
+  const [presets, setPresets] = useState<PerformancePreset[]>([]);
 
   const scene = useMemo(() => project?.scenes.find((item) => item.id === sceneId) ?? null, [project, sceneId]);
   const previewUrl = useMemo(() => sceneId
@@ -59,8 +69,12 @@ export function AnimationScriptLauncher() {
 
   useEffect(() => {
     if (!open || projects.length) return;
-    void request<ProjectSummary[]>("/projects").then((items) => {
+    void Promise.all([
+      request<ProjectSummary[]>("/projects"),
+      request<PerformancePreset[]>("/character-studio/performance-presets"),
+    ]).then(([items, performancePresets]) => {
       setProjects(items);
+      setPresets(performancePresets);
       setProjectId(items[0]?.id ?? null);
     }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unable to load projects"));
   }, [open, projects.length]);
@@ -125,6 +139,21 @@ export function AnimationScriptLauncher() {
     setMessage("Animation script saved and the directed Character Studio frame refreshed.");
   }
 
+  async function applyPreset(preset: PerformancePreset) {
+    if (!sceneId) return;
+    setBusy(true);
+    setError("");
+    try {
+      setPlan(await request<AnimationPlan>(`/scenes/${sceneId}/animation-plan/apply-preset/${preset.preset_id}`, { method: "POST" }));
+      setPreviewNonce((value) => value + 1);
+      setMessage(`${preset.label} applied and saved to this scene.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to apply performance preset");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function addPerformanceMethod(method: string) {
     if (!plan) return;
     setPlan({ ...plan, pose_sequence: [...plan.pose_sequence, method] });
@@ -151,6 +180,10 @@ export function AnimationScriptLauncher() {
         {scene && <article className="animation-script-narration"><span>NARRATION</span><p>{scene.narration}</p><small>{scene.visual_intent}</small></article>}
         {busy && !plan ? <div className="animation-script-loading">Directing performance…</div> : plan && <div className="animation-script-form">
           <div className="animation-script-version"><span>CHARACTER STUDIO</span><strong>Plan {plan.version}</strong></div>
+          <section className="animation-script-library wide">
+            <div><span>REUSABLE PERFORMANCE LIBRARY</span><small>Apply a complete pose, expression, prop, camera, and timing pattern.</small></div>
+            <div>{presets.map((preset) => <button className={plan.preset_id === preset.preset_id ? "active" : ""} key={preset.preset_id} type="button" disabled={busy} onClick={() => void applyPreset(preset)}><strong>{preset.label}</strong><small>{preset.description}</small><em>{preset.poses.map(performanceLabel).join(" → ")}</em><i>Camera: {performanceLabel(preset.camera_motion.mode)} · {Math.round(preset.camera_motion.intensity * 100)}%</i></button>)}</div>
+          </section>
           <label className="wide">Character action<textarea value={plan.character_action} onChange={(event) => setPlan({ ...plan, character_action: event.target.value })} /></label>
           <label>Expression sequence<input value={plan.expression_sequence.join(", ")} onChange={(event) => setPlan({ ...plan, expression_sequence: list(event.target.value) })} /></label>
           <label>Pose sequence<input value={plan.pose_sequence.join(", ")} onChange={(event) => setPlan({ ...plan, pose_sequence: list(event.target.value) })} /></label>
@@ -170,6 +203,7 @@ export function AnimationScriptLauncher() {
           </figure>
           <label>Props<input value={plan.props.join(", ")} onChange={(event) => setPlan({ ...plan, props: list(event.target.value) })} /></label>
           <label className="wide">Camera direction<textarea value={plan.camera_direction} onChange={(event) => setPlan({ ...plan, camera_direction: event.target.value })} /></label>
+          {plan.camera_motion && <div className="animation-script-camera wide"><span>EXECUTABLE CAMERA</span><strong>{performanceLabel(plan.camera_motion.mode)}</strong><small>{Math.round(plan.camera_motion.intensity * 100)}% intensity · focus {plan.camera_motion.focus.map((value) => Math.round(value * 100)).join(" / ")}</small></div>}
           <label className="wide">Transition intention<input value={plan.transition_intention} onChange={(event) => setPlan({ ...plan, transition_intention: event.target.value })} /></label>
           <div className="animation-script-beats"><span>PERFORMANCE TIMING</span>{Object.entries(plan.animation_beats).map(([key, value]) => <label key={key}>{key}<input type="number" min="0" max="1" step="0.05" value={value} onChange={(event) => setPlan({ ...plan, animation_beats: { ...plan.animation_beats, [key]: Number(event.target.value) } })} /></label>)}</div>
         </div>}

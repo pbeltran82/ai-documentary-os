@@ -21,6 +21,7 @@ from .schemas import HealthResponse
 from .services import animation_script_runtime as _animation_script_runtime
 from .services import cinematic_character_polish as _cinematic_character_polish
 from .services import character_pose_stability as _character_pose_stability
+from .services import character_camera_director as _character_camera_director
 from .services import manifest_events as _manifest_events
 from .services.media_library import MEDIA_ROOT
 
@@ -28,7 +29,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "1.9.2"
+VERSION = "1.9.4"
 
 
 @asynccontextmanager
