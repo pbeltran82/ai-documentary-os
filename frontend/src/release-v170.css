@@ -1,9 +1,9 @@
 .sidebar-footer::before {
-  content: "v1.9.1";
+  content: "v1.9.2";
 }
 
 .sidebar-footer::after {
-  content: "Animation Script Director";
+  content: "Cinematic Character Polish";
 }
 
 .asset-workspace .project-topbar .status-pill,
@@ -13,7 +13,7 @@
 
 .asset-workspace .project-topbar .status-pill::after,
 .timeline-workspace .project-topbar .status-pill::after {
-  content: "Animation Script Director v1.9.1";
+  content: "Cinematic Character Polish v1.9.2";
   font-size: 0.75rem;
 }
 
@@ -25,12 +25,12 @@
 }
 
 .finance-motion-header > div > span::after {
-  content: "Direct one scene or the full project using saved animation performance plans and modular exact visuals.";
+  content: "Direct one scene or the full project with neutral cinematic art direction, stable character performance, and saved animation plans.";
   font-size: 1rem;
 }
 
 .finance-motion-rule span::after {
-  content: "Human behavior uses saved action, pose, expression, prop, and camera direction. Money systems get finance motion. Algorithms get technology motion. Strong real footage remains valid.";
+  content: "Human behavior gets stable expressive performance and hand-to-prop staging. Money systems use neutral cinematic motion. Algorithms retain their dedicated technology language. Strong real footage remains valid.";
   font-size: 0.9rem;
 }
 
@@ -40,7 +40,7 @@
 }
 
 .finance-motion-recommendation + .finance-motion-section-heading p::after {
-  content: "Every exact visual family supports Clean, Premium, and Editorial art direction.";
+  content: "Every exact visual family supports Clean, Cinematic, and Editorial art direction.";
   font-size: 0.78rem;
 }
 
