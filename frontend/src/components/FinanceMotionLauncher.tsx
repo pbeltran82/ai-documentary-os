@@ -26,6 +26,16 @@ type MotionSuggestion = {
   styles: StyleOption[];
   default_style_id: string;
 };
+type StoryBeat = {
+  label: string;
+  description: string;
+  time_seconds: number;
+};
+type Storyboard = {
+  template_id: string;
+  duration_seconds: number;
+  beats: StoryBeat[];
+};
 type GeneratedAsset = {
   preview_url: string;
   download_url: string;
@@ -57,6 +67,7 @@ export function FinanceMotionLauncher() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [sceneId, setSceneId] = useState<number | null>(null);
   const [suggestion, setSuggestion] = useState<MotionSuggestion | null>(null);
+  const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
   const [templateId, setTemplateId] = useState("");
   const [styleId, setStyleId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,11 +86,6 @@ export function FinanceMotionLauncher() {
     () => suggestion?.templates.find((item) => item.template_id === templateId) ?? null,
     [suggestion, templateId],
   );
-  const previewUrl = useMemo(() => {
-    if (!sceneId || !templateId || !styleId) return "";
-    const parameters = new URLSearchParams({ template_id: templateId, style_id: styleId });
-    return `${API}/scenes/${sceneId}/finance-motion-preview?${parameters.toString()}`;
-  }, [sceneId, styleId, templateId]);
 
   useEffect(() => {
     if (!open || projects.length) return;
@@ -110,6 +116,7 @@ export function FinanceMotionLauncher() {
     if (!open || !sceneId) return;
     setGenerated(null);
     setSuggestion(null);
+    setStoryboard(null);
     void request<MotionSuggestion>(`/scenes/${sceneId}/finance-motion-suggestion`)
       .then((item) => {
         setSuggestion(item);
@@ -118,6 +125,25 @@ export function FinanceMotionLauncher() {
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unable to direct motion"));
   }, [open, sceneId]);
+
+  useEffect(() => {
+    if (!open || !sceneId || !templateId) return;
+    setStoryboard(null);
+    const parameters = new URLSearchParams({ template_id: templateId });
+    void request<Storyboard>(`/scenes/${sceneId}/finance-motion-storyboard?${parameters.toString()}`)
+      .then((item) => setStoryboard(item))
+      .catch(() => setStoryboard(null));
+  }, [open, sceneId, templateId]);
+
+  function storyboardFrameUrl(timeSeconds: number): string {
+    if (!sceneId || !templateId || !styleId) return "";
+    const parameters = new URLSearchParams({
+      template_id: templateId,
+      style_id: styleId,
+      time_seconds: String(timeSeconds),
+    });
+    return `${API}/scenes/${sceneId}/finance-motion-preview?${parameters.toString()}`;
+  }
 
   async function generate() {
     if (!sceneId || !templateId || !styleId) return;
@@ -151,7 +177,7 @@ export function FinanceMotionLauncher() {
               <div>
                 <p>LOCAL CONTENT GENERATOR</p>
                 <h2>Finance Motion Studio</h2>
-                <span>Build an exact, rights-clean 1080p animation with semantic visual composition.</span>
+                <span>Build an exact, rights-clean 1080p animation with semantic composition and deliberate choreography.</span>
               </div>
               <button aria-label="Close" onClick={() => setOpen(false)}>×</button>
             </header>
@@ -165,7 +191,7 @@ export function FinanceMotionLauncher() {
               </label>
               <div className="finance-motion-rule">
                 <strong>Editorial rule</strong>
-                <span>Exact concept first. Semantic objects and art direction make the idea instantly readable.</span>
+                <span>Exact concept first. Every object enters, moves, and resolves in service of the narration.</span>
               </div>
             </div>
             {busy && !project ? (
@@ -193,7 +219,7 @@ export function FinanceMotionLauncher() {
 
                       <div className="finance-motion-section-heading">
                         <div><span>HOUSE STYLE</span><h3>Choose the visual language</h3></div>
-                        <p>Style changes atmosphere. The semantic composition remains tied to the narration.</p>
+                        <p>Style changes atmosphere. The semantic composition and motion beats remain tied to the narration.</p>
                       </div>
                       <div className="finance-motion-style-grid">
                         {suggestion.styles.map((item) => (
@@ -223,19 +249,27 @@ export function FinanceMotionLauncher() {
                         ))}
                       </div>
 
-                      {previewUrl && (
+                      {storyboard?.beats.length ? (
                         <article className="finance-motion-live-preview">
                           <div className="finance-motion-preview-copy">
-                            <span>INSTANT COMPOSITION PREVIEW</span>
+                            <span>THREE-BEAT MOTION STORYBOARD</span>
                             <h3>{selectedTemplate?.label ?? "Exact visual"} · {selectedStyle?.label ?? "Art direction"}</h3>
-                            <p>Review the actual semantic objects, hierarchy, and palette before rendering the full scene.</p>
+                            <p>Review how the scene establishes the system, animates the decision, and lands on the result before rendering the full MP4.</p>
                           </div>
-                          <img src={previewUrl} alt={`${selectedTemplate?.label ?? "Finance motion"} preview`} />
+                          <div className="finance-motion-storyboard">
+                            {storyboard.beats.map((beat, index) => (
+                              <figure key={`${beat.label}-${beat.time_seconds}`}>
+                                <div><span>{String(index + 1).padStart(2, "0")}</span><strong>{beat.label}</strong></div>
+                                <img src={storyboardFrameUrl(beat.time_seconds)} alt={`${beat.label} choreography frame`} />
+                                <figcaption>{beat.description}</figcaption>
+                              </figure>
+                            ))}
+                          </div>
                         </article>
-                      )}
+                      ) : null}
 
                       <button className="finance-motion-generate" disabled={busy} onClick={() => void generate()}>
-                        {busy ? "Rendering composed 1080p visual…" : `Generate ${selectedStyle?.label ?? "art-directed"} visual`}
+                        {busy ? "Rendering choreographed 1080p visual…" : `Generate ${selectedStyle?.label ?? "art-directed"} visual`}
                       </button>
                     </>
                   )}
