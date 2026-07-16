@@ -14,9 +14,17 @@ type SceneSummary = {
 };
 type ProjectDetail = ProjectSummary & { scenes: SceneSummary[] };
 type TemplateOption = { template_id: string; label: string; description: string };
+type StyleOption = {
+  style_id: string;
+  label: string;
+  description: string;
+  swatches: string[];
+};
 type MotionSuggestion = {
   recommended: TemplateOption & { confidence: number; reason: string };
   templates: TemplateOption[];
+  styles: StyleOption[];
+  default_style_id: string;
 };
 type GeneratedAsset = {
   preview_url: string;
@@ -50,6 +58,7 @@ export function FinanceMotionLauncher() {
   const [sceneId, setSceneId] = useState<number | null>(null);
   const [suggestion, setSuggestion] = useState<MotionSuggestion | null>(null);
   const [templateId, setTemplateId] = useState("");
+  const [styleId, setStyleId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [generated, setGenerated] = useState<GeneratedAsset | null>(null);
@@ -57,6 +66,10 @@ export function FinanceMotionLauncher() {
   const scene = useMemo(
     () => project?.scenes.find((item) => item.id === sceneId) ?? null,
     [project, sceneId],
+  );
+  const selectedStyle = useMemo(
+    () => suggestion?.styles.find((item) => item.style_id === styleId) ?? null,
+    [suggestion, styleId],
   );
 
   useEffect(() => {
@@ -92,19 +105,21 @@ export function FinanceMotionLauncher() {
       .then((item) => {
         setSuggestion(item);
         setTemplateId(item.recommended.template_id);
+        setStyleId(item.default_style_id);
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unable to direct motion"));
   }, [open, sceneId]);
 
   async function generate() {
-    if (!sceneId || !templateId) return;
+    if (!sceneId || !templateId || !styleId) return;
     setBusy(true);
     setGenerated(null);
     setError("");
     try {
+      const parameters = new URLSearchParams({ template_id: templateId, style_id: styleId });
       setGenerated(
         await request<GeneratedAsset>(
-          `/scenes/${sceneId}/finance-motion?template_id=${encodeURIComponent(templateId)}`,
+          `/scenes/${sceneId}/finance-motion?${parameters.toString()}`,
           { method: "POST" },
         ),
       );
@@ -127,7 +142,7 @@ export function FinanceMotionLauncher() {
               <div>
                 <p>LOCAL CONTENT GENERATOR</p>
                 <h2>Finance Motion Studio</h2>
-                <span>Build an exact, rights-clean 1080p animation when free providers fail.</span>
+                <span>Build an exact, rights-clean 1080p animation with deliberate art direction.</span>
               </div>
               <button aria-label="Close" onClick={() => setOpen(false)}>×</button>
             </header>
@@ -141,7 +156,7 @@ export function FinanceMotionLauncher() {
               </label>
               <div className="finance-motion-rule">
                 <strong>Editorial rule</strong>
-                <span>Strong real footage first. Exact generated motion when stock fails.</span>
+                <span>Exact concept first. Style and polish serve the story—not the other way around.</span>
               </div>
             </div>
             {busy && !project ? (
@@ -166,6 +181,31 @@ export function FinanceMotionLauncher() {
                         <strong>{Math.round(suggestion.recommended.confidence * 100)}%</strong>
                         <small>{suggestion.recommended.reason}</small>
                       </article>
+
+                      <div className="finance-motion-section-heading">
+                        <div><span>HOUSE STYLE</span><h3>Choose the visual language</h3></div>
+                        <p>Premium Motion is the richer default. Clean and Editorial remain available per scene.</p>
+                      </div>
+                      <div className="finance-motion-style-grid">
+                        {suggestion.styles.map((item) => (
+                          <button
+                            key={item.style_id}
+                            className={item.style_id === styleId ? "active" : ""}
+                            onClick={() => setStyleId(item.style_id)}
+                            aria-pressed={item.style_id === styleId}
+                          >
+                            <div className="finance-motion-swatches" aria-hidden="true">
+                              {item.swatches.map((swatch) => <i key={swatch} style={{ backgroundColor: swatch }} />)}
+                            </div>
+                            <strong>{item.label}</strong>
+                            <span>{item.description}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="finance-motion-section-heading template-heading">
+                        <div><span>VISUAL METAPHOR</span><h3>Choose the exact composition</h3></div>
+                      </div>
                       <div className="finance-motion-template-grid">
                         {suggestion.templates.map((item) => (
                           <button key={item.template_id} className={item.template_id === templateId ? "active" : ""} onClick={() => setTemplateId(item.template_id)}>
@@ -174,14 +214,14 @@ export function FinanceMotionLauncher() {
                         ))}
                       </div>
                       <button className="finance-motion-generate" disabled={busy} onClick={() => void generate()}>
-                        {busy ? "Rendering exact 1080p visual…" : "Generate and attach to scene"}
+                        {busy ? "Rendering art-directed 1080p visual…" : `Generate ${selectedStyle?.label ?? "art-directed"} visual`}
                       </button>
                     </>
                   )}
                   {generated && (
                     <article className="finance-motion-success">
                       <video src={generated.download_url} poster={generated.preview_url} controls autoPlay muted loop />
-                      <div><span>GENERATED AND ATTACHED</span><h3>Project-owned motion graphic ready</h3><p>{generated.license_name}. The old timeline render was invalidated.</p><button onClick={() => window.location.reload()}>Reload workspace</button></div>
+                      <div><span>GENERATED AND ATTACHED</span><h3>{selectedStyle?.label ?? "Art-directed"} motion graphic ready</h3><p>{generated.license_name}. The old timeline render was invalidated.</p><button onClick={() => window.location.reload()}>Reload workspace</button></div>
                     </article>
                   )}
                 </main>
