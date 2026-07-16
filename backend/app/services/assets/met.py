@@ -96,7 +96,7 @@ def search(query: str, _media_type: str, per_page: int) -> tuple[list[AssetCandi
         provider_label="The Met",
     )
     object_ids = payload.get("objectIDs") or []
-    fetch_limit = min(max(per_page * 5, 25), 50)
+    fetch_limit = min(max(per_page * 3, 12), 24)
     normalized: list[tuple[AssetCandidate, bool]] = []
 
     for object_id in object_ids[:fetch_limit]:
