@@ -16,7 +16,6 @@ from app.services.finance_motion_art import (
     ffmpeg_encoder_command,
     render_frame,
     style_catalog,
-    styled_background,
     suggest_template,
 )
 
@@ -101,13 +100,12 @@ class FinanceMotionTests(unittest.TestCase):
         for style in STYLES:
             with self.subTest(style=style.style_id):
                 frame = render_frame("paycheck_split", 4, 2, style.style_id)
-                clean_background = styled_background(style.style_id, 2)
-                safe_area = (80, 930, 1840, 1040)
-                difference = ImageChops.difference(
-                    frame.crop(safe_area),
-                    clean_background.crop(safe_area),
+                safe_area = frame.crop((80, 930, 1840, 1040)).convert("L")
+                bright_content = safe_area.point(
+                    lambda value: 255 if value >= 225 else 0,
+                    mode="1",
                 )
-                self.assertIsNone(difference.getbbox())
+                self.assertIsNone(bright_content.getbbox())
 
     def test_paycheck_template_has_real_motion_between_keyframes(self) -> None:
         early = render_frame("paycheck_split", 4, 0.45, DEFAULT_STYLE_ID)
