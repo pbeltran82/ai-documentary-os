@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from PIL import Image
 
 from ..models import Scene
-from . import character_explainer as character
+from . import character_staging as character
 from . import finance_motion_choreography as finance
 
 FINANCE_FAMILY_ID = "finance_motion"
