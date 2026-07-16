@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "../finance-motion.css";
+import "../batch-production.css";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
@@ -59,6 +60,44 @@ type GeneratedAsset = {
   download_url: string;
   license_name: string;
 };
+type BatchEntryStatus = "completed" | "skipped" | "failed";
+type BatchEntry = {
+  sceneId: number;
+  sceneNumber: number;
+  status: BatchEntryStatus;
+  family: string;
+  template: string;
+  message: string;
+};
+type BatchProgress = {
+  active: boolean;
+  finished: boolean;
+  total: number;
+  processed: number;
+  currentSceneNumber: number | null;
+  currentFamily: string;
+  currentTemplate: string;
+  completed: number;
+  skipped: number;
+  failed: number;
+  entries: BatchEntry[];
+  finalizeError: string;
+};
+
+const EMPTY_BATCH: BatchProgress = {
+  active: false,
+  finished: false,
+  total: 0,
+  processed: 0,
+  currentSceneNumber: null,
+  currentFamily: "",
+  currentTemplate: "",
+  completed: 0,
+  skipped: 0,
+  failed: 0,
+  entries: [],
+  finalizeError: "",
+};
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API}${path}`, options);
@@ -78,6 +117,12 @@ function durationLabel(value: number): string {
   return `${Number.isInteger(value) ? value : value.toFixed(1)}s`;
 }
 
+function familyGlyph(familyId: string): string {
+  if (familyId === "character_explainer") return "◯╱╲";
+  if (familyId === "tech_behavior_motion") return "◎→◇";
+  return "↗ 10%";
+}
+
 export function FinanceMotionLauncher() {
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -89,6 +134,9 @@ export function FinanceMotionLauncher() {
   const [familyId, setFamilyId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [styleId, setStyleId] = useState("");
+  const [batchStyleId, setBatchStyleId] = useState("");
+  const [replaceExisting, setReplaceExisting] = useState(false);
+  const [batch, setBatch] = useState<BatchProgress>(EMPTY_BATCH);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [generated, setGenerated] = useState<GeneratedAsset | null>(null);
@@ -117,6 +165,19 @@ export function FinanceMotionLauncher() {
     () => suggestion?.templates_by_family[familyId] ?? [],
     [familyId, suggestion],
   );
+  const missingVisualCount = useMemo(
+    () => project?.scenes.filter((item) => !item.selected_asset).length ?? 0,
+    [project],
+  );
+  const batchStyle = useMemo(
+    () => suggestion?.styles.find((item) => item.style_id === batchStyleId) ?? null,
+    [batchStyleId, suggestion],
+  );
+  const batchPercent = batch.total ? Math.round((batch.processed / batch.total) * 100) : 0;
+  const failedSceneIds = useMemo(
+    () => batch.entries.filter((item) => item.status === "failed").map((item) => item.sceneId),
+    [batch.entries],
+  );
 
   useEffect(() => {
     if (!open || projects.length) return;
@@ -134,6 +195,8 @@ export function FinanceMotionLauncher() {
     if (!open || !projectId) return;
     setBusy(true);
     setGenerated(null);
+    setBatch(EMPTY_BATCH);
+    setBatchStyleId("");
     void request<ProjectDetail>(`/projects/${projectId}`)
       .then((item) => {
         setProject(item);
@@ -156,7 +219,8 @@ export function FinanceMotionLauncher() {
         setSuggestion(item);
         setFamilyId(recommendedFamily);
         setTemplateId(item.recommended_by_family[recommendedFamily]?.template_id ?? item.recommended.template_id);
-        setStyleId(item.default_style_id);
+        setStyleId((current) => current || item.default_style_id);
+        setBatchStyleId((current) => current || item.default_style_id);
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unable to direct exact visual"));
   }, [open, sceneId]);
@@ -219,6 +283,133 @@ export function FinanceMotionLauncher() {
     }
   }
 
+  async function runBatch(sceneIds?: number[], forceReplace = false) {
+    if (!project || !projectId || !batchStyleId) return;
+    const requestedIds = sceneIds ? new Set(sceneIds) : null;
+    const scenes = project.scenes.filter((item) => !requestedIds || requestedIds.has(item.id));
+    const shouldReplace = forceReplace || replaceExisting;
+    let completed = 0;
+    let skipped = 0;
+    let failed = 0;
+    const entries: BatchEntry[] = [];
+
+    setError("");
+    setGenerated(null);
+    setBatch({
+      ...EMPTY_BATCH,
+      active: true,
+      total: scenes.length,
+    });
+
+    for (let index = 0; index < scenes.length; index += 1) {
+      const item = scenes[index];
+      if (item.selected_asset && !shouldReplace) {
+        skipped += 1;
+        entries.push({
+          sceneId: item.id,
+          sceneNumber: item.scene_number,
+          status: "skipped",
+          family: "Existing visual",
+          template: item.selected_asset.provider,
+          message: "Skipped because a visual is already attached.",
+        });
+        setBatch((current) => ({
+          ...current,
+          processed: index + 1,
+          skipped,
+          entries: [...entries],
+        }));
+        continue;
+      }
+
+      setBatch((current) => ({
+        ...current,
+        currentSceneNumber: item.scene_number,
+        currentFamily: "Directing scene…",
+        currentTemplate: "Analyzing narration and visual intent",
+      }));
+
+      try {
+        const directed = await request<MotionSuggestion>(`/scenes/${item.id}/finance-motion-suggestion`);
+        const recommendedFamily = directed.recommended_family.family_id;
+        const recommendedTemplate = directed.recommended_by_family[recommendedFamily] ?? directed.recommended;
+        setBatch((current) => ({
+          ...current,
+          currentFamily: directed.recommended_family.label,
+          currentTemplate: recommendedTemplate.label,
+        }));
+
+        const parameters = new URLSearchParams({
+          family_id: recommendedFamily,
+          template_id: recommendedTemplate.template_id,
+          style_id: batchStyleId,
+          defer_manifest: "true",
+        });
+        await request<GeneratedAsset>(
+          `/scenes/${item.id}/finance-motion?${parameters.toString()}`,
+          { method: "POST" },
+        );
+        completed += 1;
+        entries.push({
+          sceneId: item.id,
+          sceneNumber: item.scene_number,
+          status: "completed",
+          family: directed.recommended_family.label,
+          template: recommendedTemplate.label,
+          message: `${batchStyle?.label ?? "Selected style"} visual generated and attached.`,
+        });
+      } catch (reason) {
+        failed += 1;
+        entries.push({
+          sceneId: item.id,
+          sceneNumber: item.scene_number,
+          status: "failed",
+          family: "Generation failed",
+          template: "Needs review",
+          message: reason instanceof Error ? reason.message : "Unable to generate this scene.",
+        });
+      }
+
+      setBatch((current) => ({
+        ...current,
+        processed: index + 1,
+        completed,
+        skipped,
+        failed,
+        entries: [...entries],
+      }));
+    }
+
+    let finalizeError = "";
+    try {
+      if (completed > 0) {
+        await request(`/projects/${projectId}/exact-visual-batch/finalize`, { method: "POST" });
+      }
+      const refreshed = await request<ProjectDetail>(`/projects/${projectId}`);
+      setProject(refreshed);
+    } catch (reason) {
+      finalizeError = reason instanceof Error ? reason.message : "Unable to finalize the project manifest.";
+    }
+
+    setBatch((current) => ({
+      ...current,
+      active: false,
+      finished: true,
+      currentSceneNumber: null,
+      currentFamily: "",
+      currentTemplate: "",
+      completed,
+      skipped,
+      failed,
+      entries: [...entries],
+      finalizeError,
+    }));
+  }
+
+  function dismissBatch() {
+    setBatch(EMPTY_BATCH);
+  }
+
   return (
     <>
       <button className="finance-motion-launcher" onClick={() => setOpen(true)}>
@@ -231,30 +422,62 @@ export function FinanceMotionLauncher() {
               <div>
                 <p>LOCAL CONTENT GENERATOR</p>
                 <h2>Exact Visual Studio</h2>
-                <span>Direct a rights-clean 1080p scene with finance graphics or human-behavior animation.</span>
+                <span>Direct one scene or manufacture an entire rights-clean visual plan locally.</span>
               </div>
-              <button aria-label="Close" onClick={() => setOpen(false)}>×</button>
+              <button aria-label="Close" disabled={batch.active} onClick={() => setOpen(false)}>×</button>
             </header>
             {error && <div className="finance-motion-error">{error}</div>}
             <div className="finance-motion-controls">
               <label>
                 Project
-                <select value={projectId ?? ""} onChange={(event) => setProjectId(Number(event.target.value))}>
+                <select value={projectId ?? ""} disabled={batch.active} onChange={(event) => setProjectId(Number(event.target.value))}>
                   {projects.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}
                 </select>
               </label>
               <div className="finance-motion-rule">
                 <strong>Director rule</strong>
-                <span>Human action gets a character. Money systems get semantic finance graphics. Strong real footage remains valid.</span>
+                <span>Human action gets a character. Money systems get finance motion. Algorithms get technology motion. Strong real footage remains valid.</span>
               </div>
             </div>
+            {project?.scenes.length ? (
+              <section className="batch-production-toolbar">
+                <div>
+                  <span>BATCH PRODUCTION CONSOLE</span>
+                  <h3>Generate the project’s visual plan</h3>
+                  <p>{missingVisualCount} of {project.scenes.length} scenes currently need visuals. Existing assets are protected by default.</p>
+                </div>
+                <label>
+                  Project style
+                  <select value={batchStyleId} disabled={batch.active} onChange={(event) => setBatchStyleId(event.target.value)}>
+                    {suggestion?.styles.map((item) => <option value={item.style_id} key={item.style_id}>{item.label}</option>)}
+                  </select>
+                </label>
+                <label className="batch-production-replace">
+                  <input
+                    type="checkbox"
+                    checked={replaceExisting}
+                    disabled={batch.active}
+                    onChange={(event) => setReplaceExisting(event.target.checked)}
+                  />
+                  <span><strong>Replace existing visuals</strong><small>Regenerate every scene instead of filling only gaps.</small></span>
+                </label>
+                <button
+                  className="batch-production-start"
+                  disabled={busy || batch.active || !batchStyleId}
+                  onClick={() => void runBatch()}
+                >
+                  <span>✦</span>
+                  {replaceExisting ? "Regenerate all visuals" : "Generate all missing visuals"}
+                </button>
+              </section>
+            ) : null}
             {busy && !project ? (
               <div className="finance-motion-empty">Loading production workspace…</div>
             ) : project?.scenes.length ? (
               <div className="finance-motion-layout">
                 <aside className="finance-motion-scenes">
                   {project.scenes.map((item) => (
-                    <button className={item.id === sceneId ? "active" : ""} key={item.id} onClick={() => setSceneId(item.id)}>
+                    <button className={item.id === sceneId ? "active" : ""} key={item.id} disabled={batch.active} onClick={() => setSceneId(item.id)}>
                       <strong>Scene {String(item.scene_number).padStart(2, "0")}</strong>
                       <span>{durationLabel(item.duration_seconds)} · {item.selected_asset?.provider ?? "No visual"}</span>
                       <p>{item.narration}</p>
@@ -277,7 +500,7 @@ export function FinanceMotionLauncher() {
 
                       <div className="finance-motion-section-heading">
                         <div><span>VISUAL FAMILY</span><h3>Choose how the scene communicates</h3></div>
-                        <p>The director preselects the strongest route, but both systems remain available per scene.</p>
+                        <p>The director preselects the strongest route, but every modular family remains available per scene.</p>
                       </div>
                       <div className="exact-visual-family-grid">
                         {suggestion.families.map((item) => (
@@ -288,7 +511,7 @@ export function FinanceMotionLauncher() {
                             aria-pressed={item.family_id === familyId}
                           >
                             <div>
-                              <span>{item.family_id === "character_explainer" ? "◯╱╲" : "↗ 10%"}</span>
+                              <span>{familyGlyph(item.family_id)}</span>
                               {item.family_id === suggestion.recommended_family.family_id && <em>RECOMMENDED</em>}
                             </div>
                             <strong>{item.label}</strong>
@@ -307,7 +530,7 @@ export function FinanceMotionLauncher() {
 
                       <div className="finance-motion-section-heading">
                         <div><span>HOUSE STYLE</span><h3>Choose the visual language</h3></div>
-                        <p>All character and finance compositions support Clean, Premium, and Editorial art direction.</p>
+                        <p>All exact visual families support Clean, Premium, and Editorial art direction.</p>
                       </div>
                       <div className="finance-motion-style-grid">
                         {suggestion.styles.map((item) => (
@@ -356,7 +579,7 @@ export function FinanceMotionLauncher() {
                         </article>
                       ) : null}
 
-                      <button className="finance-motion-generate" disabled={busy} onClick={() => void generate()}>
+                      <button className="finance-motion-generate" disabled={busy || batch.active} onClick={() => void generate()}>
                         {busy ? `Rendering ${selectedFamily?.label ?? "exact"} 1080p visual…` : `Generate ${selectedStyle?.label ?? "art-directed"} ${selectedFamily?.label ?? "visual"}`}
                       </button>
                     </>
@@ -372,6 +595,68 @@ export function FinanceMotionLauncher() {
             ) : (
               <div className="finance-motion-empty">Create a project with scenes before generating exact visuals.</div>
             )}
+          </section>
+        </div>
+      )}
+
+      {(batch.active || batch.finished) && (
+        <div className="batch-production-overlay" role="dialog" aria-modal="true" aria-live="polite">
+          <section className="batch-production-progress-card">
+            <header>
+              <div>
+                <span>{batch.active ? "BATCH RENDER IN PROGRESS" : "BATCH PRODUCTION COMPLETE"}</span>
+                <h2>{project?.title ?? "Exact visual project"}</h2>
+                <p>{batch.active ? "Keep this tab open while local 1080p scenes are rendered and attached." : "Review the results before returning to the timeline."}</p>
+              </div>
+              <strong>{batchPercent}%</strong>
+            </header>
+
+            <div className="batch-production-progress-track" aria-label={`${batchPercent}% complete`}>
+              <i style={{ width: `${batchPercent}%` }} />
+            </div>
+
+            <div className="batch-production-counts">
+              <div><span>Completed</span><strong>{batch.completed}</strong></div>
+              <div><span>Skipped</span><strong>{batch.skipped}</strong></div>
+              <div><span>Failed</span><strong>{batch.failed}</strong></div>
+              <div><span>Processed</span><strong>{batch.processed}/{batch.total}</strong></div>
+            </div>
+
+            {batch.active && batch.currentSceneNumber !== null ? (
+              <article className="batch-production-current">
+                <span>NOW RENDERING</span>
+                <h3>Scene {String(batch.currentSceneNumber).padStart(2, "0")}</h3>
+                <p>{batch.currentFamily}</p>
+                <strong>{batch.currentTemplate}</strong>
+                <small>{batchStyle?.label ?? "Project style"} · Local project-owned 1080p motion</small>
+              </article>
+            ) : null}
+
+            <div className="batch-production-log">
+              {batch.entries.length ? batch.entries.map((entry) => (
+                <article className={entry.status} key={`${entry.sceneId}-${entry.status}`}>
+                  <span>Scene {String(entry.sceneNumber).padStart(2, "0")}</span>
+                  <div><strong>{entry.family}</strong><small>{entry.template}</small></div>
+                  <p>{entry.message}</p>
+                  <em>{entry.status}</em>
+                </article>
+              )) : <p className="batch-production-waiting">Directing the first scene…</p>}
+            </div>
+
+            {batch.finalizeError ? <div className="batch-production-finalize-error">Project finalization warning: {batch.finalizeError}</div> : null}
+
+            <footer>
+              {batch.active ? (
+                <p>Scenes render sequentially to protect memory, files, and project state.</p>
+              ) : (
+                <>
+                  {failedSceneIds.length ? (
+                    <button className="batch-production-retry" onClick={() => void runBatch(failedSceneIds, true)}>Retry failed scenes</button>
+                  ) : null}
+                  <button className="batch-production-done" onClick={dismissBatch}>Review Exact Visual Studio</button>
+                </>
+              )}
+            </footer>
           </section>
         </div>
       )}
