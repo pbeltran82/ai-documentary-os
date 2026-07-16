@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Asset, Scene
 from ..schemas import AssetRead
-from ..services import finance_motion_composition as _finance_motion_composition
-from ..services.finance_motion_art import (
+from ..services.finance_motion_choreography import (
     DEFAULT_STYLE_ID,
     render_finance_motion,
     render_frame,
+    storyboard_beats,
     style_catalog,
     suggest_template,
     template_catalog,
@@ -30,6 +30,13 @@ def get_scene_or_404(scene_id: int, db: Session) -> Scene:
     if scene is None:
         raise HTTPException(status_code=404, detail="Scene not found")
     return scene
+
+
+def _resolved_template_id(scene: Scene, template_id: str | None) -> str:
+    if template_id:
+        return template_id
+    template, _confidence, _reason = suggest_template(scene)
+    return template.template_id
 
 
 @router.get("/scenes/{scene_id}/finance-motion-suggestion")
@@ -53,20 +60,38 @@ def finance_motion_suggestion(
     }
 
 
+@router.get("/scenes/{scene_id}/finance-motion-storyboard")
+def finance_motion_storyboard(
+    scene_id: int,
+    template_id: str | None = Query(default=None, max_length=80),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    scene = get_scene_or_404(scene_id, db)
+    resolved_template = _resolved_template_id(scene, template_id)
+    duration = max(1.0, float(scene.duration_seconds))
+    return {
+        "template_id": resolved_template,
+        "duration_seconds": duration,
+        "beats": storyboard_beats(resolved_template, duration),
+    }
+
+
 @router.get("/scenes/{scene_id}/finance-motion-preview")
 def finance_motion_preview(
     scene_id: int,
     template_id: str | None = Query(default=None, max_length=80),
     style_id: str | None = Query(default=None, max_length=80),
+    time_seconds: float | None = Query(default=None, ge=0, le=300),
     db: Session = Depends(get_db),
 ) -> Response:
     scene = get_scene_or_404(scene_id, db)
-    resolved_template = template_id
-    if not resolved_template:
-        resolved_template, _confidence, _reason = suggest_template(scene)
-        resolved_template = resolved_template.template_id
+    resolved_template = _resolved_template_id(scene, template_id)
     duration = max(1.0, float(scene.duration_seconds))
-    preview_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
+    preview_time = (
+        min(duration - 0.03, max(0.0, float(time_seconds)))
+        if time_seconds is not None
+        else min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
+    )
     frame = render_frame(
         resolved_template,
         duration,
@@ -122,7 +147,7 @@ def generate_finance_motion(
         "license_url": "",
         "attribution": (
             "Generated locally by AI Documentary OS Finance Motion Studio · "
-            f"Visual Composition v1.2 · {generated.style.label}"
+            f"Motion Choreography v1.3 · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
         "local_preview_path": generated.preview_relative_path,
