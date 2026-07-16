@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Asset, Scene
 from ..schemas import AssetRead
+from ..services import finance_motion_truthful as _finance_motion_truthful
 from ..services.exact_visuals import (
     CHARACTER_FAMILY_ID,
     DEFAULT_STYLE_ID,
@@ -211,7 +212,7 @@ def generate_exact_visual(
         "license_name": "Project-owned generated media",
         "license_url": "",
         "attribution": (
-            "Generated locally by AI Documentary OS Exact Visual Studio v1.7.1 · "
+            "Generated locally by AI Documentary OS Exact Visual Studio v1.7.2 · "
             f"{family_label} · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
