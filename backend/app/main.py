@@ -20,6 +20,7 @@ from .routers.timeline import router as timeline_router
 from .schemas import HealthResponse
 from .services import animation_script_runtime as _animation_script_runtime
 from .services import cinematic_character_polish as _cinematic_character_polish
+from .services import character_pose_stability as _character_pose_stability
 from .services import manifest_events as _manifest_events
 from .services.media_library import MEDIA_ROOT
 
