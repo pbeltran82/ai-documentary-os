@@ -3,11 +3,11 @@
 }
 
 .sidebar-footer::before {
-  content: "v1.0.0";
+  content: "v1.0.1";
 }
 
 .sidebar-footer::after {
-  content: "Finance Motion Studio";
+  content: "Portable Motion Renderer";
 }
 
 .asset-workspace .project-topbar .status-pill {
@@ -15,6 +15,6 @@
 }
 
 .asset-workspace .project-topbar .status-pill::after {
-  content: "Visual Director + Motion v1.0";
+  content: "Visual Director + Motion v1.0.1";
   font-size: 0.75rem;
 }
