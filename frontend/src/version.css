@@ -1,0 +1,20 @@
+.sidebar-footer span {
+  display: none;
+}
+
+.sidebar-footer::before {
+  content: "v0.9.3";
+}
+
+.sidebar-footer::after {
+  content: "Adaptive Visual Feed";
+}
+
+.asset-workspace .project-topbar .status-pill {
+  font-size: 0;
+}
+
+.asset-workspace .project-topbar .status-pill::after {
+  content: "Adaptive Visual Feed v0.9.3";
+  font-size: 0.75rem;
+}
