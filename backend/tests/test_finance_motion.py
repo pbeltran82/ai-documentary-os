@@ -47,7 +47,10 @@ class FinanceMotionTests(unittest.TestCase):
 
     def test_automatic_investing_scene_gets_transfer_template(self) -> None:
         template, _confidence, _reason = suggest_template(
-            self.scene("Route ten percent automatically into an index fund every payday.")
+            self.scene(
+                "Route ten percent automatically into an index fund every payday.",
+                "A recurring automatic transfer from checking into an investment account.",
+            )
         )
         self.assertEqual(template.template_id, "recurring_transfer")
 
