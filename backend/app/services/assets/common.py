@@ -42,7 +42,7 @@ def json_request(
         url,
         headers={
             "Accept": "application/json",
-            "User-Agent": "AI-Documentary-OS/0.4",
+            "User-Agent": "AI-Documentary-OS/0.9.1",
             **(headers or {}),
         },
     )
@@ -93,11 +93,17 @@ def public_search_url(provider: str, query: str, media_type: str) -> str:
         )
     if provider == "unsplash":
         return f"https://unsplash.com/s/photos/{encoded}"
+    if provider == "openverse":
+        return f"https://openverse.org/search/image?q={encoded}"
     if provider == "wikimedia":
         return (
             "https://commons.wikimedia.org/w/index.php?"
             f"search={encoded}&title=Special:MediaSearch&type=image"
         )
+    if provider == "loc":
+        return f"https://www.loc.gov/photos/?q={encoded}"
+    if provider == "met":
+        return f"https://www.metmuseum.org/art/collection/search?q={encoded}&searchField=All"
     if provider == "nasa":
         return f"https://images.nasa.gov/search?q={encoded}&media={media_type}"
     return (
