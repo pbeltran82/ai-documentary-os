@@ -5,10 +5,41 @@ import unittest
 from PIL import ImageChops, ImageDraw
 
 from app.services import character_expressive as expressive
+from app.services import character_pose_stability
 from app.services import exact_visuals
 
 
 class ExpressiveCharacterTests(unittest.TestCase):
+    def test_character_studio_animation_vocabulary_is_supported(self) -> None:
+        expected = {
+            "walk", "run", "look", "think", "celebrate", "point", "wave",
+            "shrug", "confused", "nod", "shake_head", "type", "swipe", "tap", "idle",
+        }
+        self.assertTrue(expected.issubset(character_pose_stability.SUPPORTED_POSES))
+
+    def test_new_performance_methods_render_distinct_motion(self) -> None:
+        from PIL import Image
+
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (139, 92, 246),
+            "person_alt": (34, 211, 238),
+            "skin": (251, 191, 145),
+            "accent": (34, 211, 238),
+        }
+        for pose in ("run", "look", "think", "wave", "shrug", "confused", "nod", "shake_head", "type", "swipe"):
+            with self.subTest(pose=pose):
+                frames = []
+                for time_seconds in (0.15, 0.55):
+                    canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+                    expressive._CURRENT_TIME = time_seconds
+                    expressive._CURRENT_DURATION = 2.0
+                    expressive._expressive_person(
+                        ImageDraw.Draw(canvas), (350, 620), palette, scale=1.2, pose=pose
+                    )
+                    frames.append(canvas)
+                self.assertIsNotNone(ImageChops.difference(*frames).getbbox())
+
     def test_character_family_routes_through_expressive_renderer(self) -> None:
         self.assertIs(exact_visuals.character, expressive)
 

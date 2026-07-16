@@ -16,6 +16,16 @@ SUPPORTED_POSES = {
     "relaxed",
     "slump",
     "walk",
+    "run",
+    "look",
+    "think",
+    "wave",
+    "shrug",
+    "confused",
+    "nod",
+    "shake_head",
+    "type",
+    "swipe",
 }
 
 
@@ -34,10 +44,11 @@ def _sequence_state(
     fallback: str,
     *,
     mapper=lambda value: value,
+    beats: object = None,
 ) -> tuple[str, str, float]:
     if not values:
         return fallback, fallback, 0.0
-    position = _clamp(progress) * len(values)
+    position = runtime._sequence_position(progress, len(values), beats)
     index = min(len(values) - 1, int(min(position, len(values) - 0.000001)))
     local = position - index
     current = mapper(values[index])
@@ -85,12 +96,14 @@ def _stable_planned_person(*args, pose: str = "idle", mood: str = "neutral", **k
         progress,
         pose,
         mapper=lambda value: _supported_pose(value, pose),
+        beats=plan.get("animation_beats"),
     )
     current_mood, next_mood, mood_blend = _sequence_state(
         expressions,
         progress,
         mood,
         mapper=runtime._mapped_expression,
+        beats=plan.get("animation_beats"),
     )
     blend = max(pose_blend, mood_blend)
 

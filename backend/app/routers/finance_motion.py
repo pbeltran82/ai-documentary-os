@@ -11,6 +11,7 @@ from ..database import get_db
 from ..models import Asset, Project, Scene
 from ..schemas import AssetRead
 from ..services import finance_motion_truthful as _finance_motion_truthful
+from ..services import animation_script_runtime
 from ..services.exact_visuals import (
     CHARACTER_FAMILY_ID,
     DEFAULT_STYLE_ID,
@@ -147,13 +148,22 @@ def exact_visual_preview(
         if time_seconds is not None
         else min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
     )
-    frame = render_frame(
-        resolved_family,
-        resolved_template,
-        duration,
-        preview_time,
-        style_id or DEFAULT_STYLE_ID,
-    )
+    if resolved_family == CHARACTER_FAMILY_ID:
+        frame = animation_script_runtime.render_planned_frame(
+            scene,
+            resolved_template,
+            duration,
+            preview_time,
+            style_id or DEFAULT_STYLE_ID,
+        )
+    else:
+        frame = render_frame(
+            resolved_family,
+            resolved_template,
+            duration,
+            preview_time,
+            style_id or DEFAULT_STYLE_ID,
+        )
     output = BytesIO()
     frame.save(output, format="PNG", optimize=True)
     return Response(

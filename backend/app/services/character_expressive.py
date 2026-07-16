@@ -164,6 +164,7 @@ def _expressive_person(
     skin = palette["skin"]
     outline = (3, 6, 14)
     pulse = _performance_pulse()
+    motion_phase = _CURRENT_TIME * 6.2
 
     posture = {
         "slump": (18, 11, -7),
@@ -173,6 +174,16 @@ def _expressive_person(
         "receive": (-5, -2, 5),
         "point": (-3, -2, 6),
         "walk": (0, 0, 7),
+        "run": (-4, -3, 13),
+        "look": (0, 0, 4),
+        "think": (5, 3, -4),
+        "wave": (-2, -2, 5),
+        "shrug": (-7, -2, 0),
+        "confused": (5, 4, -5),
+        "nod": (0, round(6 * math.sin(motion_phase * 0.55)), 0),
+        "shake_head": (0, 0, round(7 * math.sin(motion_phase * 0.7))),
+        "type": (-1, -2, 6),
+        "swipe": (-2, -2, 7),
     }.get(pose, (0, 0, 0))
     shoulder_drop, head_drop, lean = posture
     lean += pulse * 8 * facing
@@ -181,6 +192,10 @@ def _expressive_person(
     shoulder = (x + round(lean * scale), ground_y - round((178 - shoulder_drop) * scale))
     neck = (shoulder[0] + round(2 * facing * scale), shoulder[1] - round(22 * scale))
     head = (neck[0] + round((5 + pulse * 4) * facing * scale), neck[1] - round((54 - head_drop) * scale))
+    if pose == "look":
+        head = (head[0] + round(8 * math.sin(motion_phase * 0.35) * scale), head[1])
+    elif pose == "shake_head":
+        head = (head[0] + round(10 * math.sin(motion_phase * 0.7) * scale), head[1])
 
     torso_width = round(54 * scale)
     shoulder_width = round(47 * scale)
@@ -223,6 +238,25 @@ def _expressive_person(
         front_hand = (x + round(54 * scale), shoulder[1] + round(124 * scale))
         rear_hand = (x - round(54 * scale), shoulder[1] + round(124 * scale))
         open_front = False
+    elif pose == "wave":
+        wave = math.sin(motion_phase * 1.15)
+        front_hand = (x + facing * round((80 + 10 * wave) * scale), shoulder[1] - round(86 * scale))
+        rear_hand = (x - facing * round(66 * scale), shoulder[1] + round(102 * scale))
+        open_front = True
+    elif pose in {"shrug", "confused"}:
+        lift = round((30 + 5 * math.sin(motion_phase * 0.5)) * scale)
+        front_hand = (x + facing * round(94 * scale), shoulder[1] + lift)
+        rear_hand = (x - facing * round(94 * scale), shoulder[1] + lift)
+        open_front = True
+    elif pose == "think":
+        front_hand = (head[0] + facing * round(35 * scale), head[1] + round(25 * scale))
+        rear_hand = (x - facing * round(62 * scale), shoulder[1] + round(105 * scale))
+        open_front = False
+    elif pose in {"type", "swipe"}:
+        travel = math.sin(motion_phase) if pose == "type" else math.sin(motion_phase * 0.45)
+        front_hand = (x + facing * round((72 + 20 * travel) * scale), shoulder[1] + round(55 * scale))
+        rear_hand = (x + facing * round((28 - 12 * travel) * scale), shoulder[1] + round(68 * scale))
+        open_front = pose == "swipe"
     else:
         front_hand = (x + facing * round(74 * scale), shoulder[1] + round(102 * scale))
         rear_hand = (x - facing * round(72 * scale), shoulder[1] + round(102 * scale))
@@ -241,9 +275,10 @@ def _expressive_person(
     _limb(draw, (front_shoulder, front_elbow, front_hand), body, limb_width)
     _limb(draw, (rear_shoulder, rear_elbow, rear_hand), body, limb_width)
     _hand(draw, front_hand, body, scale, open_hand=open_front)
-    _hand(draw, rear_hand, body, scale, open_hand=pose in {"celebrate", "relaxed"})
+    _hand(draw, rear_hand, body, scale, open_hand=pose in {"celebrate", "relaxed", "shrug", "confused"})
 
-    step = math.sin(_CURRENT_TIME * 6.2) if pose == "walk" else 0.0
+    locomotion_speed = 1.65 if pose == "run" else 1.0
+    step = math.sin(motion_phase * locomotion_speed) if pose in {"walk", "run"} else 0.0
     knee_y = ground_y - round(38 * scale)
     left_foot = (x - round((56 + 26 * step) * scale), ground_y)
     right_foot = (x + round((56 - 26 * step) * scale), ground_y - round(max(0.0, step) * 10 * scale))
@@ -259,7 +294,7 @@ def _expressive_person(
     _shoe(draw, left_foot, -1, body, scale)
     _shoe(draw, right_foot, 1, body, scale)
 
-    if pose in {"phone", "tap"}:
+    if pose in {"phone", "tap", "type", "swipe"}:
         phone_x = x + facing * round(76 * scale)
         phone_y = shoulder[1] + round(45 * scale)
         draw.rounded_rectangle((phone_x - round(20 * scale), phone_y - round(34 * scale), phone_x + round(20 * scale), phone_y + round(34 * scale)), radius=max(4, round(7 * scale)), fill=palette["ink"], outline=palette["accent"], width=max(2, round(3 * scale)))
