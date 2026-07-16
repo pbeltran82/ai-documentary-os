@@ -61,7 +61,7 @@ def search(query: str, media_type: str, per_page: int) -> tuple[list[AssetCandid
 
     batches: list[list[AssetCandidate]] = []
     remaining_values: list[int] = []
-    source_limit = max(6, per_page)
+    source_limit = min(max(4, per_page // 2), 8)
 
     for source_label, searcher in ARCHIVE_SEARCHERS:
         try:
