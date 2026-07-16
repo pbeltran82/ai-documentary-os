@@ -221,8 +221,8 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <span>v0.6.0</span>
-          <span>Timeline Builder</span>
+          <span>v0.7.1</span>
+          <span>Narration Coverage</span>
         </div>
       </aside>
 
@@ -243,6 +243,7 @@ function App() {
             error={error}
             onBack={returnToMissionControl}
             onOpenAssets={() => setWorkspaceMode("assets")}
+            onOpenScenes={() => setWorkspaceMode("scenes")}
           />
         ) : (
           <ProjectWorkspace
@@ -281,7 +282,7 @@ function App() {
             </article>
             <article className="stat-card accent">
               <span>Current focus</span>
-              <strong>Timeline Builder</strong>
+              <strong>Narration Coverage</strong>
             </article>
           </section>
 
