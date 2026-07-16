@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..models import Project, Scene
+from ..schemas import TimelineStyleUpdate
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, resolve_media_path
 from .voiceover import load_voiceover
 
@@ -23,7 +24,20 @@ RENDER_TIMEOUT_SECONDS = int(os.getenv("TIMELINE_RENDER_TIMEOUT_SECONDS", "3600"
 FFMPEG_NAME = os.getenv("FFMPEG_BIN", "ffmpeg")
 AUDIO_SAMPLE_RATE = int(os.getenv("TIMELINE_AUDIO_SAMPLE_RATE", "48000"))
 AUDIO_BITRATE = os.getenv("TIMELINE_AUDIO_BITRATE", "192k")
-ALIGNMENT_TOLERANCE_SECONDS = float(os.getenv("NARRATION_ALIGNMENT_TOLERANCE_SECONDS", "0.25"))
+ALIGNMENT_TOLERANCE_SECONDS = float(
+    os.getenv("NARRATION_ALIGNMENT_TOLERANCE_SECONDS", "0.25")
+)
+
+DEFAULT_STYLE = {
+    "transition_style": "crossfade",
+    "transition_duration_seconds": 0.35,
+    "photo_motion": "alternate",
+    "edge_fade_seconds": 0.35,
+}
+TRANSITION_FILTERS = {
+    "crossfade": "fade",
+    "fade_black": "fadeblack",
+}
 
 
 def utc_iso() -> str:
@@ -47,7 +61,107 @@ def ffmpeg_executable() -> str | None:
     return shutil.which(FFMPEG_NAME)
 
 
-def scene_clip(scene: Scene, input_index: int) -> tuple[dict[str, Any] | None, str | None]:
+def atomic_text_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        prefix=f".{path.name}-",
+        suffix=".tmp",
+        dir=path.parent,
+        delete=False,
+    ) as temporary:
+        temporary.write(content)
+        temporary_path = Path(temporary.name)
+    temporary_path.replace(path)
+
+
+def normalize_timeline_style(
+    style: TimelineStyleUpdate | dict[str, Any] | None,
+) -> dict[str, Any]:
+    normalized = dict(DEFAULT_STYLE)
+    if style is not None:
+        values = style.model_dump() if isinstance(style, TimelineStyleUpdate) else style
+        normalized.update(
+            {
+                key: values[key]
+                for key in DEFAULT_STYLE
+                if key in values and values[key] is not None
+            }
+        )
+
+    normalized["transition_duration_seconds"] = round(
+        max(0.0, min(1.0, float(normalized["transition_duration_seconds"]))),
+        3,
+    )
+    normalized["edge_fade_seconds"] = round(
+        max(0.0, min(2.0, float(normalized["edge_fade_seconds"]))),
+        3,
+    )
+    if normalized["transition_style"] == "cut":
+        normalized["transition_duration_seconds"] = 0.0
+    return normalized
+
+
+def timeline_style_path(project_id: int) -> Path:
+    return timeline_directory(project_id) / "style.json"
+
+
+def load_timeline_style(project_id: int) -> dict[str, Any]:
+    path = timeline_style_path(project_id)
+    if not path.is_file():
+        return normalize_timeline_style(None)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return normalize_timeline_style(None)
+    return normalize_timeline_style(payload if isinstance(payload, dict) else None)
+
+
+def save_timeline_style(
+    project_id: int,
+    style: TimelineStyleUpdate | dict[str, Any],
+) -> dict[str, Any]:
+    normalized = normalize_timeline_style(style)
+    atomic_text_write(
+        timeline_style_path(project_id),
+        json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
+    )
+    return normalized
+
+
+def transition_duration_for_boundary(
+    previous_clip: dict[str, Any],
+    next_clip: dict[str, Any],
+    requested_seconds: float,
+) -> float:
+    if requested_seconds <= 0:
+        return 0.0
+    safe_limit = min(
+        float(previous_clip["duration_seconds"]) * 0.25,
+        float(next_clip["duration_seconds"]) * 0.25,
+        0.75,
+    )
+    return round(max(0.0, min(requested_seconds, safe_limit)), 3)
+
+
+def photo_motion_for_clip(
+    clip_index: int,
+    media_type: str,
+    photo_motion: str,
+) -> str:
+    if media_type != "photo" or photo_motion == "static":
+        return "static"
+    if photo_motion == "alternate":
+        return "zoom_in" if clip_index % 2 == 0 else "zoom_out"
+    return photo_motion
+
+
+def scene_clip(
+    scene: Scene,
+    input_index: int,
+    style: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
     asset = scene.selected_asset
     if asset is None or scene.asset_status != "ready" or not asset.local_path:
         return None, "No ready local asset"
@@ -57,6 +171,11 @@ def scene_clip(scene: Scene, input_index: int) -> tuple[dict[str, Any] | None, s
         return None, "Local asset file is missing"
 
     duration = round(float(scene.duration_seconds), 3)
+    motion = photo_motion_for_clip(
+        input_index,
+        asset.media_type,
+        str(style["photo_motion"]),
+    )
     return (
         {
             "scene_id": scene.id,
@@ -65,6 +184,7 @@ def scene_clip(scene: Scene, input_index: int) -> tuple[dict[str, Any] | None, s
             "start_seconds": float(scene.start_seconds),
             "end_seconds": float(scene.end_seconds),
             "duration_seconds": duration,
+            "processed_duration_seconds": duration,
             "narration": scene.narration,
             "visual_intent": scene.visual_intent,
             "provider": asset.provider,
@@ -78,14 +198,61 @@ def scene_clip(scene: Scene, input_index: int) -> tuple[dict[str, Any] | None, s
             "license_name": asset.license_name,
             "attribution": asset.attribution,
             "source_file": str(source),
-            "assembly_action": (
-                f"Loop if needed, trim to {duration:g}s, fit 16:9"
-                if asset.media_type == "video"
-                else f"Hold for {duration:g}s, fit 16:9"
-            ),
+            "motion_effect": motion,
+            "transition_out": "cut",
+            "transition_duration_seconds": 0.0,
+            "assembly_action": "",
         },
         None,
     )
+
+
+def apply_edit_decisions(
+    clips: list[dict[str, Any]],
+    style: dict[str, Any],
+) -> None:
+    requested = float(style["transition_duration_seconds"])
+    transition_style = str(style["transition_style"])
+
+    for index, clip in enumerate(clips):
+        transition_seconds = 0.0
+        transition_out = "cut"
+        if index < len(clips) - 1 and transition_style != "cut":
+            transition_seconds = transition_duration_for_boundary(
+                clip,
+                clips[index + 1],
+                requested,
+            )
+            if transition_seconds > 0:
+                transition_out = transition_style
+
+        clip["transition_out"] = transition_out
+        clip["transition_duration_seconds"] = transition_seconds
+        clip["processed_duration_seconds"] = round(
+            float(clip["duration_seconds"]) + transition_seconds,
+            3,
+        )
+
+        base_action = (
+            f"Loop if needed, trim to {clip['duration_seconds']:g}s, fit 16:9"
+            if clip["media_type"] == "video"
+            else f"Hold for {clip['duration_seconds']:g}s, fit 16:9"
+        )
+        motion_label = {
+            "zoom_in": "gentle zoom in",
+            "zoom_out": "gentle zoom out",
+            "static": "static frame" if clip["media_type"] == "photo" else "native motion",
+        }[clip["motion_effect"]]
+        transition_label = {
+            "crossfade": f"{transition_seconds:g}s crossfade",
+            "fade_black": f"{transition_seconds:g}s fade through black",
+            "cut": "clean cut",
+        }[transition_out]
+        clip["assembly_action"] = (
+            f"{base_action}; {motion_label}; {transition_label} to next scene"
+            if index < len(clips) - 1
+            else f"{base_action}; {motion_label}; closing fade"
+        )
 
 
 def narration_alignment(
@@ -111,29 +278,105 @@ def narration_alignment(
     )
 
 
+def normalized_video_filter(
+    clip: dict[str, Any],
+    processed_duration: float,
+) -> str:
+    index = clip["input_index"]
+    return (
+        f"[{index}:v]"
+        f"trim=duration={processed_duration:.3f},"
+        "setpts=PTS-STARTPTS,"
+        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
+        f"pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        "setsar=1,"
+        f"fps={OUTPUT_FPS},"
+        "format=yuv420p"
+    )
+
+
+def normalized_photo_filter(
+    clip: dict[str, Any],
+    processed_duration: float,
+) -> str:
+    index = clip["input_index"]
+    motion = clip["motion_effect"]
+    base = (
+        f"[{index}:v]"
+        f"trim=duration={processed_duration:.3f},"
+        "setpts=PTS-STARTPTS,"
+        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
+        f"pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        "setsar=1,"
+    )
+    if motion == "static":
+        return base + f"fps={OUTPUT_FPS},format=yuv420p"
+
+    frames = max(2, int(round(processed_duration * OUTPUT_FPS)))
+    if motion == "zoom_out":
+        zoom_expression = f"1.08-0.08*on/{frames - 1}"
+    else:
+        zoom_expression = f"1.0+0.08*on/{frames - 1}"
+    return (
+        base
+        + f"zoompan=z='{zoom_expression}':"
+        "x='iw/2-(iw/zoom/2)':"
+        "y='ih/2-(ih/zoom/2)':"
+        f"d=1:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:fps={OUTPUT_FPS},"
+        "format=yuv420p"
+    )
+
+
 def build_filter_graph(
     clips: list[dict[str, Any]],
     runtime_seconds: float,
+    style: dict[str, Any],
     voiceover_input_index: int | None = None,
 ) -> str:
     filters: list[str] = []
-    for clip in clips:
-        index = clip["input_index"]
-        duration = clip["duration_seconds"]
-        filters.append(
-            f"[{index}:v]"
-            f"trim=duration={duration:.3f},"
-            "setpts=PTS-STARTPTS,"
-            f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
-            f"pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
-            "setsar=1,"
-            f"fps={OUTPUT_FPS},"
-            "format=yuv420p"
-            f"[v{index}]"
-        )
+    edge_fade = min(float(style["edge_fade_seconds"]), runtime_seconds / 3)
 
-    concat_inputs = "".join(f"[v{clip['input_index']}]" for clip in clips)
-    filters.append(f"{concat_inputs}concat=n={len(clips)}:v=1:a=0[outv]")
+    for clip_index, clip in enumerate(clips):
+        processed_duration = float(clip["processed_duration_seconds"])
+        chain = (
+            normalized_photo_filter(clip, processed_duration)
+            if clip["media_type"] == "photo"
+            else normalized_video_filter(clip, processed_duration)
+        )
+        if clip_index == 0 and edge_fade > 0:
+            chain += f",fade=t=in:st=0:d={edge_fade:.3f}"
+        if clip_index == len(clips) - 1 and edge_fade > 0:
+            fade_start = max(0.0, processed_duration - edge_fade)
+            chain += f",fade=t=out:st={fade_start:.3f}:d={edge_fade:.3f}"
+        chain += f"[v{clip_index}]"
+        filters.append(chain)
+
+    has_transitions = any(
+        float(clip["transition_duration_seconds"]) > 0 for clip in clips[:-1]
+    )
+    if len(clips) == 1:
+        filters.append("[v0]null[outv]")
+    elif style["transition_style"] == "cut" or not has_transitions:
+        concat_inputs = "".join(f"[v{index}]" for index in range(len(clips)))
+        filters.append(f"{concat_inputs}concat=n={len(clips)}:v=1:a=0[outv]")
+    else:
+        previous_label = "v0"
+        timeline_offset = 0.0
+        transition_filter = TRANSITION_FILTERS[str(style["transition_style"])]
+        for index in range(1, len(clips)):
+            timeline_offset += float(clips[index - 1]["duration_seconds"])
+            transition_seconds = float(
+                clips[index - 1]["transition_duration_seconds"]
+            )
+            output_label = "outv" if index == len(clips) - 1 else f"x{index}"
+            filters.append(
+                f"[{previous_label}][v{index}]"
+                f"xfade=transition={transition_filter}:"
+                f"duration={transition_seconds:.3f}:"
+                f"offset={timeline_offset:.3f}"
+                f"[{output_label}]"
+            )
+            previous_label = output_label
 
     if voiceover_input_index is not None:
         filters.append(
@@ -154,11 +397,13 @@ def build_ffmpeg_command(
     executable: str | None = None,
     voiceover: dict[str, Any] | None = None,
     runtime_seconds: float | None = None,
+    style: TimelineStyleUpdate | dict[str, Any] | None = None,
 ) -> list[str]:
     binary = executable or ffmpeg_executable() or FFMPEG_NAME
     runtime = runtime_seconds if runtime_seconds is not None else sum(
         float(clip["duration_seconds"]) for clip in clips
     )
+    normalized_style = normalize_timeline_style(style)
     command: list[str] = [binary, "-y", "-hide_banner"]
 
     for clip in clips:
@@ -184,7 +429,12 @@ def build_ffmpeg_command(
     command.extend(
         [
             "-filter_complex",
-            build_filter_graph(clips, runtime, voiceover_input_index),
+            build_filter_graph(
+                clips,
+                runtime,
+                normalized_style,
+                voiceover_input_index,
+            ),
             "-map",
             "[outv]",
         ]
@@ -223,27 +473,20 @@ def build_ffmpeg_command(
     return command
 
 
-def atomic_text_write(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        prefix=f".{path.name}-",
-        suffix=".tmp",
-        dir=path.parent,
-        delete=False,
-    ) as temporary:
-        temporary.write(content)
-        temporary_path = Path(temporary.name)
-    temporary_path.replace(path)
-
-
-def build_timeline_plan(project: Project) -> dict[str, Any]:
+def build_timeline_plan(
+    project: Project,
+    style: TimelineStyleUpdate | dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized_style = (
+        save_timeline_style(project.id, style)
+        if style is not None
+        else load_timeline_style(project.id)
+    )
     clips: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
 
     for scene in sorted(project.scenes, key=lambda item: item.scene_number):
-        clip, reason = scene_clip(scene, len(clips))
+        clip, reason = scene_clip(scene, len(clips), normalized_style)
         if clip is None:
             missing.append(
                 {
@@ -254,6 +497,8 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
             )
         else:
             clips.append(clip)
+
+    apply_edit_decisions(clips, normalized_style)
 
     timeline_dir = timeline_directory(project.id)
     output_path = timeline_dir / "first-cut.mp4"
@@ -271,6 +516,7 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
             executable,
             voiceover=voiceover,
             runtime_seconds=runtime,
+            style=normalized_style,
         )
         if clips and not missing
         else []
@@ -278,7 +524,7 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
     output_relative_path = relative_media_path(output_path)
 
     return {
-        "schema_version": "0.2",
+        "schema_version": "0.3",
         "generated_at": utc_iso(),
         "project_id": project.id,
         "project_title": project.title,
@@ -297,6 +543,7 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
             "audio_codec": "aac" if voiceover else None,
             "audio_bitrate": AUDIO_BITRATE if voiceover else None,
             "audio_sample_rate": AUDIO_SAMPLE_RATE if voiceover else None,
+            **normalized_style,
         },
         "voiceover": voiceover,
         "alignment_status": alignment_status,
@@ -316,8 +563,11 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
     }
 
 
-def write_timeline_plan(project: Project) -> dict[str, Any]:
-    plan = build_timeline_plan(project)
+def write_timeline_plan(
+    project: Project,
+    style: TimelineStyleUpdate | dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    plan = build_timeline_plan(project, style)
     timeline_dir = timeline_directory(project.id)
     plan_path = timeline_dir / "render-plan.json"
     script_path = timeline_dir / "render.sh"
@@ -344,8 +594,11 @@ def write_timeline_plan(project: Project) -> dict[str, Any]:
     return plan
 
 
-def render_first_cut(project: Project) -> dict[str, Any]:
-    plan = write_timeline_plan(project)
+def render_first_cut(
+    project: Project,
+    style: TimelineStyleUpdate | dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    plan = write_timeline_plan(project, style)
     if not plan["ready"]:
         missing_numbers = ", ".join(
             str(item["scene_number"]) for item in plan["missing_scenes"]
@@ -374,6 +627,7 @@ def render_first_cut(project: Project) -> dict[str, Any]:
         executable,
         voiceover=plan["voiceover"],
         runtime_seconds=plan["runtime_seconds"],
+        style=plan["settings"],
     )
     try:
         completed = subprocess.run(
@@ -403,8 +657,8 @@ def render_first_cut(project: Project) -> dict[str, Any]:
 
     rendered_plan = write_timeline_plan(project)
     rendered_plan["message"] = (
-        "Narrated first-cut preview rendered successfully"
+        "Narrated first-cut preview rendered with motion and transitions"
         if rendered_plan["voiceover"]
-        else "Silent first-cut preview rendered successfully"
+        else "Silent first-cut preview rendered with motion and transitions"
     )
     return rendered_plan
