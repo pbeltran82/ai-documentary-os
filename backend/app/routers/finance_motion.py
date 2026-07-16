@@ -211,7 +211,7 @@ def generate_exact_visual(
         "license_name": "Project-owned generated media",
         "license_url": "",
         "attribution": (
-            "Generated locally by AI Documentary OS Exact Visual Studio v1.7 · "
+            "Generated locally by AI Documentary OS Exact Visual Studio v1.7.1 · "
             f"{family_label} · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
