@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Asset, Scene
 from ..schemas import AssetRead
-from ..services.finance_motion import render_finance_motion, suggest_template, template_catalog
+from ..services.finance_motion_polish import (
+    render_finance_motion,
+    suggest_template,
+    template_catalog,
+)
 from ..services.media_library import resolve_media_path
 from .assets import update_project_asset_status
 
