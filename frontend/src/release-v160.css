@@ -1,0 +1,16 @@
+.sidebar-footer::before {
+  content: "v1.6.0";
+}
+
+.sidebar-footer::after {
+  content: "Subject-Aware Still Motion";
+}
+
+.timeline-workspace .project-topbar .status-pill {
+  font-size: 0;
+}
+
+.timeline-workspace .project-topbar .status-pill::after {
+  content: "Subject-Aware Still Motion v1.6";
+  font-size: 0.75rem;
+}
