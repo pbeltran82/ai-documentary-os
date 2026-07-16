@@ -8,8 +8,7 @@ from fastapi import HTTPException
 from PIL import ImageChops
 
 from app.models import Project, Scene
-from app.services import finance_motion_composition as _finance_motion_composition
-from app.services.finance_motion_art import (
+from app.services.finance_motion_choreography import (
     DEFAULT_STYLE_ID,
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
@@ -17,6 +16,7 @@ from app.services.finance_motion_art import (
     TEMPLATES,
     ffmpeg_encoder_command,
     render_frame,
+    storyboard_beats,
     style_catalog,
     suggest_template,
 )
@@ -107,6 +107,22 @@ class FinanceMotionTests(unittest.TestCase):
         self.assertEqual(DEFAULT_STYLE_ID, "premium_motion")
         self.assertTrue(all(len(item["swatches"]) == 4 for item in catalog))
 
+    def test_storyboard_beats_are_ordered_and_scene_specific(self) -> None:
+        beats = storyboard_beats("recurring_transfer", 7)
+        self.assertEqual([beat["label"] for beat in beats], ["PAYDAY", "AUTO-TRANSFER", "CONFIRMED"])
+        times = [float(beat["time_seconds"]) for beat in beats]
+        self.assertEqual(times, sorted(times))
+        self.assertTrue(all(0 < value < 7 for value in times))
+
+    def test_storyboard_keyframes_show_real_choreography_progression(self) -> None:
+        beats = storyboard_beats("paycheck_split", 7)
+        frames = [
+            render_frame("paycheck_split", 7, float(beat["time_seconds"]), DEFAULT_STYLE_ID)
+            for beat in beats
+        ]
+        self.assertIsNotNone(ImageChops.difference(frames[0], frames[1]).getbbox())
+        self.assertIsNotNone(ImageChops.difference(frames[1], frames[2]).getbbox())
+
     def test_exports_leave_the_footer_safe_area_unbranded(self) -> None:
         for style in STYLES:
             with self.subTest(style=style.style_id):
@@ -136,6 +152,8 @@ class FinanceMotionTests(unittest.TestCase):
             render_frame("not-a-template", 4, 1, DEFAULT_STYLE_ID)
         with self.assertRaises(HTTPException):
             render_frame("paycheck_split", 4, 1, "not-a-style")
+        with self.assertRaises(HTTPException):
+            storyboard_beats("not-a-template", 4)
 
 
 if __name__ == "__main__":
