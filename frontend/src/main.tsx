@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AnimationScriptLauncher } from "./components/AnimationScriptLauncher";
+import { BatchExitGuard } from "./components/BatchExitGuard";
 import { FinanceMotionLauncher } from "./components/FinanceMotionLauncher";
 import "./styles.css";
 import "./asset-planner.css";
@@ -15,11 +16,13 @@ import "./release-v140.css";
 import "./release-v150.css";
 import "./release-v160.css";
 import "./release-v170.css";
+import "./cinematic-polish.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
     <AnimationScriptLauncher />
     <FinanceMotionLauncher />
+    <BatchExitGuard />
   </StrictMode>,
 );
