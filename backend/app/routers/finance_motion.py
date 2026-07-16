@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Asset, Scene
+from ..models import Asset, Project, Scene
 from ..schemas import AssetRead
 from ..services import finance_motion_truthful as _finance_motion_truthful
 from ..services.exact_visuals import (
@@ -25,6 +25,7 @@ from ..services.exact_visuals import (
     suggest_template,
     template_catalog,
 )
+from ..services.manifest_events import defer_manifest_refresh, refresh_project_manifests
 from ..services.media_library import resolve_media_path
 from .assets import update_project_asset_status
 
@@ -168,6 +169,7 @@ def generate_exact_visual(
     family_id: str | None = Query(default=None, max_length=80),
     template_id: str | None = Query(default=None, max_length=80),
     style_id: str | None = Query(default=None, max_length=80),
+    defer_manifest: bool = Query(default=False),
     db: Session = Depends(get_db),
 ) -> Asset:
     scene = get_scene_or_404(scene_id, db)
@@ -212,7 +214,7 @@ def generate_exact_visual(
         "license_name": "Project-owned generated media",
         "license_url": "",
         "attribution": (
-            "Generated locally by AI Documentary OS Exact Visual Studio v1.7.2 · "
+            "Generated locally by AI Documentary OS Exact Visual Studio v1.8.0 · "
             f"{family_label} · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
@@ -228,6 +230,8 @@ def generate_exact_visual(
     scene.selected_asset = asset
     scene.asset_status = "ready"
     update_project_asset_status(scene.project)
+    if defer_manifest:
+        defer_manifest_refresh(db)
     try:
         db.commit()
     except Exception:
@@ -251,3 +255,19 @@ def generate_exact_visual(
         if path is not None:
             path.unlink(missing_ok=True)
     return asset
+
+
+@router.post("/projects/{project_id}/exact-visual-batch/finalize")
+def finalize_exact_visual_batch(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    refresh_project_manifests(db.get_bind(), [project_id])
+    return {
+        "project_id": project_id,
+        "status": "finalized",
+        "message": "Timeline render invalidated and project manifest refreshed once.",
+    }
