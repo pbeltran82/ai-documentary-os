@@ -8,6 +8,7 @@ import "./provider-hub.css";
 import "./visual-director.css";
 import "./timeline-builder.css";
 import "./narration.css";
+import "./finance-motion-composition.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
