@@ -17,6 +17,33 @@
   font-size: 0.75rem;
 }
 
+.finance-motion-header > div > span,
+.finance-motion-rule span,
+.exact-visual-family-recommendation + .finance-motion-section-heading p,
+.finance-motion-recommendation + .finance-motion-section-heading p {
+  font-size: 0;
+}
+
+.finance-motion-header > div > span::after {
+  content: "Direct rights-clean 1080p scenes with finance, character, or technology motion.";
+  font-size: 1rem;
+}
+
+.finance-motion-rule span::after {
+  content: "Human action gets a character. Money systems get finance motion. Algorithms and behavioral data get technology motion. Strong real footage remains valid.";
+  font-size: 0.9rem;
+}
+
+.exact-visual-family-recommendation + .finance-motion-section-heading p::after {
+  content: "The director preselects the strongest route, but every modular family remains available per scene.";
+  font-size: 0.78rem;
+}
+
+.finance-motion-recommendation + .finance-motion-section-heading p::after {
+  content: "Every exact visual family supports Clean, Premium, and Editorial art direction.";
+  font-size: 0.78rem;
+}
+
 .exact-visual-family-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
