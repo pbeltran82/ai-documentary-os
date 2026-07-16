@@ -79,7 +79,6 @@ class TimelineBuilderTests(unittest.TestCase):
             checksum_sha256="0" * 64,
         )
         scene.selected_asset = asset
-        scene.project = project
         return scene
 
     def make_project(self, media_type: str = "video") -> Project:
