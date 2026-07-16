@@ -7,7 +7,7 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.6 Timeline Builder
+## Current milestone: v0.7 Narration Alignment
 
 The working application now includes:
 
@@ -24,11 +24,13 @@ The working application now includes:
 - optional Pexels search when a key becomes available,
 - strict visual-relevance filtering for stock results,
 - local downloading of every selected visual,
-- SHA-256, content type, file size, source, creator, license, and attribution records,
+- source, creator, license, attribution, checksum, content type, and file-size records,
 - an automatically refreshed timeline manifest,
-- scene-by-scene assembly planning,
-- reproducible FFmpeg render scripts,
-- a playable local 1080p silent first-cut preview.
+- scene-by-scene FFmpeg assembly planning,
+- playable local 1080p first-cut previews,
+- local narration upload and FFprobe duration analysis,
+- explicit narration-versus-timeline mismatch warnings, and
+- narrated first-cut rendering with AAC audio.
 
 ## Architecture
 
@@ -36,8 +38,8 @@ The working application now includes:
 ai-documentary-os/
 ├── backend/                 FastAPI + SQLAlchemy + SQLite
 │   ├── app/services/assets  Replaceable media-provider adapters
-│   ├── app/services/        Local intake + FFmpeg assembly engine
-│   └── data/projects/       Local media, manifests, plans, and renders
+│   ├── app/services/        Local intake, narration, and FFmpeg assembly
+│   └── data/projects/       Local media, audio, manifests, plans, and renders
 ├── frontend/                React + TypeScript + Vite
 ├── docs/                    Master plan and creator pain log
 ├── episode-001/             Existing production workspace
@@ -56,7 +58,7 @@ chmod +x scripts/setup.sh scripts/dev.sh
 ./scripts/setup.sh
 ```
 
-The Timeline Builder requires FFmpeg:
+The Timeline Builder and narration analyzer require FFmpeg and FFprobe. Homebrew installs both together:
 
 ```bash
 brew install ffmpeg
@@ -73,7 +75,7 @@ Open:
 - Dashboard: `http://localhost:5173`
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
-- Downloaded media and renders: `http://localhost:8000/media/`
+- Downloaded media, audio, and renders: `http://localhost:8000/media/`
 
 Press `Control+C` in Terminal to stop both services.
 
@@ -99,7 +101,7 @@ Asset status: Missing
 
 ## Connecting visual providers
 
-Create or open `backend/.env`. The two currently useful keyed providers are:
+Create or open `backend/.env`:
 
 ```text
 PIXABAY_API_KEY=your_pixabay_key
@@ -127,9 +129,7 @@ The planner preserves the provider, creator, source page, original remote media 
 
 ## Local project files
 
-Selecting a visual downloads the media immediately and marks the scene `ready` only after the local copy succeeds.
-
-The project workspace is organized predictably:
+Selecting a visual downloads the media immediately and marks the scene `ready` only after the local copy succeeds. Uploading narration stores the audio locally and records its duration, checksum, content type, file size, and original filename.
 
 ```text
 backend/data/projects/
@@ -137,6 +137,9 @@ backend/data/projects/
     ├── assets/
     │   ├── scene-001-pixabay-12345.mp4
     │   └── scene-001-pixabay-12345-poster.jpg
+    ├── audio/
+    │   ├── narration.mp3
+    │   └── narration.json
     └── timeline/
         ├── manifest.json
         ├── render-plan.json
@@ -144,17 +147,17 @@ backend/data/projects/
         └── first-cut.mp4
 ```
 
-The timeline manifest includes scene timing, narration, local paths, checksums, source links, and rights metadata. The render plan adds exact clip operations and the complete FFmpeg command.
-
 Timeline API endpoints:
 
 ```text
-POST /api/projects/{project_id}/timeline-manifest
-POST /api/projects/{project_id}/timeline/plan
-POST /api/projects/{project_id}/timeline/render
+POST   /api/projects/{project_id}/timeline-manifest
+POST   /api/projects/{project_id}/timeline/plan
+PUT    /api/projects/{project_id}/timeline/narration?filename=voiceover.mp3
+DELETE /api/projects/{project_id}/timeline/narration
+POST   /api/projects/{project_id}/timeline/render
 ```
 
-## Timeline Builder behavior
+## Timeline and narration behavior
 
 For every ready scene, the assembly engine:
 
@@ -165,19 +168,32 @@ For every ready scene, the assembly engine:
 5. converts it to 30 fps and `yuv420p`, and
 6. concatenates every scene in timeline order.
 
-The v0.6 first cut is intentionally silent. Narration, music, transitions, captions, and final export controls are later milestones.
+When narration is attached, the engine:
 
-Optional local-media and render settings in `backend/.env`:
+1. inspects its exact duration with FFprobe,
+2. compares it with the visual timeline,
+3. reports whether it is aligned, shorter, or longer,
+4. pads short narration with silence or trims long narration to the timeline runtime, and
+5. muxes the voiceover into the first cut as AAC audio.
+
+The system preserves the original uploaded narration file. Automatic time-stretching is intentionally not applied because it can damage voice quality and storytelling cadence.
+
+Optional local-media, narration, and render settings in `backend/.env`:
 
 ```text
 PUBLIC_BACKEND_URL=http://localhost:8000
 MEDIA_ROOT=./data/projects
 MAX_ASSET_DOWNLOAD_BYTES=524288000
+MAX_NARRATION_UPLOAD_BYTES=262144000
 TIMELINE_OUTPUT_WIDTH=1920
 TIMELINE_OUTPUT_HEIGHT=1080
 TIMELINE_OUTPUT_FPS=30
 TIMELINE_RENDER_TIMEOUT_SECONDS=3600
+TIMELINE_AUDIO_SAMPLE_RATE=48000
+TIMELINE_AUDIO_BITRATE=192k
+NARRATION_ALIGNMENT_TOLERANCE_SECONDS=0.25
 FFMPEG_BIN=ffmpeg
+FFPROBE_BIN=ffprobe
 ```
 
 ## Existing local databases
@@ -188,9 +204,9 @@ The database lives at:
 backend/data/documentary_os.db
 ```
 
-Startup migrations remain additive. Existing projects, scenes, downloaded assets, and rights records are preserved.
+Startup migrations remain additive. Existing projects, scenes, downloaded assets, and rights records are preserved. Narration metadata is stored inside the local project folder, so no destructive database migration is required for v0.7.
 
-Secrets, the database, downloaded media, and generated exports are excluded from Git.
+Secrets, the database, downloaded media, narration, and generated exports are excluded from Git.
 
 ## Product direction
 
@@ -199,4 +215,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next milestone is **narration audio alignment**, followed by transitions, captions, music, and final export controls.
+The next milestone is **transitions and caption timing**, followed by music and final export controls.

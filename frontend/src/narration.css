@@ -1,0 +1,157 @@
+.narration-panel {
+  border-color: #3a345f;
+  background:
+    linear-gradient(145deg, rgba(67, 52, 126, 0.12), rgba(18, 20, 26, 0.9));
+}
+
+.narration-attached {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 14px;
+}
+
+.narration-file-card,
+.alignment-note,
+.narration-empty {
+  border: 1px solid #2d303a;
+  border-radius: 13px;
+  background: #0d0f13;
+}
+
+.narration-file-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+}
+
+.narration-file-card strong,
+.narration-file-card small {
+  display: block;
+}
+
+.narration-file-card strong {
+  margin-top: 7px;
+  overflow: hidden;
+  color: #eceaf2;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.narration-file-card small {
+  margin-top: 6px;
+  color: #858995;
+}
+
+.narration-file-card audio {
+  width: 100%;
+  min-width: 0;
+}
+
+.alignment-note {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  padding: 16px;
+}
+
+.alignment-note strong {
+  color: #d9dbe2;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.alignment-note span {
+  color: #858995;
+  font-size: 11px;
+}
+
+.alignment-note.aligned {
+  border-color: #315c4d;
+  background: #0e211a;
+}
+
+.alignment-note.aligned strong {
+  color: #a5ecd0;
+}
+
+.alignment-note.shorter,
+.alignment-note.longer {
+  border-color: #68532b;
+  background: #241d10;
+}
+
+.alignment-note.shorter strong,
+.alignment-note.longer strong {
+  color: #ffe0a0;
+}
+
+.narration-empty {
+  padding: 22px;
+  text-align: center;
+}
+
+.narration-empty strong {
+  color: #e2dff0;
+}
+
+.narration-empty p {
+  margin: 8px 0 0;
+  color: #858995;
+  font-size: 12px;
+}
+
+.narration-upload-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 14px;
+}
+
+.audio-file-picker {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px dashed #514879;
+  border-radius: 11px;
+  color: #c5c0ef;
+  background: #11101b;
+  cursor: pointer;
+}
+
+.audio-file-picker:hover {
+  border-color: #7564d8;
+}
+
+.audio-file-picker span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-file-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 980px) {
+  .narration-attached,
+  .narration-file-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .narration-upload-row {
+    grid-template-columns: 1fr;
+  }
+}

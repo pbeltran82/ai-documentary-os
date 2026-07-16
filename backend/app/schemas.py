@@ -201,6 +201,17 @@ class TimelineClipRead(BaseModel):
     assembly_action: str
 
 
+class VoiceoverRead(BaseModel):
+    original_filename: str
+    relative_path: str
+    public_url: str
+    content_type: str
+    file_size_bytes: int
+    checksum_sha256: str
+    duration_seconds: float
+    uploaded_at: str
+
+
 class TimelinePlanResponse(BaseModel):
     schema_version: str
     generated_at: str
@@ -212,6 +223,10 @@ class TimelinePlanResponse(BaseModel):
     clip_count: int
     missing_scenes: list[TimelineMissingScene] = Field(default_factory=list)
     settings: dict[str, Any]
+    voiceover: VoiceoverRead | None = None
+    alignment_status: str
+    duration_delta_seconds: float | None = None
+    alignment_message: str
     clips: list[TimelineClipRead] = Field(default_factory=list)
     command: list[str] = Field(default_factory=list)
     output_relative_path: str

@@ -14,12 +14,16 @@ from fastapi import HTTPException
 
 from ..models import Project, Scene
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, resolve_media_path
+from .voiceover import load_voiceover
 
 OUTPUT_WIDTH = int(os.getenv("TIMELINE_OUTPUT_WIDTH", "1920"))
 OUTPUT_HEIGHT = int(os.getenv("TIMELINE_OUTPUT_HEIGHT", "1080"))
 OUTPUT_FPS = int(os.getenv("TIMELINE_OUTPUT_FPS", "30"))
 RENDER_TIMEOUT_SECONDS = int(os.getenv("TIMELINE_RENDER_TIMEOUT_SECONDS", "3600"))
 FFMPEG_NAME = os.getenv("FFMPEG_BIN", "ffmpeg")
+AUDIO_SAMPLE_RATE = int(os.getenv("TIMELINE_AUDIO_SAMPLE_RATE", "48000"))
+AUDIO_BITRATE = os.getenv("TIMELINE_AUDIO_BITRATE", "192k")
+ALIGNMENT_TOLERANCE_SECONDS = float(os.getenv("NARRATION_ALIGNMENT_TOLERANCE_SECONDS", "0.25"))
 
 
 def utc_iso() -> str:
@@ -84,7 +88,34 @@ def scene_clip(scene: Scene, input_index: int) -> tuple[dict[str, Any] | None, s
     )
 
 
-def build_filter_graph(clips: list[dict[str, Any]]) -> str:
+def narration_alignment(
+    voiceover: dict[str, Any] | None,
+    runtime_seconds: float,
+) -> tuple[str, float | None, str]:
+    if voiceover is None:
+        return "missing", None, "Upload narration to render a voiced first cut."
+
+    delta = round(float(voiceover["duration_seconds"]) - runtime_seconds, 3)
+    if abs(delta) <= ALIGNMENT_TOLERANCE_SECONDS:
+        return "aligned", delta, "Narration and visual timeline are aligned."
+    if delta > 0:
+        return (
+            "longer",
+            delta,
+            f"Narration is {delta:g}s longer than the visual timeline and will be trimmed at render time.",
+        )
+    return (
+        "shorter",
+        delta,
+        f"Narration is {abs(delta):g}s shorter than the visual timeline; silence will fill the remainder.",
+    )
+
+
+def build_filter_graph(
+    clips: list[dict[str, Any]],
+    runtime_seconds: float,
+    voiceover_input_index: int | None = None,
+) -> str:
     filters: list[str] = []
     for clip in clips:
         index = clip["input_index"]
@@ -103,6 +134,17 @@ def build_filter_graph(clips: list[dict[str, Any]]) -> str:
 
     concat_inputs = "".join(f"[v{clip['input_index']}]" for clip in clips)
     filters.append(f"{concat_inputs}concat=n={len(clips)}:v=1:a=0[outv]")
+
+    if voiceover_input_index is not None:
+        filters.append(
+            f"[{voiceover_input_index}:a]"
+            "asetpts=PTS-STARTPTS,"
+            f"aresample={AUDIO_SAMPLE_RATE},"
+            "aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            f"apad=whole_dur={runtime_seconds:.3f},"
+            f"atrim=duration={runtime_seconds:.3f}"
+            "[outa]"
+        )
     return ";".join(filters)
 
 
@@ -110,8 +152,13 @@ def build_ffmpeg_command(
     clips: list[dict[str, Any]],
     output_path: Path,
     executable: str | None = None,
+    voiceover: dict[str, Any] | None = None,
+    runtime_seconds: float | None = None,
 ) -> list[str]:
     binary = executable or ffmpeg_executable() or FFMPEG_NAME
+    runtime = runtime_seconds if runtime_seconds is not None else sum(
+        float(clip["duration_seconds"]) for clip in clips
+    )
     command: list[str] = [binary, "-y", "-hide_banner"]
 
     for clip in clips:
@@ -129,13 +176,35 @@ def build_ffmpeg_command(
         else:
             command.extend(["-stream_loop", "-1", "-i", clip["source_file"]])
 
+    voiceover_input_index: int | None = None
+    if voiceover is not None:
+        voiceover_input_index = len(clips)
+        command.extend(["-i", voiceover["source_file"]])
+
     command.extend(
         [
             "-filter_complex",
-            build_filter_graph(clips),
+            build_filter_graph(clips, runtime, voiceover_input_index),
             "-map",
             "[outv]",
-            "-an",
+        ]
+    )
+    if voiceover_input_index is not None:
+        command.extend(
+            [
+                "-map",
+                "[outa]",
+                "-c:a",
+                "aac",
+                "-b:a",
+                AUDIO_BITRATE,
+            ]
+        )
+    else:
+        command.append("-an")
+
+    command.extend(
+        [
             "-c:v",
             "libx264",
             "-preset",
@@ -144,6 +213,8 @@ def build_ffmpeg_command(
             "18",
             "-pix_fmt",
             "yuv420p",
+            "-t",
+            f"{runtime:.3f}",
             "-movflags",
             "+faststart",
             str(output_path),
@@ -187,12 +258,27 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
     timeline_dir = timeline_directory(project.id)
     output_path = timeline_dir / "first-cut.mp4"
     executable = ffmpeg_executable()
-    command = build_ffmpeg_command(clips, output_path, executable) if clips and not missing else []
     runtime = max((float(scene.end_seconds) for scene in project.scenes), default=0.0)
+    voiceover = load_voiceover(project.id)
+    alignment_status, duration_delta, alignment_message = narration_alignment(
+        voiceover,
+        runtime,
+    )
+    command = (
+        build_ffmpeg_command(
+            clips,
+            output_path,
+            executable,
+            voiceover=voiceover,
+            runtime_seconds=runtime,
+        )
+        if clips and not missing
+        else []
+    )
     output_relative_path = relative_media_path(output_path)
 
     return {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "generated_at": utc_iso(),
         "project_id": project.id,
         "project_title": project.title,
@@ -207,8 +293,15 @@ def build_timeline_plan(project: Project) -> dict[str, Any]:
             "fps": OUTPUT_FPS,
             "video_codec": "libx264",
             "pixel_format": "yuv420p",
-            "audio": "none",
+            "audio": "narration" if voiceover else "none",
+            "audio_codec": "aac" if voiceover else None,
+            "audio_bitrate": AUDIO_BITRATE if voiceover else None,
+            "audio_sample_rate": AUDIO_SAMPLE_RATE if voiceover else None,
         },
+        "voiceover": voiceover,
+        "alignment_status": alignment_status,
+        "duration_delta_seconds": duration_delta,
+        "alignment_message": alignment_message,
         "clips": clips,
         "command": command,
         "output_relative_path": output_relative_path,
@@ -241,7 +334,11 @@ def write_timeline_plan(project: Project) -> dict[str, Any]:
         json.dumps(plan, indent=2, ensure_ascii=False) + "\n",
     )
     script = "#!/bin/sh\nset -eu\n"
-    script += (shlex.join(plan["command"]) + "\n") if plan["command"] else "echo 'Timeline is not ready to render.'\nexit 1\n"
+    script += (
+        shlex.join(plan["command"]) + "\n"
+        if plan["command"]
+        else "echo 'Timeline is not ready to render.'\nexit 1\n"
+    )
     atomic_text_write(script_path, script)
     script_path.chmod(0o755)
     return plan
@@ -271,7 +368,13 @@ def render_first_cut(project: Project) -> dict[str, Any]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.unlink(missing_ok=True)
 
-    command = build_ffmpeg_command(plan["clips"], output_path, executable)
+    command = build_ffmpeg_command(
+        plan["clips"],
+        output_path,
+        executable,
+        voiceover=plan["voiceover"],
+        runtime_seconds=plan["runtime_seconds"],
+    )
     try:
         completed = subprocess.run(
             command,
@@ -299,5 +402,9 @@ def render_first_cut(project: Project) -> dict[str, Any]:
         )
 
     rendered_plan = write_timeline_plan(project)
-    rendered_plan["message"] = "Silent first-cut preview rendered successfully"
+    rendered_plan["message"] = (
+        "Narrated first-cut preview rendered successfully"
+        if rendered_plan["voiceover"]
+        else "Silent first-cut preview rendered successfully"
+    )
     return rendered_plan
