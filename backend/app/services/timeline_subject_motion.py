@@ -92,7 +92,7 @@ def direct_still(scene: Scene, clip_index: int) -> StillDirection:
             0.50,
             0.50,
             "readability_hold",
-            24,
+            28,
             -0.16,
             0.82,
         )
@@ -253,7 +253,7 @@ def _zoom_parameters(
             f"(ih-ih/zoom)*{focal_y:.3f}",
         )
     if motion in {"pan_left", "pan_right"}:
-        zoom = "1.075"
+        zoom = "1.060"
         left = max(0.05, focal_x - 0.34)
         right = min(0.95, focal_x + 0.34)
         start, end = (right, left) if motion == "pan_left" else (left, right)
@@ -334,7 +334,7 @@ def apply_edit_decisions(
 
 def build_timeline_plan(project, style=None) -> dict[str, Any]:
     plan = _original_build_timeline_plan(project, style)
-    plan["schema_version"] = "0.5"
+    plan["schema_version"] = "0.4"
     plan["settings"]["still_direction"] = "subject_aware"
     return plan
 
