@@ -24,7 +24,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 
 @asynccontextmanager
@@ -38,7 +38,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=f"{APP_NAME} API",
     version=VERSION,
-    description="Local-first documentary command center with project-wide exact visual generation, full-page production progress, deferred manifest finalization, and modular visual families.",
+    description="Local-first documentary command center with project-wide batch generation, expressive jointed character performances, and modular exact visual families.",
     lifespan=lifespan,
 )
 
