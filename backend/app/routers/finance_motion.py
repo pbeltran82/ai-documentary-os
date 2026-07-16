@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Asset, Scene
 from ..schemas import AssetRead
+from ..services import finance_motion_composition as _finance_motion_composition
 from ..services.finance_motion_art import (
     DEFAULT_STYLE_ID,
     render_finance_motion,
+    render_frame,
     style_catalog,
     suggest_template,
     template_catalog,
@@ -48,6 +51,35 @@ def finance_motion_suggestion(
         "styles": style_catalog(),
         "default_style_id": DEFAULT_STYLE_ID,
     }
+
+
+@router.get("/scenes/{scene_id}/finance-motion-preview")
+def finance_motion_preview(
+    scene_id: int,
+    template_id: str | None = Query(default=None, max_length=80),
+    style_id: str | None = Query(default=None, max_length=80),
+    db: Session = Depends(get_db),
+) -> Response:
+    scene = get_scene_or_404(scene_id, db)
+    resolved_template = template_id
+    if not resolved_template:
+        resolved_template, _confidence, _reason = suggest_template(scene)
+        resolved_template = resolved_template.template_id
+    duration = max(1.0, float(scene.duration_seconds))
+    preview_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
+    frame = render_frame(
+        resolved_template,
+        duration,
+        preview_time,
+        style_id or DEFAULT_STYLE_ID,
+    )
+    output = BytesIO()
+    frame.save(output, format="PNG", optimize=True)
+    return Response(
+        content=output.getvalue(),
+        media_type="image/png",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/scenes/{scene_id}/finance-motion", response_model=AssetRead)
@@ -90,7 +122,7 @@ def generate_finance_motion(
         "license_url": "",
         "attribution": (
             "Generated locally by AI Documentary OS Finance Motion Studio · "
-            f"{generated.style.label}"
+            f"Visual Composition v1.2 · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
         "local_preview_path": generated.preview_relative_path,
