@@ -1,0 +1,20 @@
+.sidebar-footer span {
+  display: none;
+}
+
+.sidebar-footer::before {
+  content: "v1.4.0";
+}
+
+.sidebar-footer::after {
+  content: "Character Explainer";
+}
+
+.asset-workspace .project-topbar .status-pill {
+  font-size: 0;
+}
+
+.asset-workspace .project-topbar .status-pill::after {
+  content: "Exact Visual Studio v1.4";
+  font-size: 0.75rem;
+}
