@@ -9,6 +9,7 @@ import "./visual-director.css";
 import "./timeline-builder.css";
 import "./narration.css";
 import "./finance-motion-composition.css";
+import "./character-explainer.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
