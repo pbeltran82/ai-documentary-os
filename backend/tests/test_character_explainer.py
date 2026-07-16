@@ -8,8 +8,9 @@ from fastapi import HTTPException
 from PIL import ImageChops
 
 from app.models import Project, Scene
-from app.services import character_explainer as character
+from app.services import character_staging as character
 from app.services import exact_visuals
+from app.services import visual_staging
 
 
 class CharacterExplainerTests(unittest.TestCase):
@@ -144,6 +145,42 @@ class CharacterExplainerTests(unittest.TestCase):
         self.assertIsNotNone(ImageChops.difference(frames[1], frames[2]).getbbox())
         self.assertLess(float(beats[0]["time_seconds"]), float(beats[1]["time_seconds"]))
         self.assertLess(float(beats[1]["time_seconds"]), float(beats[2]["time_seconds"]))
+
+    def test_every_character_staging_plan_protects_the_face(self) -> None:
+        for template in character.CHARACTER_TEMPLATES:
+            with self.subTest(template=template.template_id):
+                plan = visual_staging.staging_plan(template.template_id)
+                self.assertTrue(plan.is_face_safe())
+
+    def test_face_pixels_remain_visible_in_previously_occluded_templates(self) -> None:
+        for template_id in ("spend_first", "automatic_investing_habit"):
+            beats = character.storyboard_beats(template_id, 4)
+            left, top, right, bottom = visual_staging.face_safe_zone(template_id)
+            crop_box = (left - 22, top - 22, right + 22, bottom + 22)
+            for style in character.STYLES:
+                for beat in beats:
+                    with self.subTest(
+                        template=template_id,
+                        style=style.style_id,
+                        beat=beat["label"],
+                    ):
+                        frame = character.render_frame(
+                            template_id,
+                            4,
+                            float(beat["time_seconds"]),
+                            style.style_id,
+                        )
+                        crop = frame.crop(crop_box)
+                        skin_like = sum(
+                            1
+                            for red, green, blue in crop.getdata()
+                            if red >= 175
+                            and green >= 110
+                            and blue >= 70
+                            and red > green
+                            and green >= blue
+                        )
+                        self.assertGreater(skin_like, 350)
 
     def test_character_exports_keep_footer_safe_area_unbranded(self) -> None:
         frame = character.render_frame(
