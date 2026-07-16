@@ -1,9 +1,9 @@
 .sidebar-footer::before {
-  content: "v1.8.0";
+  content: "v1.9.0";
 }
 
 .sidebar-footer::after {
-  content: "Batch Production Console";
+  content: "Expressive Character Studio";
 }
 
 .asset-workspace .project-topbar .status-pill,
@@ -13,7 +13,7 @@
 
 .asset-workspace .project-topbar .status-pill::after,
 .timeline-workspace .project-topbar .status-pill::after {
-  content: "Batch Production Console v1.8.0";
+  content: "Expressive Character Studio v1.9.0";
   font-size: 0.75rem;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .finance-motion-rule span::after {
-  content: "Human action gets a character. Money systems get finance motion. Algorithms and behavioral data get technology motion. Strong real footage remains valid.";
+  content: "Human behavior gets expressive character performance. Money systems get finance motion. Algorithms and behavioral data get technology motion. Strong real footage remains valid.";
   font-size: 0.9rem;
 }
 
@@ -46,6 +46,15 @@
 
 .exact-visual-family-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.exact-visual-family-grid > button:nth-child(2) > div > span {
+  font-size: 0;
+}
+
+.exact-visual-family-grid > button:nth-child(2) > div > span::after {
+  content: "◉╱╲✋";
+  font-size: 1rem;
 }
 
 .exact-visual-family-grid > button:nth-child(3) > div > span {
