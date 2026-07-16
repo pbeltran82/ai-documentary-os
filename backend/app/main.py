@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .database import Base, engine, migrate_sqlite_schema
 from .routers.adaptive_assets import router as adaptive_assets_router
 from .routers.assets import router as assets_router
+from .routers.finance_motion import router as finance_motion_router
 from .routers.projects import router as projects_router
 from .routers.scenes import router as scenes_router
 from .routers.timeline import router as timeline_router
@@ -23,7 +24,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "0.9.3"
+VERSION = "1.0.0"
 
 
 @asynccontextmanager
@@ -37,7 +38,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=f"{APP_NAME} API",
     version=VERSION,
-    description="Local-first documentary command center with adaptive visual search and editorial motion.",
+    description="Local-first documentary command center with generated finance motion graphics.",
     lifespan=lifespan,
 )
 
@@ -60,6 +61,7 @@ app.include_router(projects_router, prefix="/api")
 app.include_router(scenes_router, prefix="/api")
 app.include_router(assets_router, prefix="/api")
 app.include_router(adaptive_assets_router, prefix="/api")
+app.include_router(finance_motion_router, prefix="/api")
 app.include_router(timeline_router, prefix="/api")
 
 
