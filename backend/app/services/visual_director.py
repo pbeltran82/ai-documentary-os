@@ -204,7 +204,12 @@ def build_shot_brief(scene: Scene, media_type: str) -> ShotBrief:
     rule = brief_rule(context, media_type)
     if rule is None:
         keyword_phrases = unique_phrases(scene.search_keywords, 4)
-        subject = clean_phrase(scene.visual_intent or keyword_phrases[0] if keyword_phrases else scene.narration)
+        if scene.visual_intent.strip():
+            subject = clean_phrase(scene.visual_intent)
+        elif keyword_phrases:
+            subject = keyword_phrases[0]
+        else:
+            subject = clean_phrase(scene.narration)
         query_variants = unique_phrases(
             [
                 *keyword_phrases,
@@ -242,9 +247,9 @@ def provider_priority(media_type: str, brief: ShotBrief, configured: Iterable[st
     available = set(configured)
     brief_words = words(" ".join([brief.subject, *brief.must_show, *brief.query_variants]))
     if media_type == "video":
-        order = ["pixabay", "pexels", "nasa"]
+        order = ["pixabay", "pexels"]
     else:
-        order = ["unsplash", "pixabay", "wikimedia", "nasa", "pexels"]
+        order = ["unsplash", "pixabay", "wikimedia", "pexels"]
 
     if brief_words & {"space", "earth", "planet", "rocket", "nasa", "satellite"}:
         order = ["nasa", *[item for item in order if item != "nasa"]]
@@ -261,7 +266,6 @@ def candidate_text(candidate: AssetCandidate) -> str:
             " ".join(candidate.keywords),
             candidate.attribution,
             candidate.source_url,
-            candidate.query_variant,
         ]
     ).lower()
 
