@@ -44,7 +44,13 @@ class AssetBase(BaseModel):
 
 
 class AssetCandidate(AssetBase):
-    pass
+    description: str = Field(default="", max_length=5000)
+    keywords: list[str] = Field(default_factory=list, max_length=40)
+    query_variant: str = Field(default="", max_length=200)
+    director_score: float = Field(default=0, ge=0, le=100)
+    director_reasons: list[str] = Field(default_factory=list, max_length=6)
+    director_warnings: list[str] = Field(default_factory=list, max_length=6)
+    shortlist_rank: int | None = Field(default=None, ge=1, le=30)
 
 
 class AssetSelect(AssetBase):
@@ -155,6 +161,18 @@ class ProviderStatusResponse(BaseModel):
     source_url: str
 
 
+class ShotBrief(BaseModel):
+    scene_id: int
+    subject: str
+    action: str
+    setting: str
+    framing: str
+    mood: str
+    must_show: list[str] = Field(default_factory=list)
+    must_avoid: list[str] = Field(default_factory=list)
+    query_variants: list[str] = Field(default_factory=list)
+
+
 class AssetSearchResponse(BaseModel):
     provider: str
     configured: bool
@@ -163,6 +181,34 @@ class AssetSearchResponse(BaseModel):
     source_url: str
     rate_limit_remaining: int | None = None
     candidates: list[AssetCandidate] = Field(default_factory=list)
+
+
+class VisualDirectorResponse(BaseModel):
+    media_type: str
+    shot_brief: ShotBrief
+    search_queries: list[str] = Field(default_factory=list)
+    providers_searched: list[str] = Field(default_factory=list)
+    rate_limit_remaining: int | None = None
+    rejected_count: int = 0
+    candidates: list[AssetCandidate] = Field(default_factory=list)
+
+
+class VisualFeedbackCreate(BaseModel):
+    provider: str = Field(min_length=1, max_length=40)
+    provider_asset_id: str = Field(min_length=1, max_length=200)
+    reason: str = Field(
+        default="wrong_concept",
+        pattern="^(wrong_concept|too_generic|repetitive|poor_quality|bad_style)$",
+    )
+
+
+class VisualFeedbackRead(VisualFeedbackCreate):
+    scene_id: int
+    created_at: str
+
+
+class VisualFeedbackReset(BaseModel):
+    removed: int
 
 
 class TimelineManifestResponse(BaseModel):
