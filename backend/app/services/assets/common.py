@@ -94,7 +94,10 @@ def public_search_url(provider: str, query: str, media_type: str) -> str:
     if provider == "unsplash":
         return f"https://unsplash.com/s/photos/{encoded}"
     if provider == "wikimedia":
-        return f"https://openverse.org/search/image?q={encoded}"
+        return (
+            "https://commons.wikimedia.org/w/index.php?"
+            f"search={encoded}&title=Special:MediaSearch&type=image"
+        )
     if provider == "nasa":
         return f"https://images.nasa.gov/search?q={encoded}&media={media_type}"
     return (
