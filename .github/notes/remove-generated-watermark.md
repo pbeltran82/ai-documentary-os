@@ -1,1 +1,0 @@
-Temporary release note marker for Finance Motion Studio v1.0.2. This file will be removed before merge.
