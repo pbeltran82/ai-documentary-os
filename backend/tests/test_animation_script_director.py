@@ -56,6 +56,19 @@ class AnimationScriptDirectorTests(unittest.TestCase):
         plan = director.build_animation_plan(self.scene("A person receives a paycheck."))
         self.assertAlmostEqual(sum(plan["animation_beats"].values()), 1.0)
 
+    def test_plan_exposes_editable_direction_contract(self) -> None:
+        plan = director.build_animation_plan(self.scene("A person considers a difficult choice."))
+        for field in (
+            "character_action",
+            "expression_sequence",
+            "pose_sequence",
+            "props",
+            "camera_direction",
+            "animation_beats",
+            "transition_intention",
+        ):
+            self.assertIn(field, plan)
+
 
 if __name__ == "__main__":
     unittest.main()
