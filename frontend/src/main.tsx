@@ -10,6 +10,7 @@ import "./timeline-builder.css";
 import "./narration.css";
 import "./finance-motion-composition.css";
 import "./character-explainer.css";
+import "./release-v140.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
