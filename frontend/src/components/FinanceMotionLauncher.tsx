@@ -71,6 +71,15 @@ export function FinanceMotionLauncher() {
     () => suggestion?.styles.find((item) => item.style_id === styleId) ?? null,
     [suggestion, styleId],
   );
+  const selectedTemplate = useMemo(
+    () => suggestion?.templates.find((item) => item.template_id === templateId) ?? null,
+    [suggestion, templateId],
+  );
+  const previewUrl = useMemo(() => {
+    if (!sceneId || !templateId || !styleId) return "";
+    const parameters = new URLSearchParams({ template_id: templateId, style_id: styleId });
+    return `${API}/scenes/${sceneId}/finance-motion-preview?${parameters.toString()}`;
+  }, [sceneId, styleId, templateId]);
 
   useEffect(() => {
     if (!open || projects.length) return;
@@ -142,7 +151,7 @@ export function FinanceMotionLauncher() {
               <div>
                 <p>LOCAL CONTENT GENERATOR</p>
                 <h2>Finance Motion Studio</h2>
-                <span>Build an exact, rights-clean 1080p animation with deliberate art direction.</span>
+                <span>Build an exact, rights-clean 1080p animation with semantic visual composition.</span>
               </div>
               <button aria-label="Close" onClick={() => setOpen(false)}>×</button>
             </header>
@@ -156,7 +165,7 @@ export function FinanceMotionLauncher() {
               </label>
               <div className="finance-motion-rule">
                 <strong>Editorial rule</strong>
-                <span>Exact concept first. Style and polish serve the story—not the other way around.</span>
+                <span>Exact concept first. Semantic objects and art direction make the idea instantly readable.</span>
               </div>
             </div>
             {busy && !project ? (
@@ -184,7 +193,7 @@ export function FinanceMotionLauncher() {
 
                       <div className="finance-motion-section-heading">
                         <div><span>HOUSE STYLE</span><h3>Choose the visual language</h3></div>
-                        <p>Premium Motion is the richer default. Clean and Editorial remain available per scene.</p>
+                        <p>Style changes atmosphere. The semantic composition remains tied to the narration.</p>
                       </div>
                       <div className="finance-motion-style-grid">
                         {suggestion.styles.map((item) => (
@@ -213,8 +222,20 @@ export function FinanceMotionLauncher() {
                           </button>
                         ))}
                       </div>
+
+                      {previewUrl && (
+                        <article className="finance-motion-live-preview">
+                          <div className="finance-motion-preview-copy">
+                            <span>INSTANT COMPOSITION PREVIEW</span>
+                            <h3>{selectedTemplate?.label ?? "Exact visual"} · {selectedStyle?.label ?? "Art direction"}</h3>
+                            <p>Review the actual semantic objects, hierarchy, and palette before rendering the full scene.</p>
+                          </div>
+                          <img src={previewUrl} alt={`${selectedTemplate?.label ?? "Finance motion"} preview`} />
+                        </article>
+                      )}
+
                       <button className="finance-motion-generate" disabled={busy} onClick={() => void generate()}>
-                        {busy ? "Rendering art-directed 1080p visual…" : `Generate ${selectedStyle?.label ?? "art-directed"} visual`}
+                        {busy ? "Rendering composed 1080p visual…" : `Generate ${selectedStyle?.label ?? "art-directed"} visual`}
                       </button>
                     </>
                   )}
