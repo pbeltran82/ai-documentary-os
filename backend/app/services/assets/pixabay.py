@@ -151,6 +151,11 @@ def rank_hits(hits: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
     return sorted(strong, key=metrics, reverse=True)
 
 
+def descriptive_fields(item: dict[str, Any]) -> tuple[str, list[str]]:
+    description = str(item.get("tags") or "")
+    return description, sorted(word_set(description))[:40]
+
+
 def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
     creator = str(item.get("user") or "")
     creator_id = item.get("user_id")
@@ -159,6 +164,7 @@ def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
         if creator and creator_id
         else "https://pixabay.com"
     )
+    description, keywords = descriptive_fields(item)
     return AssetCandidate(
         provider="pixabay",
         provider_asset_id=str(item["id"]),
@@ -179,6 +185,8 @@ def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
         license_name="Pixabay Content License",
         license_url="https://pixabay.com/service/license-summary/",
         attribution=f"{creator} on Pixabay" if creator else "Media from Pixabay",
+        description=description,
+        keywords=keywords,
     )
 
 
@@ -209,6 +217,7 @@ def normalize_video(item: dict[str, Any]) -> AssetCandidate | None:
         if creator and creator_id
         else "https://pixabay.com"
     )
+    description, keywords = descriptive_fields(item)
     return AssetCandidate(
         provider="pixabay",
         provider_asset_id=str(item["id"]),
@@ -224,6 +233,8 @@ def normalize_video(item: dict[str, Any]) -> AssetCandidate | None:
         license_name="Pixabay Content License",
         license_url="https://pixabay.com/service/license-summary/",
         attribution=f"{creator} on Pixabay" if creator else "Media from Pixabay",
+        description=description,
+        keywords=keywords,
     )
 
 
