@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import quote, urlencode
 
 from ...schemas import AssetCandidate
 from .common import ProviderSpec, clean_html, json_request
+
+WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 def metadata_value(metadata: dict[str, Any], key: str) -> str:
@@ -21,6 +24,17 @@ def normalize_photo(page: dict[str, Any]) -> AssetCandidate | None:
     source_url = f"https://commons.wikimedia.org/wiki/{quote(title.replace(' ', '_'), safe=':_')}"
     creator = metadata_value(metadata, "Artist") or metadata_value(metadata, "Credit") or "Wikimedia contributor"
     license_name = metadata_value(metadata, "LicenseShortName") or metadata_value(metadata, "UsageTerms") or "See file page"
+    description = " ".join(
+        value
+        for value in (
+            title.replace("File:", ""),
+            metadata_value(metadata, "ObjectName"),
+            metadata_value(metadata, "ImageDescription"),
+            metadata_value(metadata, "Categories"),
+        )
+        if value
+    )
+    keywords = sorted(set(WORD_RE.findall(description.lower())))[:40]
     return AssetCandidate(
         provider="wikimedia",
         provider_asset_id=str(page.get("pageid") or title),
@@ -36,6 +50,8 @@ def normalize_photo(page: dict[str, Any]) -> AssetCandidate | None:
         license_name=license_name[:200],
         license_url=metadata_value(metadata, "LicenseUrl"),
         attribution=f"{creator} · {license_name}"[:2000],
+        description=description[:5000],
+        keywords=keywords,
     )
 
 
@@ -52,7 +68,7 @@ def search(query: str, _media_type: str, per_page: int) -> tuple[list[AssetCandi
         "iiprop": "url|mime|mediatype|extmetadata|size",
         "iiurlwidth": "960",
         "iiextmetadatalanguage": "en",
-        "iiextmetadatafilter": "Artist|Credit|LicenseShortName|LicenseUrl|UsageTerms",
+        "iiextmetadatafilter": "Artist|Credit|LicenseShortName|LicenseUrl|UsageTerms|ObjectName|ImageDescription|Categories",
         "origin": "*",
     }
     payload, _headers = json_request(

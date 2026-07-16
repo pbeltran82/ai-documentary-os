@@ -12,8 +12,12 @@ import type {
   SceneGenerateResponse,
   SceneUpdate,
   SelectedAsset,
+  ShotBrief,
   TimelineManifestResponse,
   TimelinePlan,
+  VisualDirectorResponse,
+  VisualFeedback,
+  VisualFeedbackReason,
 } from "./types";
 
 const API_BASE_URL =
@@ -73,6 +77,44 @@ export const api = {
   deleteScene: (sceneId: number) =>
     request<void>(`/scenes/${sceneId}`, { method: "DELETE" }),
   getProviderStatuses: () => request<ProviderStatus[]>("/providers/status"),
+  getShotBrief: (sceneId: number, mediaType: MediaType) => {
+    const params = new URLSearchParams({ media_type: mediaType });
+    return request<ShotBrief>(`/scenes/${sceneId}/shot-brief?${params.toString()}`);
+  },
+  directVisuals: (
+    sceneId: number,
+    options: {
+      media_type: MediaType;
+      provider?: "auto" | ProviderName;
+      per_page?: number;
+    },
+  ) => {
+    const params = new URLSearchParams({
+      media_type: options.media_type,
+      provider: options.provider ?? "auto",
+      per_page: String(options.per_page ?? 6),
+    });
+    return request<VisualDirectorResponse>(
+      `/scenes/${sceneId}/visual-director?${params.toString()}`,
+    );
+  },
+  rejectVisual: (
+    sceneId: number,
+    candidate: AssetCandidate,
+    reason: VisualFeedbackReason,
+  ) =>
+    request<VisualFeedback>(`/scenes/${sceneId}/visual-feedback`, {
+      method: "POST",
+      body: JSON.stringify({
+        provider: candidate.provider,
+        provider_asset_id: candidate.provider_asset_id,
+        reason,
+      }),
+    }),
+  resetVisualFeedback: (sceneId: number) =>
+    request<{ removed: number }>(`/scenes/${sceneId}/visual-feedback`, {
+      method: "DELETE",
+    }),
   searchAssets: (
     sceneId: number,
     options: {

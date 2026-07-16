@@ -19,6 +19,12 @@ export type AssetStatus = "missing" | "searching" | "selected" | "ready";
 export type MediaType = "video" | "photo";
 export type ProviderName = "pixabay" | "unsplash" | "wikimedia" | "nasa" | "pexels";
 export type NarrationAlignmentStatus = "missing" | "aligned" | "shorter" | "longer";
+export type VisualFeedbackReason =
+  | "wrong_concept"
+  | "too_generic"
+  | "repetitive"
+  | "poor_quality"
+  | "bad_style";
 
 export interface SelectedAsset {
   id: number;
@@ -63,6 +69,13 @@ export interface AssetCandidate {
   license_name: string;
   license_url: string;
   attribution: string;
+  description: string;
+  keywords: string[];
+  query_variant: string;
+  director_score: number;
+  director_reasons: string[];
+  director_warnings: string[];
+  shortlist_rank: number | null;
 }
 
 export interface ProviderStatus {
@@ -83,6 +96,36 @@ export interface AssetSearchResponse {
   source_url: string;
   rate_limit_remaining: number | null;
   candidates: AssetCandidate[];
+}
+
+export interface ShotBrief {
+  scene_id: number;
+  subject: string;
+  action: string;
+  setting: string;
+  framing: string;
+  mood: string;
+  must_show: string[];
+  must_avoid: string[];
+  query_variants: string[];
+}
+
+export interface VisualDirectorResponse {
+  media_type: MediaType;
+  shot_brief: ShotBrief;
+  search_queries: string[];
+  providers_searched: ProviderName[];
+  rate_limit_remaining: number | null;
+  rejected_count: number;
+  candidates: AssetCandidate[];
+}
+
+export interface VisualFeedback {
+  scene_id: number;
+  provider: ProviderName;
+  provider_asset_id: string;
+  reason: VisualFeedbackReason;
+  created_at: string;
 }
 
 export interface Scene {

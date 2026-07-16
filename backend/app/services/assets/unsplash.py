@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 from urllib.parse import quote, urlencode
 
 from ...schemas import AssetCandidate
 from .common import ProviderSpec, json_request, rate_limit_remaining
+
+WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 def with_utm(url: str) -> str:
@@ -19,6 +22,8 @@ def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
     links = item.get("links") or {}
     user = item.get("user") or {}
     creator = user.get("name") or user.get("username") or ""
+    description = str(item.get("description") or item.get("alt_description") or "")
+    keywords = sorted(set(WORD_RE.findall(description.lower())))[:40]
     return AssetCandidate(
         provider="unsplash",
         provider_asset_id=str(item["id"]),
@@ -34,6 +39,8 @@ def normalize_photo(item: dict[str, Any]) -> AssetCandidate:
         license_name="Unsplash License",
         license_url="https://unsplash.com/license",
         attribution=f"Photo by {creator} on Unsplash" if creator else "Photo on Unsplash",
+        description=description,
+        keywords=keywords,
     )
 
 
