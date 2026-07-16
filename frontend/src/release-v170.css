@@ -1,0 +1,18 @@
+.sidebar-footer::before {
+  content: "v1.7.0";
+}
+
+.sidebar-footer::after {
+  content: "Tech & Behavior Motion";
+}
+
+.asset-workspace .project-topbar .status-pill,
+.timeline-workspace .project-topbar .status-pill {
+  font-size: 0;
+}
+
+.asset-workspace .project-topbar .status-pill::after,
+.timeline-workspace .project-topbar .status-pill::after {
+  content: "Modular Exact Visuals v1.7";
+  font-size: 0.75rem;
+}
