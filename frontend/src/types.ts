@@ -19,12 +19,21 @@ export type AssetStatus = "missing" | "searching" | "selected" | "ready";
 export type MediaType = "video" | "photo";
 export type ProviderName = "pixabay" | "unsplash" | "wikimedia" | "nasa" | "pexels";
 export type NarrationAlignmentStatus = "missing" | "aligned" | "shorter" | "longer";
+export type TransitionStyle = "cut" | "crossfade" | "fade_black";
+export type PhotoMotion = "static" | "zoom_in" | "zoom_out" | "alternate";
 export type VisualFeedbackReason =
   | "wrong_concept"
   | "too_generic"
   | "repetitive"
   | "poor_quality"
   | "bad_style";
+
+export interface TimelineStyle {
+  transition_style: TransitionStyle;
+  transition_duration_seconds: number;
+  photo_motion: PhotoMotion;
+  edge_fade_seconds: number;
+}
 
 export interface SelectedAsset {
   id: number;
@@ -213,6 +222,7 @@ export interface TimelineClip {
   start_seconds: number;
   end_seconds: number;
   duration_seconds: number;
+  processed_duration_seconds: number;
   narration: string;
   visual_intent: string;
   provider: ProviderName;
@@ -226,6 +236,9 @@ export interface TimelineClip {
   license_name: string;
   attribution: string;
   source_file: string;
+  motion_effect: "static" | "zoom_in" | "zoom_out";
+  transition_out: TransitionStyle;
+  transition_duration_seconds: number;
   assembly_action: string;
 }
 
@@ -260,6 +273,10 @@ export interface TimelinePlan {
     audio_codec: string | null;
     audio_bitrate: string | null;
     audio_sample_rate: number | null;
+    transition_style: TransitionStyle;
+    transition_duration_seconds: number;
+    photo_motion: PhotoMotion;
+    edge_fade_seconds: number;
   };
   voiceover: Voiceover | null;
   alignment_status: NarrationAlignmentStatus;
