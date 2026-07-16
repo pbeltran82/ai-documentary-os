@@ -16,3 +16,22 @@
   content: "Modular Exact Visuals v1.7";
   font-size: 0.75rem;
 }
+
+.exact-visual-family-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.exact-visual-family-grid > button:nth-child(3) > div > span {
+  font-size: 0;
+}
+
+.exact-visual-family-grid > button:nth-child(3) > div > span::after {
+  content: "◎→◇";
+  font-size: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .exact-visual-family-grid {
+    grid-template-columns: 1fr;
+  }
+}
