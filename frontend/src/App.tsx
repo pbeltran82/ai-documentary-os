@@ -20,7 +20,7 @@ const pipeline = [
   { name: "Research", description: "Sources, facts, timeline" },
   { name: "Script", description: "Narration and story arc" },
   { name: "Scenes", description: "Timing and visual intent" },
-  { name: "Assets", description: "Search, select, generate" },
+  { name: "Assets", description: "Direct, rank, approve" },
   { name: "Timeline", description: "Automatic first assembly" },
   { name: "Export", description: "Polish and publish" },
 ];
@@ -221,8 +221,8 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <span>v0.7.1</span>
-          <span>Narration Coverage</span>
+          <span>v0.8.0</span>
+          <span>Visual Director</span>
         </div>
       </aside>
 
@@ -282,7 +282,7 @@ function App() {
             </article>
             <article className="stat-card accent">
               <span>Current focus</span>
-              <strong>Narration Coverage</strong>
+              <strong>Visual Director</strong>
             </article>
           </section>
 
