@@ -25,7 +25,7 @@ interface AssetPlannerProps {
 const providerFallbackLabels: Record<ProviderName, string> = {
   pixabay: "Pixabay",
   unsplash: "Unsplash",
-  wikimedia: "Wikimedia Commons",
+  wikimedia: "Open Archives",
   nasa: "NASA Images",
   pexels: "Pexels",
 };
@@ -409,7 +409,7 @@ export function AssetPlanner({
         </div>
         <div className="header-actions">
           <button className="ghost-button" onClick={onOpenScenes}>Scene Engine</button>
-          <span className="status-pill">Visual Director v0.8</span>
+          <span className="status-pill">Universal Visual Feed v0.9.2</span>
         </div>
       </header>
 
@@ -612,11 +612,11 @@ export function AssetPlanner({
 
             <div className="director-action-row">
               <div>
-                <strong>Search every relevant connected provider</strong>
-                <p>Rank by concept fit, framing, resolution, duration, and project diversity.</p>
+                <strong>Search every configured source in one global feed</strong>
+                <p>Rights-filter, deduplicate, and rank the strongest matches regardless of provider.</p>
               </div>
               <button className="primary-button" disabled={directing || loading || !brief} onClick={() => void directVisuals()}>
-                {directing ? "Directing shortlist…" : "Build director shortlist"}
+                {directing ? "Ranking global feed…" : "Build universal shortlist"}
               </button>
             </div>
 
@@ -645,7 +645,7 @@ export function AssetPlanner({
                 </div>
                 {directorResults.candidates.length === 0 ? (
                   <div className="empty-state compact-empty">
-                    <h4>No defensible shortlist yet.</h4>
+                    <h4>No defensible global shortlist yet.</h4>
                     <p>Try Stock photo, loosen the shot brief with a query chip, or reset rejected candidates.</p>
                   </div>
                 ) : (

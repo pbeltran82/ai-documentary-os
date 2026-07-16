@@ -31,7 +31,7 @@ ALIGNMENT_TOLERANCE_SECONDS = float(
 DEFAULT_STYLE = {
     "transition_style": "crossfade",
     "transition_duration_seconds": 0.35,
-    "photo_motion": "alternate",
+    "photo_motion": "editorial",
     "edge_fade_seconds": 0.35,
 }
 TRANSITION_FILTERS = {
@@ -145,16 +145,92 @@ def transition_duration_for_boundary(
     return round(max(0.0, min(requested_seconds, safe_limit)), 3)
 
 
+READABILITY_WORDS = {
+    "app",
+    "balance",
+    "bill",
+    "blueprint",
+    "budget",
+    "calendar",
+    "chart",
+    "document",
+    "graph",
+    "index",
+    "interface",
+    "map",
+    "newspaper",
+    "screen",
+    "statement",
+    "subscribe",
+    "text",
+}
+EMPHASIS_WORDS = {
+    "declined",
+    "empty",
+    "exact",
+    "first",
+    "important",
+    "never",
+    "nothing",
+    "opposite",
+    "warning",
+    "zero",
+}
+REVEAL_WORDS = {
+    "build",
+    "compound",
+    "future",
+    "growth",
+    "machine",
+    "plan",
+    "wealth",
+}
+
+
+def editorial_photo_motion(scene: Scene, clip_index: int) -> tuple[str, str]:
+    asset = scene.selected_asset
+    duration = float(scene.duration_seconds)
+    context = " ".join(
+        [scene.narration, scene.visual_intent, *scene.search_keywords]
+    ).lower()
+    context_words = set(context.replace("&", " ").split())
+    width = int(asset.width if asset is not None else 0)
+    height = int(asset.height if asset is not None else 0)
+    ratio = width / height if width > 0 and height > 0 else 0.0
+
+    if duration < 1.75:
+        return "static", "Very short still held steady for immediate readability"
+    if context_words & READABILITY_WORDS:
+        return "static", "Text, chart, map, or interface content held steady for readability"
+    if ratio >= 1.85 and duration >= 4:
+        direction = "pan_left" if scene.scene_number % 2 else "pan_right"
+        return direction, "Wide composition receives a slow documentary pan"
+    if context_words & EMPHASIS_WORDS:
+        return "zoom_in", "Narrative emphasis receives a restrained push-in"
+    if context_words & REVEAL_WORDS:
+        return "zoom_out", "Growth or reveal language receives a restrained pull-out"
+    if ratio and ratio < 1.1:
+        return "zoom_in", "Portrait-oriented source receives a subtle push-in over a soft background"
+    fallback = "zoom_in" if clip_index % 2 == 0 else "zoom_out"
+    return fallback, "Balanced editorial motion prevents a static slideshow feel"
+
+
 def photo_motion_for_clip(
+    scene: Scene,
     clip_index: int,
     media_type: str,
     photo_motion: str,
-) -> str:
-    if media_type != "photo" or photo_motion == "static":
-        return "static"
+) -> tuple[str, str]:
+    if media_type != "photo":
+        return "static", "Stock video keeps its native motion"
+    if photo_motion == "editorial":
+        return editorial_photo_motion(scene, clip_index)
+    if photo_motion == "static":
+        return "static", "Still-photo motion disabled by the saved timeline style"
     if photo_motion == "alternate":
-        return "zoom_in" if clip_index % 2 == 0 else "zoom_out"
-    return photo_motion
+        motion = "zoom_in" if clip_index % 2 == 0 else "zoom_out"
+        return motion, "Saved style alternates gentle zoom directions"
+    return photo_motion, f"Saved style applies {photo_motion.replace('_', ' ')}"
 
 
 def scene_clip(
@@ -171,7 +247,8 @@ def scene_clip(
         return None, "Local asset file is missing"
 
     duration = round(float(scene.duration_seconds), 3)
-    motion = photo_motion_for_clip(
+    motion, motion_reason = photo_motion_for_clip(
+        scene,
         input_index,
         asset.media_type,
         str(style["photo_motion"]),
@@ -199,6 +276,7 @@ def scene_clip(
             "attribution": asset.attribution,
             "source_file": str(source),
             "motion_effect": motion,
+            "motion_reason": motion_reason,
             "transition_out": "cut",
             "transition_duration_seconds": 0.0,
             "assembly_action": "",
@@ -241,6 +319,8 @@ def apply_edit_decisions(
         motion_label = {
             "zoom_in": "gentle zoom in",
             "zoom_out": "gentle zoom out",
+            "pan_left": "slow pan left",
+            "pan_right": "slow pan right",
             "static": "static frame" if clip["media_type"] == "photo" else "native motion",
         }[clip["motion_effect"]]
         transition_label = {
@@ -295,33 +375,62 @@ def normalized_video_filter(
     )
 
 
+def photo_zoom_expression(motion: str, frames: int, duration: float) -> tuple[str, str, str]:
+    progress = f"on/{max(1, frames - 1)}"
+    delta = 0.04 if duration <= 3 else 0.06 if duration <= 7 else 0.08
+    if motion == "zoom_out":
+        zoom = f"{1 + delta:.3f}-{delta:.3f}*{progress}"
+        return zoom, "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+    if motion == "pan_left":
+        return "1.060", f"(iw-iw/zoom)*(1-{progress})", "ih/2-(ih/zoom/2)"
+    if motion == "pan_right":
+        return "1.060", f"(iw-iw/zoom)*{progress}", "ih/2-(ih/zoom/2)"
+    zoom = f"1.000+{delta:.3f}*{progress}"
+    return zoom, "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+
+
 def normalized_photo_filter(
     clip: dict[str, Any],
     processed_duration: float,
 ) -> str:
     index = clip["input_index"]
     motion = clip["motion_effect"]
-    base = (
+    frames = max(2, int(round(processed_duration * OUTPUT_FPS)))
+    background_label = f"photo_bg_{index}"
+    foreground_label = f"photo_fg_{index}"
+    blurred_label = f"photo_blur_{index}"
+    framed_label = f"photo_frame_{index}"
+
+    graph = (
         f"[{index}:v]"
         f"trim=duration={processed_duration:.3f},"
         "setpts=PTS-STARTPTS,"
+        f"split=2[{background_label}][{foreground_label}];"
+        f"[{background_label}]"
+        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,"
+        f"crop={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
+        "gblur=sigma=28,"
+        "eq=brightness=-0.18:saturation=0.78,"
+        f"setsar=1[{blurred_label}];"
+        f"[{foreground_label}]"
         f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
-        f"pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
-        "setsar=1,"
+        f"setsar=1[{framed_label}];"
+        f"[{blurred_label}][{framed_label}]"
+        "overlay=(W-w)/2:(H-h)/2:shortest=1,"
     )
     if motion == "static":
-        return base + f"fps={OUTPUT_FPS},format=yuv420p"
+        return graph + f"fps={OUTPUT_FPS},format=yuv420p"
 
-    frames = max(2, int(round(processed_duration * OUTPUT_FPS)))
-    if motion == "zoom_out":
-        zoom_expression = f"1.08-0.08*on/{frames - 1}"
-    else:
-        zoom_expression = f"1.0+0.08*on/{frames - 1}"
+    zoom, x_position, y_position = photo_zoom_expression(
+        motion,
+        frames,
+        processed_duration,
+    )
     return (
-        base
-        + f"zoompan=z='{zoom_expression}':"
-        "x='iw/2-(iw/zoom/2)':"
-        "y='ih/2-(ih/zoom/2)':"
+        graph
+        + f"zoompan=z='{zoom}':"
+        f"x='{x_position}':"
+        f"y='{y_position}':"
         f"d=1:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:fps={OUTPUT_FPS},"
         "format=yuv420p"
     )
@@ -524,7 +633,7 @@ def build_timeline_plan(
     output_relative_path = relative_media_path(output_path)
 
     return {
-        "schema_version": "0.3",
+        "schema_version": "0.4",
         "generated_at": utc_iso(),
         "project_id": project.id,
         "project_title": project.title,

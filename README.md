@@ -7,7 +7,7 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.7.1 Narration Coverage Guardrails
+## Current milestone: v0.9.2 Universal Visual Feed + Editorial Still Motion
 
 The working application now includes:
 
@@ -19,14 +19,16 @@ The working application now includes:
 - provider-independent visual search,
 - Pixabay photo and video search,
 - Unsplash photography search,
-- Wikimedia Commons historical and cultural image search,
+- one quality-filtered Open Archives feed spanning Wikimedia Commons, Openverse, Library of Congress, and The Met,
 - NASA image and video search,
 - optional Pexels search when a key becomes available,
 - strict visual-relevance filtering for stock results,
 - local downloading of every selected visual,
 - source, creator, license, attribution, checksum, content type, and file-size records,
 - an automatically refreshed timeline manifest,
+- one globally ranked visual feed across every configured provider,
 - scene-by-scene FFmpeg assembly planning,
+- scene-aware still-image pushes, pulls, pans, steady holds, and soft 16:9 backgrounds,
 - playable local 1080p first-cut previews,
 - local narration upload and FFprobe duration analysis,
 - explicit narration-versus-timeline mismatch warnings,
@@ -123,7 +125,7 @@ Provider roles:
 |---|---:|---:|---:|---|
 | Pixabay | Yes | Yes | Yes | General stock media |
 | Unsplash | Yes | No | Yes | Cinematic photography |
-| Wikimedia Commons | Yes | No | No | History, maps, art, archives |
+| Open Archives | Yes | No | No | Wikimedia, Openverse, Library of Congress, and The Met |
 | NASA Images | Yes | Yes | No | Space, science, aviation, climate |
 | Pexels | Yes | Yes | Optional | Additional general stock media |
 
@@ -225,4 +227,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next milestone is **transitions and caption timing**, followed by music and final export controls.
+The next milestone is **caption timing and final export controls**, followed by music and publishing assistance.

@@ -221,13 +221,43 @@ class VisualDirectorTests(unittest.TestCase):
 
         self.assertEqual(shortlist[0].provider_asset_id, "fresh")
 
-    def test_default_finance_video_search_does_not_call_nasa(self) -> None:
+    def test_global_feed_includes_every_configured_provider(self) -> None:
         _project, scene = self.project_with_scene(
             "Route ten percent automatically into a low-cost S&P 500 index fund.",
         )
+        brief = build_shot_brief(scene, "photo")
+        providers = provider_priority(
+            "photo",
+            brief,
+            ["pixabay", "unsplash", "wikimedia", "nasa"],
+        )
+        self.assertEqual(
+            providers,
+            ["unsplash", "pixabay", "wikimedia", "nasa"],
+        )
+
+    def test_global_feed_deduplicates_same_media_url_across_providers(self) -> None:
+        _project, scene = self.project_with_scene(
+            "Spoiler alert: there’s never anything left.",
+        )
         brief = build_shot_brief(scene, "video")
-        providers = provider_priority("video", brief, ["pixabay", "nasa"])
-        self.assertEqual(providers, ["pixabay"])
+        first = self.candidate(
+            "first",
+            "bank account zero balance empty wallet",
+        )
+        duplicate = self.candidate(
+            "duplicate",
+            "bank account zero balance empty wallet",
+        ).model_copy(
+            update={
+                "provider": "pexels",
+                "download_url": first.download_url + "?duplicate=1",
+            }
+        )
+
+        shortlist = director_shortlist(scene, brief, [first, duplicate], set(), 6)
+
+        self.assertEqual(len(shortlist), 1)
 
 
 class VisualFeedbackTests(unittest.TestCase):

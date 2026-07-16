@@ -20,7 +20,7 @@ export type MediaType = "video" | "photo";
 export type ProviderName = "pixabay" | "unsplash" | "wikimedia" | "nasa" | "pexels";
 export type NarrationAlignmentStatus = "missing" | "aligned" | "shorter" | "longer";
 export type TransitionStyle = "cut" | "crossfade" | "fade_black";
-export type PhotoMotion = "static" | "zoom_in" | "zoom_out" | "alternate";
+export type PhotoMotion = "editorial" | "static" | "zoom_in" | "zoom_out" | "alternate";
 export type VisualFeedbackReason =
   | "wrong_concept"
   | "too_generic"
@@ -236,7 +236,8 @@ export interface TimelineClip {
   license_name: string;
   attribution: string;
   source_file: string;
-  motion_effect: "static" | "zoom_in" | "zoom_out";
+  motion_effect: "static" | "zoom_in" | "zoom_out" | "pan_left" | "pan_right";
+  motion_reason: string;
   transition_out: TransitionStyle;
   transition_duration_seconds: number;
   assembly_action: string;

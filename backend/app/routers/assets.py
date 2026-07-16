@@ -150,12 +150,17 @@ def direct_visual_search(
     for provider_name in provider_names:
         provider_spec = PROVIDERS[provider_name]
         provider_succeeded = False
-        for focused_query in queries:
+        provider_queries = (
+            queries[:1]
+            if provider == "auto" and provider_name == "wikimedia"
+            else queries
+        )
+        for focused_query in provider_queries:
             try:
                 candidates, remaining = provider_spec.search(
                     focused_query,
                     media_type,
-                    max(8, per_page * 2),
+                    max(6, per_page),
                 )
             except HTTPException:
                 if provider != "auto":
