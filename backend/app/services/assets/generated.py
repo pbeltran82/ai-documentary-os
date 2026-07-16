@@ -20,7 +20,7 @@ def search(
 SPEC = ProviderSpec(
     name="generated",
     label="Finance Motion Studio",
-    media_types=("video",),
+    media_types=(),
     env_key=None,
     setup_hint="Built in. Generates project-owned 1080p motion graphics locally with FFmpeg.",
     source_url="http://localhost:5173",
