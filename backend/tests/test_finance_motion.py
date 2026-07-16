@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from fastapi import HTTPException
 from PIL import ImageChops
 
 from app.models import Project, Scene
+from app.services import finance_motion_composition as _finance_motion_composition
 from app.services.finance_motion_art import (
     DEFAULT_STYLE_ID,
     OUTPUT_HEIGHT,
@@ -78,6 +80,15 @@ class FinanceMotionTests(unittest.TestCase):
                 frame = render_frame(template.template_id, 4, 1.5, DEFAULT_STYLE_ID)
                 self.assertEqual(frame.size, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
                 self.assertEqual(frame.mode, "RGB")
+
+    def test_semantic_templates_have_distinct_compositions(self) -> None:
+        signatures: set[str] = set()
+        for template in TEMPLATES:
+            frame = render_frame(template.template_id, 4, 2.0, "clean_infographic")
+            sample = frame.resize((96, 54))
+            signatures.add(hashlib.sha256(sample.tobytes()).hexdigest())
+            self.assertGreater(len(set(sample.getdata())), 35)
+        self.assertEqual(len(signatures), len(TEMPLATES))
 
     def test_all_house_styles_render_and_are_visually_distinct(self) -> None:
         frames = [
