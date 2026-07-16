@@ -1,6 +1,12 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import type { ProjectDetail, TimelinePlan } from "../types";
+import type {
+  PhotoMotion,
+  ProjectDetail,
+  TimelinePlan,
+  TimelineStyle,
+  TransitionStyle,
+} from "../types";
 
 interface TimelineBuilderProps {
   project: ProjectDetail;
@@ -10,6 +16,26 @@ interface TimelineBuilderProps {
   onOpenAssets: () => void;
   onOpenScenes: () => void;
 }
+
+const defaultTimelineStyle: TimelineStyle = {
+  transition_style: "crossfade",
+  transition_duration_seconds: 0.35,
+  photo_motion: "alternate",
+  edge_fade_seconds: 0.35,
+};
+
+const transitionLabels: Record<TransitionStyle, string> = {
+  cut: "Clean cuts",
+  crossfade: "Crossfade",
+  fade_black: "Fade through black",
+};
+
+const motionLabels: Record<PhotoMotion, string> = {
+  static: "Static stills",
+  zoom_in: "Gentle zoom in",
+  zoom_out: "Gentle zoom out",
+  alternate: "Alternate zoom in/out",
+};
 
 function formatTime(seconds: number): string {
   const whole = Math.max(0, Math.round(seconds));
@@ -34,6 +60,27 @@ function formatSeconds(seconds: number): string {
   return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
 }
 
+function styleFromPlan(plan: TimelinePlan): TimelineStyle {
+  return {
+    transition_style: plan.settings.transition_style,
+    transition_duration_seconds: plan.settings.transition_duration_seconds,
+    photo_motion: plan.settings.photo_motion,
+    edge_fade_seconds: plan.settings.edge_fade_seconds,
+  };
+}
+
+function clipMotionLabel(value: string): string {
+  if (value === "zoom_in") return "Zoom in";
+  if (value === "zoom_out") return "Zoom out";
+  return "Static";
+}
+
+function clipTransitionLabel(value: TransitionStyle, seconds: number): string {
+  if (value === "crossfade") return `${seconds}s crossfade`;
+  if (value === "fade_black") return `${seconds}s fade black`;
+  return "Clean cut";
+}
+
 export function TimelineBuilder({
   project,
   loading,
@@ -43,6 +90,8 @@ export function TimelineBuilder({
   onOpenScenes,
 }: TimelineBuilderProps) {
   const [plan, setPlan] = useState<TimelinePlan | null>(null);
+  const [style, setStyle] = useState<TimelineStyle>(defaultTimelineStyle);
+  const [styleDirty, setStyleDirty] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -107,20 +156,26 @@ export function TimelineBuilder({
       : "Assets missing";
 
   const renderButtonLabel = rendering
-    ? "Rendering with FFmpeg…"
+    ? "Rendering motion cut…"
     : isTrimmedExcerpt
       ? `Render ${formatTime(plan?.runtime_seconds ?? 0)} narrated excerpt`
       : isPaddedNarration
         ? "Render narrated cut + silence"
         : plan?.voiceover
-          ? "Render voiced first cut"
-          : "Render silent first cut";
+          ? "Render motion first cut"
+          : "Render silent motion cut";
 
-  async function buildPlan() {
+  function acceptPlan(nextPlan: TimelinePlan) {
+    setPlan(nextPlan);
+    setStyle(styleFromPlan(nextPlan));
+    setStyleDirty(false);
+  }
+
+  async function buildPlan(nextStyle?: TimelineStyle) {
     setPlanning(true);
     setLocalError("");
     try {
-      setPlan(await api.buildTimelinePlan(project.id));
+      acceptPlan(await api.buildTimelinePlan(project.id, nextStyle));
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Unable to build timeline plan");
     } finally {
@@ -128,16 +183,28 @@ export function TimelineBuilder({
     }
   }
 
+  async function applyMotionPlan() {
+    await buildPlan(style);
+  }
+
   async function renderFirstCut() {
     setRendering(true);
     setLocalError("");
     try {
-      setPlan(await api.renderTimeline(project.id));
+      acceptPlan(await api.renderTimeline(project.id, style));
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Unable to render first cut");
     } finally {
       setRendering(false);
     }
+  }
+
+  function updateStyle<K extends keyof TimelineStyle>(
+    key: K,
+    value: TimelineStyle[K],
+  ) {
+    setStyle((current) => ({ ...current, [key]: value }));
+    setStyleDirty(true);
   }
 
   function chooseNarration(event: ChangeEvent<HTMLInputElement>) {
@@ -150,7 +217,7 @@ export function TimelineBuilder({
     setUploading(true);
     setLocalError("");
     try {
-      setPlan(await api.uploadNarration(project.id, selectedFile));
+      acceptPlan(await api.uploadNarration(project.id, selectedFile));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
@@ -166,7 +233,7 @@ export function TimelineBuilder({
     setRemovingAudio(true);
     setLocalError("");
     try {
-      setPlan(await api.removeNarration(project.id));
+      acceptPlan(await api.removeNarration(project.id));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
@@ -188,12 +255,12 @@ export function TimelineBuilder({
           <p className="eyebrow">TIMELINE BUILDER</p>
           <h2>{project.title}</h2>
           <p className="project-summary">
-            Convert approved local assets into an exact first cut, then align and attach the project narration.
+            Assemble exact scene timing, add restrained documentary motion, and attach the project narration.
           </p>
         </div>
         <div className="header-actions">
           <button className="ghost-button" onClick={onOpenAssets}>Asset Planner</button>
-          <span className="status-pill">Narration Coverage v0.7.1</span>
+          <span className="status-pill">Timeline Motion v0.9</span>
         </div>
       </header>
 
@@ -224,6 +291,95 @@ export function TimelineBuilder({
         </article>
       </section>
 
+      <section className="panel motion-control-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">MOTION & TRANSITIONS</p>
+            <h3>Choose the editorial movement</h3>
+          </div>
+          <span className={`asset-status ${styleDirty ? "searching" : "ready"}`}>
+            {styleDirty ? "Changes pending" : "Plan saved"}
+          </span>
+        </div>
+
+        <div className="motion-control-grid">
+          <label>
+            <span>Scene transition</span>
+            <select
+              value={style.transition_style}
+              onChange={(event) => updateStyle(
+                "transition_style",
+                event.target.value as TransitionStyle,
+              )}
+            >
+              <option value="crossfade">Crossfade</option>
+              <option value="fade_black">Fade through black</option>
+              <option value="cut">Clean cut</option>
+            </select>
+          </label>
+          <label>
+            <span>Transition length</span>
+            <select
+              value={style.transition_duration_seconds}
+              disabled={style.transition_style === "cut"}
+              onChange={(event) => updateStyle(
+                "transition_duration_seconds",
+                Number(event.target.value),
+              )}
+            >
+              <option value={0.25}>0.25s · crisp</option>
+              <option value={0.35}>0.35s · documentary</option>
+              <option value={0.5}>0.50s · smooth</option>
+              <option value={0.65}>0.65s · deliberate</option>
+            </select>
+          </label>
+          <label>
+            <span>Still-photo motion</span>
+            <select
+              value={style.photo_motion}
+              onChange={(event) => updateStyle(
+                "photo_motion",
+                event.target.value as PhotoMotion,
+              )}
+            >
+              <option value="alternate">Alternate zoom in/out</option>
+              <option value="zoom_in">Gentle zoom in</option>
+              <option value="zoom_out">Gentle zoom out</option>
+              <option value="static">Static stills</option>
+            </select>
+          </label>
+          <label>
+            <span>Opening & closing fade</span>
+            <select
+              value={style.edge_fade_seconds}
+              onChange={(event) => updateStyle(
+                "edge_fade_seconds",
+                Number(event.target.value),
+              )}
+            >
+              <option value={0}>None</option>
+              <option value={0.25}>0.25s</option>
+              <option value={0.35}>0.35s</option>
+              <option value={0.5}>0.50s</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="motion-control-footer">
+          <p>
+            Crossfade handles overlap outside the scene slots, so the narration and final runtime stay exact.
+            Still photos receive a subtle Ken Burns move; stock videos keep their native motion.
+          </p>
+          <button
+            className="secondary-button"
+            disabled={!styleDirty || planning || rendering || loading}
+            onClick={() => void applyMotionPlan()}
+          >
+            {planning ? "Saving motion plan…" : "Apply motion plan"}
+          </button>
+        </div>
+      </section>
+
       <section className="panel timeline-command-panel">
         <div className="section-heading">
           <div>
@@ -239,8 +395,16 @@ export function TimelineBuilder({
           <div className="timeline-readiness">
             <strong>{readyAssets} of {project.scenes.length} scenes ready</strong>
             <p>
-              Videos are looped when necessary, trimmed to the scene slot, normalized to 1080p, and concatenated in scene order.
+              Clips are normalized to 1080p, timed exactly, given the saved motion treatment, and assembled in narration order.
             </p>
+            <p className="motion-summary">
+              {transitionLabels[style.transition_style]} · {motionLabels[style.photo_motion]} · {style.edge_fade_seconds}s edge fade
+            </p>
+            {styleDirty && (
+              <p className="timeline-warning">
+                Motion settings changed. Rendering will save and use the new plan.
+              </p>
+            )}
             {isTrimmedExcerpt && (
               <p className="timeline-warning">
                 This render is an excerpt. Only the first {formatTime(plan?.runtime_seconds ?? 0)} of the narration will be included.
@@ -256,7 +420,7 @@ export function TimelineBuilder({
               disabled={planning || rendering || loading}
               onClick={() => void buildPlan()}
             >
-              {planning ? "Building…" : "Refresh plan"}
+              {planning ? "Building…" : "Refresh saved plan"}
             </button>
             <button
               className="primary-button"
@@ -391,14 +555,14 @@ export function TimelineBuilder({
           <div className="section-heading">
             <div>
               <p className="eyebrow">FIRST-CUT PREVIEW</p>
-              <h3>{isTrimmedExcerpt ? "Playable narrated excerpt" : "Playable local assembly"}</h3>
+              <h3>{isTrimmedExcerpt ? "Playable narrated excerpt" : "Playable motion assembly"}</h3>
             </div>
             <span className="status-pill">
               {isTrimmedExcerpt
                 ? "Narrated excerpt"
                 : plan.voiceover
-                  ? "Narrated preview"
-                  : "Silent preview"}
+                  ? "Motion + narration"
+                  : "Motion preview"}
             </span>
           </div>
           <video key={previewUrl} className="timeline-video" controls playsInline src={previewUrl} />
@@ -406,6 +570,8 @@ export function TimelineBuilder({
             <span>{formatBytes(plan.output_size_bytes)}</span>
             <span>{formatTime(plan.runtime_seconds)}</span>
             <span>{plan.voiceover ? "AAC narration" : "No audio"}</span>
+            <span>{transitionLabels[plan.settings.transition_style]}</span>
+            <span>{motionLabels[plan.settings.photo_motion]}</span>
             {isTrimmedExcerpt && narrationCoverage && (
               <span>{formatSeconds(narrationCoverage.uncoveredSeconds)} narration not yet covered</span>
             )}
@@ -433,7 +599,7 @@ export function TimelineBuilder({
           </div>
         ) : (
           <div className="timeline-clip-list">
-            {plan.clips.map((clip) => (
+            {plan.clips.map((clip, index) => (
               <article className="timeline-clip-card" key={clip.scene_id}>
                 <img src={clip.preview_url} alt={`Scene ${clip.scene_number} selected visual`} />
                 <div className="timeline-clip-copy">
@@ -446,6 +612,10 @@ export function TimelineBuilder({
                     <span>{clip.media_type}</span>
                     <span>{clip.provider}</span>
                     <span>{clip.duration_seconds}s</span>
+                    {clip.media_type === "photo" && <span>{clipMotionLabel(clip.motion_effect)}</span>}
+                    {index < plan.clips.length - 1 && (
+                      <span>{clipTransitionLabel(clip.transition_out, clip.transition_duration_seconds)}</span>
+                    )}
                   </div>
                   <small>{clip.assembly_action}</small>
                 </div>

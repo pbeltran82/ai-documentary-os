@@ -15,6 +15,7 @@ import type {
   ShotBrief,
   TimelineManifestResponse,
   TimelinePlan,
+  TimelineStyle,
   VisualDirectorResponse,
   VisualFeedback,
   VisualFeedbackReason,
@@ -145,9 +146,10 @@ export const api = {
     request<TimelineManifestResponse>(`/projects/${projectId}/timeline-manifest`, {
       method: "POST",
     }),
-  buildTimelinePlan: (projectId: number) =>
+  buildTimelinePlan: (projectId: number, style?: TimelineStyle) =>
     request<TimelinePlan>(`/projects/${projectId}/timeline/plan`, {
       method: "POST",
+      body: style ? JSON.stringify(style) : undefined,
     }),
   uploadNarration: (projectId: number, file: File) =>
     request<TimelinePlan>(
@@ -164,8 +166,9 @@ export const api = {
     request<TimelinePlan>(`/projects/${projectId}/timeline/narration`, {
       method: "DELETE",
     }),
-  renderTimeline: (projectId: number) =>
+  renderTimeline: (projectId: number, style?: TimelineStyle) =>
     request<TimelinePlan>(`/projects/${projectId}/timeline/render`, {
       method: "POST",
+      body: style ? JSON.stringify(style) : undefined,
     }),
 };

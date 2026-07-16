@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Project, Scene
-from ..schemas import TimelinePlanResponse
+from ..schemas import TimelinePlanResponse, TimelineStyleUpdate
 from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.timeline_builder import render_first_cut, write_timeline_plan
 from ..services.voiceover import remove_voiceover, save_voiceover
@@ -32,10 +32,13 @@ def get_project_or_404(project_id: int, db: Session) -> Project:
 )
 def create_timeline_plan(
     project_id: int,
+    payload: TimelineStyleUpdate | None = None,
     db: Session = Depends(get_db),
 ) -> dict:
     project = get_project_or_404(project_id, db)
-    return write_timeline_plan(project)
+    if payload is not None:
+        invalidate_render_artifacts(project_id)
+    return write_timeline_plan(project, payload)
 
 
 @router.put(
@@ -75,7 +78,8 @@ def delete_narration(
 )
 def render_timeline(
     project_id: int,
+    payload: TimelineStyleUpdate | None = None,
     db: Session = Depends(get_db),
 ) -> dict:
     project = get_project_or_404(project_id, db)
-    return render_first_cut(project)
+    return render_first_cut(project, payload)

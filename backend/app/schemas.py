@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -218,6 +218,13 @@ class TimelineManifestResponse(BaseModel):
     manifest: dict[str, Any]
 
 
+class TimelineStyleUpdate(BaseModel):
+    transition_style: Literal["cut", "crossfade", "fade_black"] = "crossfade"
+    transition_duration_seconds: float = Field(default=0.35, ge=0, le=1)
+    photo_motion: Literal["static", "zoom_in", "zoom_out", "alternate"] = "alternate"
+    edge_fade_seconds: float = Field(default=0.35, ge=0, le=2)
+
+
 class TimelineMissingScene(BaseModel):
     scene_id: int
     scene_number: int
@@ -231,6 +238,7 @@ class TimelineClipRead(BaseModel):
     start_seconds: float
     end_seconds: float
     duration_seconds: float
+    processed_duration_seconds: float
     narration: str
     visual_intent: str
     provider: str
@@ -244,6 +252,9 @@ class TimelineClipRead(BaseModel):
     license_name: str
     attribution: str
     source_file: str
+    motion_effect: str
+    transition_out: str
+    transition_duration_seconds: float
     assembly_action: str
 
 
