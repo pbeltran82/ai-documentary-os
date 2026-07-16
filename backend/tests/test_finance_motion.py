@@ -4,12 +4,14 @@ import unittest
 from pathlib import Path
 
 from fastapi import HTTPException
+from PIL import ImageChops
 
 from app.models import Project, Scene
-from app.services.finance_motion import (
+from app.services.finance_motion_polish import (
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
     TEMPLATES,
+    _background,
     ffmpeg_encoder_command,
     render_frame,
     suggest_template,
@@ -74,6 +76,21 @@ class FinanceMotionTests(unittest.TestCase):
                 frame = render_frame(template.template_id, 4, 1.5)
                 self.assertEqual(frame.size, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
                 self.assertEqual(frame.mode, "RGB")
+
+    def test_exports_leave_the_footer_safe_area_unbranded(self) -> None:
+        frame = render_frame("paycheck_split", 4, 2)
+        clean_background = _background()
+        safe_area = (80, 930, 1840, 1040)
+        difference = ImageChops.difference(
+            frame.crop(safe_area),
+            clean_background.crop(safe_area),
+        )
+        self.assertIsNone(difference.getbbox())
+
+    def test_paycheck_template_has_real_motion_between_keyframes(self) -> None:
+        early = render_frame("paycheck_split", 4, 0.45)
+        settled = render_frame("paycheck_split", 4, 2.0)
+        self.assertIsNotNone(ImageChops.difference(early, settled).getbbox())
 
     def test_encoder_uses_raw_frames_not_optional_drawtext_filter(self) -> None:
         command = ffmpeg_encoder_command("ffmpeg", Path("output.mp4"))
