@@ -88,6 +88,7 @@ def relevance_score(candidate: AssetCandidate, query: str, highlight: bool) -> t
 def search(query: str, _media_type: str, per_page: int) -> tuple[list[AssetCandidate], int | None]:
     search_params = {
         "hasImages": "true",
+        "isPublicDomain": "true",
         "q": query,
     }
     payload, _headers = json_request(

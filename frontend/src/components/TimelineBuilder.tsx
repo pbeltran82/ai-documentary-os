@@ -20,7 +20,7 @@ interface TimelineBuilderProps {
 const defaultTimelineStyle: TimelineStyle = {
   transition_style: "crossfade",
   transition_duration_seconds: 0.35,
-  photo_motion: "alternate",
+  photo_motion: "editorial",
   edge_fade_seconds: 0.35,
 };
 
@@ -31,6 +31,7 @@ const transitionLabels: Record<TransitionStyle, string> = {
 };
 
 const motionLabels: Record<PhotoMotion, string> = {
+  editorial: "Editorial auto-direction",
   static: "Static stills",
   zoom_in: "Gentle zoom in",
   zoom_out: "Gentle zoom out",
@@ -72,6 +73,8 @@ function styleFromPlan(plan: TimelinePlan): TimelineStyle {
 function clipMotionLabel(value: string): string {
   if (value === "zoom_in") return "Zoom in";
   if (value === "zoom_out") return "Zoom out";
+  if (value === "pan_left") return "Pan left";
+  if (value === "pan_right") return "Pan right";
   return "Static";
 }
 
@@ -260,7 +263,7 @@ export function TimelineBuilder({
         </div>
         <div className="header-actions">
           <button className="ghost-button" onClick={onOpenAssets}>Asset Planner</button>
-          <span className="status-pill">Timeline Motion v0.9</span>
+          <span className="status-pill">Editorial Motion v0.9.2</span>
         </div>
       </header>
 
@@ -342,6 +345,7 @@ export function TimelineBuilder({
                 event.target.value as PhotoMotion,
               )}
             >
+              <option value="editorial">Editorial auto-direction</option>
               <option value="alternate">Alternate zoom in/out</option>
               <option value="zoom_in">Gentle zoom in</option>
               <option value="zoom_out">Gentle zoom out</option>
@@ -368,7 +372,7 @@ export function TimelineBuilder({
         <div className="motion-control-footer">
           <p>
             Crossfade handles overlap outside the scene slots, so the narration and final runtime stay exact.
-            Still photos receive a subtle Ken Burns move; stock videos keep their native motion.
+            Editorial mode chooses a restrained push, pull, pan, or steady hold per scene. Still photos use a soft 16:9 background; stock videos keep native motion.
           </p>
           <button
             className="secondary-button"
@@ -612,12 +616,13 @@ export function TimelineBuilder({
                     <span>{clip.media_type}</span>
                     <span>{clip.provider}</span>
                     <span>{clip.duration_seconds}s</span>
-                    {clip.media_type === "photo" && <span>{clipMotionLabel(clip.motion_effect)}</span>}
+                    {clip.media_type === "photo" && <span title={clip.motion_reason}>{clipMotionLabel(clip.motion_effect)}</span>}
                     {index < plan.clips.length - 1 && (
                       <span>{clipTransitionLabel(clip.transition_out, clip.transition_duration_seconds)}</span>
                     )}
                   </div>
                   <small>{clip.assembly_action}</small>
+                  {clip.media_type === "photo" && <small>{clip.motion_reason}</small>}
                 </div>
               </article>
             ))}

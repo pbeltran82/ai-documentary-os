@@ -244,19 +244,33 @@ def build_shot_brief(scene: Scene, media_type: str) -> ShotBrief:
 
 
 def provider_priority(media_type: str, brief: ShotBrief, configured: Iterable[str]) -> list[str]:
-    available = set(configured)
+    """Return every configured source in scene-aware order for one global feed."""
+    configured_names = list(dict.fromkeys(configured))
+    available = set(configured_names)
     brief_words = words(" ".join([brief.subject, *brief.must_show, *brief.query_variants]))
     if media_type == "video":
-        order = ["pixabay", "pexels"]
+        order = ["pixabay", "pexels", "nasa"]
     else:
-        order = ["unsplash", "pixabay", "wikimedia", "pexels"]
+        order = ["unsplash", "pixabay", "wikimedia", "nasa", "pexels"]
 
     if brief_words & {"space", "earth", "planet", "rocket", "nasa", "satellite"}:
         order = ["nasa", *[item for item in order if item != "nasa"]]
-    elif brief_words & {"historic", "history", "archive", "painting", "map", "war"}:
+    elif brief_words & {
+        "historic",
+        "historical",
+        "history",
+        "archive",
+        "archival",
+        "painting",
+        "map",
+        "war",
+        "museum",
+    }:
         order = ["wikimedia", *[item for item in order if item != "wikimedia"]]
 
-    return [name for name in order if name in available][:3]
+    ranked = [name for name in order if name in available]
+    ranked.extend(name for name in configured_names if name not in ranked)
+    return ranked
 
 
 def candidate_text(candidate: AssetCandidate) -> str:
@@ -388,6 +402,12 @@ def score_candidate(
     )
 
 
+def canonical_candidate_url(candidate: AssetCandidate) -> str:
+    """Collapse exact cross-provider duplicates without trusting URL query strings."""
+    value = (candidate.download_url or candidate.preview_url or "").strip().lower()
+    return value.split("#", 1)[0].split("?", 1)[0]
+
+
 def director_shortlist(
     scene: Scene,
     brief: ShotBrief,
@@ -412,10 +432,14 @@ def director_shortlist(
     shortlist: list[AssetCandidate] = []
     per_provider: dict[str, int] = {}
     per_query: dict[str, int] = {}
-    seen: set[tuple[str, str]] = set()
+    seen_assets: set[tuple[str, str]] = set()
+    seen_urls: set[str] = set()
     for candidate in scored:
         identity = (candidate.provider, candidate.provider_asset_id)
-        if identity in seen or candidate.director_score < 58:
+        media_url = canonical_candidate_url(candidate)
+        if identity in seen_assets or candidate.director_score < 58:
+            continue
+        if media_url and media_url in seen_urls:
             continue
         if per_provider.get(candidate.provider, 0) >= 3:
             continue
@@ -425,7 +449,9 @@ def director_shortlist(
         shortlist.append(
             candidate.model_copy(update={"shortlist_rank": len(shortlist) + 1})
         )
-        seen.add(identity)
+        seen_assets.add(identity)
+        if media_url:
+            seen_urls.add(media_url)
         per_provider[candidate.provider] = per_provider.get(candidate.provider, 0) + 1
         if query_key:
             per_query[query_key] = per_query.get(query_key, 0) + 1

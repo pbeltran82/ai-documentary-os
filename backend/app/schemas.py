@@ -221,7 +221,7 @@ class TimelineManifestResponse(BaseModel):
 class TimelineStyleUpdate(BaseModel):
     transition_style: Literal["cut", "crossfade", "fade_black"] = "crossfade"
     transition_duration_seconds: float = Field(default=0.35, ge=0, le=1)
-    photo_motion: Literal["static", "zoom_in", "zoom_out", "alternate"] = "alternate"
+    photo_motion: Literal["editorial", "static", "zoom_in", "zoom_out", "alternate"] = "editorial"
     edge_fade_seconds: float = Field(default=0.35, ge=0, le=2)
 
 
@@ -253,6 +253,7 @@ class TimelineClipRead(BaseModel):
     attribution: str
     source_file: str
     motion_effect: str
+    motion_reason: str
     transition_out: str
     transition_duration_seconds: float
     assembly_action: str

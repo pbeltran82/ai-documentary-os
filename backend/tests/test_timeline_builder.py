@@ -114,7 +114,7 @@ class TimelineBuilderTests(unittest.TestCase):
             plan = timeline_builder.write_timeline_plan(project)
 
         self.assertTrue(plan["ready"])
-        self.assertEqual(plan["schema_version"], "0.3")
+        self.assertEqual(plan["schema_version"], "0.4")
         self.assertEqual(plan["clip_count"], 1)
         self.assertEqual(plan["runtime_seconds"], 5)
         self.assertIn("-stream_loop", plan["command"])
@@ -141,9 +141,10 @@ class TimelineBuilderTests(unittest.TestCase):
         self.assertIn("-framerate", plan["command"])
         self.assertNotIn("-stream_loop", plan["command"])
         filter_graph = plan["command"][plan["command"].index("-filter_complex") + 1]
-        self.assertIn("zoompan=z='1.0+0.08*on/", filter_graph)
-        self.assertEqual(plan["clips"][0]["motion_effect"], "zoom_in")
-        self.assertIn("gentle zoom in", plan["clips"][0]["assembly_action"])
+        self.assertIn("gblur=sigma=28", filter_graph)
+        self.assertIn("overlay=(W-w)/2:(H-h)/2", filter_graph)
+        self.assertEqual(plan["clips"][0]["motion_effect"], "static")
+        self.assertIn("readability", plan["clips"][0]["motion_reason"].lower())
 
     def test_crossfade_preserves_exact_timeline_runtime(self) -> None:
         project = self.make_project("video")
@@ -224,6 +225,37 @@ class TimelineBuilderTests(unittest.TestCase):
         self.assertEqual(loaded["transition_style"], "cut")
         self.assertEqual(loaded["transition_duration_seconds"], 0)
         self.assertEqual(loaded["photo_motion"], "static")
+
+    def test_editorial_motion_pans_wide_archival_still(self) -> None:
+        project = self.make_project("photo")
+        scene = project.scenes[0]
+        scene.visual_intent = "Wide historic factory panorama"
+        scene.search_keywords = ["historic archive factory"]
+        scene.duration_seconds = 6
+        scene.end_seconds = 6
+        scene.selected_asset.width = 2400
+        scene.selected_asset.height = 1000
+
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(project)
+
+        self.assertEqual(plan["clips"][0]["motion_effect"], "pan_left")
+        self.assertIn("documentary pan", plan["clips"][0]["motion_reason"])
+        filter_graph = plan["command"][plan["command"].index("-filter_complex") + 1]
+        self.assertIn("zoompan=z='1.060'", filter_graph)
+
+    def test_editorial_motion_pushes_into_emphasis_scene(self) -> None:
+        project = self.make_project("photo")
+        scene = project.scenes[0]
+        scene.narration = "There is nothing left."
+        scene.visual_intent = "An empty wallet"
+        scene.search_keywords = ["empty wallet"]
+
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(project)
+
+        self.assertEqual(plan["clips"][0]["motion_effect"], "zoom_in")
+        self.assertIn("push-in", plan["clips"][0]["motion_reason"])
 
     def test_missing_asset_blocks_render_plan(self) -> None:
         project = self.make_project("video")
