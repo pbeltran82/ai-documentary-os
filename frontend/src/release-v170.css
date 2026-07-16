@@ -1,0 +1,64 @@
+.sidebar-footer::before {
+  content: "v1.7.0";
+}
+
+.sidebar-footer::after {
+  content: "Tech & Behavior Motion";
+}
+
+.asset-workspace .project-topbar .status-pill,
+.timeline-workspace .project-topbar .status-pill {
+  font-size: 0;
+}
+
+.asset-workspace .project-topbar .status-pill::after,
+.timeline-workspace .project-topbar .status-pill::after {
+  content: "Modular Exact Visuals v1.7";
+  font-size: 0.75rem;
+}
+
+.finance-motion-header > div > span,
+.finance-motion-rule span,
+.exact-visual-family-recommendation + .finance-motion-section-heading p,
+.finance-motion-recommendation + .finance-motion-section-heading p {
+  font-size: 0;
+}
+
+.finance-motion-header > div > span::after {
+  content: "Direct rights-clean 1080p scenes with finance, character, or technology motion.";
+  font-size: 1rem;
+}
+
+.finance-motion-rule span::after {
+  content: "Human action gets a character. Money systems get finance motion. Algorithms and behavioral data get technology motion. Strong real footage remains valid.";
+  font-size: 0.9rem;
+}
+
+.exact-visual-family-recommendation + .finance-motion-section-heading p::after {
+  content: "The director preselects the strongest route, but every modular family remains available per scene.";
+  font-size: 0.78rem;
+}
+
+.finance-motion-recommendation + .finance-motion-section-heading p::after {
+  content: "Every exact visual family supports Clean, Premium, and Editorial art direction.";
+  font-size: 0.78rem;
+}
+
+.exact-visual-family-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.exact-visual-family-grid > button:nth-child(3) > div > span {
+  font-size: 0;
+}
+
+.exact-visual-family-grid > button:nth-child(3) > div > span::after {
+  content: "◎→◇";
+  font-size: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .exact-visual-family-grid {
+    grid-template-columns: 1fr;
+  }
+}
