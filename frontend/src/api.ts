@@ -20,6 +20,7 @@ import type {
   VisualFeedback,
   VisualFeedbackReason,
 } from "./types";
+import "./version.css";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
@@ -92,11 +93,10 @@ export const api = {
   ) => {
     const params = new URLSearchParams({
       media_type: options.media_type,
-      provider: options.provider ?? "auto",
       per_page: String(options.per_page ?? 6),
     });
     return request<VisualDirectorResponse>(
-      `/scenes/${sceneId}/visual-director?${params.toString()}`,
+      `/scenes/${sceneId}/adaptive-visual-director?${params.toString()}`,
     );
   },
   rejectVisual: (
