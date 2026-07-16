@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from PIL import Image
 
 from ..models import Scene
-from . import character_staging_clean as character
+from . import character_expressive as character
 from . import finance_motion_choreography as finance
 from . import tech_behavior_route_patch as tech
 
@@ -22,7 +22,7 @@ FAMILIES = (
     {
         "family_id": CHARACTER_FAMILY_ID,
         "label": "Character Explainer",
-        "description": "Use editorial icon-figures when a person's behavior, decision, reaction, or habit is the story.",
+        "description": "Use expressive editorial characters when a person's behavior, decision, reaction, or habit is the story.",
     },
     {
         "family_id": TECH_FAMILY_ID,
@@ -159,9 +159,6 @@ def recommend_family(scene: Scene) -> tuple[str, float, str]:
             "Editorial recommendation: prefer strong real footage of a person using technology; use Tech & Behavior Motion only when no defensible real asset exists.",
         )
 
-    # Strong algorithmic, predictive, surveillance, or digital-twin language is
-    # its own visual system. It wins before generic human or CTA language because
-    # technology is the mechanism the scene needs to explain.
     if explicit_tech and tech_score >= max(6, finance_score):
         confidence = min(0.98, 0.68 + 0.018 * tech_score)
         return (
@@ -170,8 +167,6 @@ def recommend_family(scene: Scene) -> tuple[str, float, str]:
             f"The scene centers on algorithmic behavior: {explicit_tech[0]}.",
         )
 
-    # Explicit financial-system language wins for charts, index funds,
-    # compounding, and finance CTAs unless the scene has a stronger behavior cue.
     if explicit_finance and not explicit_character:
         confidence = min(0.97, 0.68 + 0.025 * finance_score)
         return (
