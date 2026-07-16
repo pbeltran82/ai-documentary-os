@@ -205,7 +205,7 @@ def generate_exact_visual(
         "license_url": "",
         "attribution": (
             "Generated locally by AI Documentary OS Exact Visual Studio · "
-            f"Character Explainer v1.4 · {family_label} · {generated.style.label}"
+            f"v1.4 · {family_label} · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
         "local_preview_path": generated.preview_relative_path,
