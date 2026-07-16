@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -8,6 +9,7 @@ from .common import ProviderSpec, json_request
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".m4v")
+WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 def asset_file(manifest_url: str, media_type: str) -> str:
@@ -42,6 +44,14 @@ def normalize_item(item: dict[str, Any], media_type: str) -> AssetCandidate | No
     nasa_id = str(data.get("nasa_id") or "")
     download_url = asset_file(item.get("href") or "", media_type) if item.get("href") else ""
     creator = data.get("photographer") or data.get("secondary_creator") or data.get("center") or "NASA"
+    raw_keywords = data.get("keywords") or []
+    keywords = [str(value).strip().lower() for value in raw_keywords if str(value).strip()][:40]
+    description = " ".join(
+        str(value or "")
+        for value in (data.get("title"), data.get("description"), " ".join(keywords))
+    ).strip()
+    if not keywords:
+        keywords = sorted(set(WORD_RE.findall(description.lower())))[:40]
     return AssetCandidate(
         provider="nasa",
         provider_asset_id=nasa_id or str(data.get("title") or ""),
@@ -57,6 +67,8 @@ def normalize_item(item: dict[str, Any], media_type: str) -> AssetCandidate | No
         license_name="NASA Media Usage Guidelines",
         license_url="https://www.nasa.gov/nasa-brand-center/images-and-media/",
         attribution=f"Courtesy of {creator}",
+        description=description,
+        keywords=keywords,
     )
 
 
