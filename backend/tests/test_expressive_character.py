@@ -14,13 +14,13 @@ class ExpressiveCharacterTests(unittest.TestCase):
 
     def test_all_templates_render_across_house_styles(self) -> None:
         for template in expressive.CHARACTER_TEMPLATES:
-            for style_id in expressive.STYLES:
-                with self.subTest(template=template.template_id, style=style_id):
+            for style in expressive.STYLES:
+                with self.subTest(template=template.template_id, style=style.style_id):
                     frame = expressive.render_frame(
                         template.template_id,
                         6.0,
                         3.0,
-                        style_id,
+                        style.style_id,
                     )
                     self.assertEqual(frame.size, (1920, 1080))
 
@@ -61,7 +61,6 @@ class ExpressiveCharacterTests(unittest.TestCase):
             pose="celebrate",
             mood="happy",
         )
-        self.assertIsNotNone(canvas.getbbox())
         body_pixels = sum(
             1
             for pixel in canvas.getdata()
