@@ -1,0 +1,21 @@
+name: Source Snapshot
+
+on:
+  push:
+    branches: [editorial-still-motion-v092]
+  pull_request:
+    branches: [main]
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        run: zip -qr source-snapshot.zip . -x '.git/*'
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-snapshot
+          path: source-snapshot.zip
+          retention-days: 1
