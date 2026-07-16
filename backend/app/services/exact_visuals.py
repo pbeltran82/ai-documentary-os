@@ -6,7 +6,7 @@ from PIL import Image
 from ..models import Scene
 from . import character_staging_clean as character
 from . import finance_motion_choreography as finance
-from . import tech_behavior_motion as tech
+from . import tech_behavior_truthful as tech
 
 FINANCE_FAMILY_ID = "finance_motion"
 CHARACTER_FAMILY_ID = "character_explainer"
@@ -73,13 +73,26 @@ STRONG_TECH_PHRASES = {
     "digital footprint": 9,
     "digital twin": 10,
     "behavioral twin": 10,
+    "behavioral version of you": 11,
     "every scroll": 7,
     "every pause": 7,
     "deleted draft": 7,
     "machine choose": 9,
     "machine chose": 9,
     "highest bidder": 6,
+    "systems that learn how to navigate us": 14,
+    "learn how to navigate us": 13,
+    "navigate us": 9,
+    "what reaches you": 7,
+    "change your behavior": 8,
+    "help us navigate the world": 7,
 }
+
+REAL_FOOTAGE_PREFERRED_PHRASES = (
+    "help us navigate the world",
+    "using technology to navigate",
+    "person uses technology",
+)
 
 
 def family_catalog() -> list[dict[str, str]]:
@@ -134,6 +147,17 @@ def recommend_family(scene: Scene) -> tuple[str, float, str]:
     explicit_character = [phrase for phrase in STRONG_CHARACTER_PHRASES if phrase in context]
     explicit_finance = [phrase for phrase in STRONG_FINANCE_PHRASES if phrase in context]
     explicit_tech = [phrase for phrase in STRONG_TECH_PHRASES if phrase in context]
+    real_footage_signal = next(
+        (phrase for phrase in REAL_FOOTAGE_PREFERRED_PHRASES if phrase in context),
+        None,
+    )
+
+    if real_footage_signal:
+        return (
+            TECH_FAMILY_ID,
+            0.64,
+            "Editorial recommendation: prefer strong real footage of a person using technology; use Tech & Behavior Motion only when no defensible real asset exists.",
+        )
 
     # Strong algorithmic, predictive, surveillance, or digital-twin language is
     # its own visual system. It wins before generic human or CTA language because
