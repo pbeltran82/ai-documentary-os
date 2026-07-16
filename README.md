@@ -7,7 +7,7 @@ A local-first documentary production operating system focused on the two most ex
 
 > We do not automate storytelling. We automate everything around storytelling.
 
-## Current milestone: v0.7 Narration Alignment
+## Current milestone: v0.7.1 Narration Coverage Guardrails
 
 The working application now includes:
 
@@ -29,8 +29,10 @@ The working application now includes:
 - scene-by-scene FFmpeg assembly planning,
 - playable local 1080p first-cut previews,
 - local narration upload and FFprobe duration analysis,
-- explicit narration-versus-timeline mismatch warnings, and
-- narrated first-cut rendering with AAC audio.
+- explicit narration-versus-timeline mismatch warnings,
+- narrated first-cut rendering with AAC audio,
+- visual-coverage percentage and uncovered narration reporting, and
+- scene-count guidance with a direct recovery path to the Scene Engine.
 
 ## Architecture
 
@@ -176,6 +178,14 @@ When narration is attached, the engine:
 4. pads short narration with silence or trims long narration to the timeline runtime, and
 5. muxes the voiceover into the first cut as AAC audio.
 
+When narration is longer than the visual timeline, v0.7.1 treats the result explicitly as an **excerpt**. The interface shows:
+
+- the percentage of narration with visual coverage,
+- the uncovered duration,
+- an estimated total scene count based on the current visual pace,
+- the approximate number of additional visual decisions required, and
+- an **Expand scene plan** action that returns directly to Smart Import.
+
 The system preserves the original uploaded narration file. Automatic time-stretching is intentionally not applied because it can damage voice quality and storytelling cadence.
 
 Optional local-media, narration, and render settings in `backend/.env`:
@@ -204,7 +214,7 @@ The database lives at:
 backend/data/documentary_os.db
 ```
 
-Startup migrations remain additive. Existing projects, scenes, downloaded assets, and rights records are preserved. Narration metadata is stored inside the local project folder, so no destructive database migration is required for v0.7.
+Startup migrations remain additive. Existing projects, scenes, downloaded assets, and rights records are preserved. Narration metadata is stored inside the local project folder, so no destructive database migration is required for v0.7.1.
 
 Secrets, the database, downloaded media, narration, and generated exports are excluded from Git.
 

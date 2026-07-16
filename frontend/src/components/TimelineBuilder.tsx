@@ -8,6 +8,7 @@ interface TimelineBuilderProps {
   error: string;
   onBack: () => void;
   onOpenAssets: () => void;
+  onOpenScenes: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -29,12 +30,17 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatSeconds(seconds: number): string {
+  return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
+}
+
 export function TimelineBuilder({
   project,
   loading,
   error,
   onBack,
   onOpenAssets,
+  onOpenScenes,
 }: TimelineBuilderProps) {
   const [plan, setPlan] = useState<TimelinePlan | null>(null);
   const [planning, setPlanning] = useState(false);
@@ -53,13 +59,62 @@ export function TimelineBuilder({
     const cacheKey = encodeURIComponent(plan.rendered_at ?? plan.generated_at);
     return `${plan.output_url}?v=${cacheKey}`;
   }, [plan]);
+
+  const narrationCoverage = useMemo(() => {
+    if (!plan?.voiceover) return null;
+    const narrationSeconds = plan.voiceover.duration_seconds;
+    const timelineSeconds = plan.runtime_seconds;
+    const coveragePercent = narrationSeconds > 0
+      ? Math.min(100, (timelineSeconds / narrationSeconds) * 100)
+      : 100;
+    const uncoveredSeconds = Math.max(0, narrationSeconds - timelineSeconds);
+    const currentSceneCount = Math.max(1, project.scenes.length);
+    const currentAverageSlot = timelineSeconds > 0
+      ? timelineSeconds / currentSceneCount
+      : 5;
+    const targetSceneSeconds = Math.min(15, Math.max(3, currentAverageSlot || 5));
+    const recommendedSceneCount = Math.max(
+      currentSceneCount,
+      Math.ceil(narrationSeconds / targetSceneSeconds),
+    );
+
+    return {
+      coveragePercent,
+      uncoveredSeconds,
+      targetSceneSeconds,
+      recommendedSceneCount,
+      additionalScenesNeeded: Math.max(0, recommendedSceneCount - currentSceneCount),
+    };
+  }, [plan, project.scenes.length]);
+
+  const isTrimmedExcerpt = Boolean(
+    plan?.voiceover && plan.alignment_status === "longer",
+  );
+  const isPaddedNarration = Boolean(
+    plan?.voiceover && plan.alignment_status === "shorter",
+  );
+
   const renderStatus = plan?.output_exists
-    ? plan.voiceover
-      ? "Rendered with narration"
-      : "Rendered"
+    ? isTrimmedExcerpt
+      ? "Rendered excerpt"
+      : isPaddedNarration
+        ? "Rendered with silence"
+        : plan.voiceover
+          ? "Rendered with narration"
+          : "Rendered"
     : plan?.ready
       ? "Ready to render"
       : "Assets missing";
+
+  const renderButtonLabel = rendering
+    ? "Rendering with FFmpeg…"
+    : isTrimmedExcerpt
+      ? `Render ${formatTime(plan?.runtime_seconds ?? 0)} narrated excerpt`
+      : isPaddedNarration
+        ? "Render narrated cut + silence"
+        : plan?.voiceover
+          ? "Render voiced first cut"
+          : "Render silent first cut";
 
   async function buildPlan() {
     setPlanning(true);
@@ -138,7 +193,7 @@ export function TimelineBuilder({
         </div>
         <div className="header-actions">
           <button className="ghost-button" onClick={onOpenAssets}>Asset Planner</button>
-          <span className="status-pill">Narration Alignment v0.7</span>
+          <span className="status-pill">Narration Coverage v0.7.1</span>
         </div>
       </header>
 
@@ -150,7 +205,7 @@ export function TimelineBuilder({
           <strong>{plan?.clip_count ?? readyAssets}</strong>
         </article>
         <article className="stat-card">
-          <span>Runtime</span>
+          <span>Visual runtime</span>
           <strong>{formatTime(plan?.runtime_seconds ?? 0)}</strong>
         </article>
         <article className="stat-card">
@@ -158,8 +213,14 @@ export function TimelineBuilder({
           <strong>{plan?.voiceover ? formatTime(plan.voiceover.duration_seconds) : "Missing"}</strong>
         </article>
         <article className="stat-card accent">
-          <span>First cut</span>
-          <strong>{plan?.output_exists ? formatBytes(plan.output_size_bytes) : "Pending"}</strong>
+          <span>{isTrimmedExcerpt ? "Narration covered" : "First cut"}</span>
+          <strong>
+            {isTrimmedExcerpt && narrationCoverage
+              ? `${Math.round(narrationCoverage.coveragePercent)}%`
+              : plan?.output_exists
+                ? formatBytes(plan.output_size_bytes)
+                : "Pending"}
+          </strong>
         </article>
       </section>
 
@@ -180,6 +241,11 @@ export function TimelineBuilder({
             <p>
               Videos are looped when necessary, trimmed to the scene slot, normalized to 1080p, and concatenated in scene order.
             </p>
+            {isTrimmedExcerpt && (
+              <p className="timeline-warning">
+                This render is an excerpt. Only the first {formatTime(plan?.runtime_seconds ?? 0)} of the narration will be included.
+              </p>
+            )}
             {plan && !plan.ffmpeg_available && (
               <p className="timeline-warning">FFmpeg is not available. Install it with <code>brew install ffmpeg</code>.</p>
             )}
@@ -197,11 +263,7 @@ export function TimelineBuilder({
               disabled={rendering || planning || loading || !plan?.ready || !plan.ffmpeg_available}
               onClick={() => void renderFirstCut()}
             >
-              {rendering
-                ? "Rendering with FFmpeg…"
-                : plan?.voiceover
-                  ? "Render voiced first cut"
-                  : "Render silent first cut"}
+              {renderButtonLabel}
             </button>
           </div>
         </div>
@@ -259,6 +321,42 @@ export function TimelineBuilder({
           </div>
         )}
 
+        {isTrimmedExcerpt && narrationCoverage && (
+          <div className="narration-coverage-card">
+            <div className="coverage-heading">
+              <div>
+                <span className="eyebrow">VISUAL COVERAGE GAP</span>
+                <strong>{Math.round(narrationCoverage.coveragePercent)}% of narration has visuals</strong>
+              </div>
+              <span>{formatSeconds(narrationCoverage.uncoveredSeconds)} uncovered</span>
+            </div>
+            <div
+              className="coverage-track"
+              role="progressbar"
+              aria-label="Narration visual coverage"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(narrationCoverage.coveragePercent)}
+            >
+              <div
+                className="coverage-fill"
+                style={{ width: `${narrationCoverage.coveragePercent}%` }}
+              />
+            </div>
+            <p>
+              At the current {narrationCoverage.targetSceneSeconds.toFixed(1)}-second visual pace,
+              expand this project from {project.scenes.length} to about {narrationCoverage.recommendedSceneCount} scenes.
+              {narrationCoverage.additionalScenesNeeded > 0
+                ? ` That is roughly ${narrationCoverage.additionalScenesNeeded} more visual decisions.`
+                : ""}
+            </p>
+            <div className="coverage-actions">
+              <button className="primary-button" onClick={onOpenScenes}>Expand scene plan</button>
+              <span>Paste the complete narration transcript into Smart Import, then return for asset selection.</span>
+            </div>
+          </div>
+        )}
+
         <div className="narration-upload-row">
           <label className="audio-file-picker">
             <span>{selectedFile ? selectedFile.name : plan?.voiceover ? "Choose replacement audio" : "Choose narration audio"}</span>
@@ -293,15 +391,24 @@ export function TimelineBuilder({
           <div className="section-heading">
             <div>
               <p className="eyebrow">FIRST-CUT PREVIEW</p>
-              <h3>Playable local assembly</h3>
+              <h3>{isTrimmedExcerpt ? "Playable narrated excerpt" : "Playable local assembly"}</h3>
             </div>
-            <span className="status-pill">{plan.voiceover ? "Narrated preview" : "Silent preview"}</span>
+            <span className="status-pill">
+              {isTrimmedExcerpt
+                ? "Narrated excerpt"
+                : plan.voiceover
+                  ? "Narrated preview"
+                  : "Silent preview"}
+            </span>
           </div>
           <video key={previewUrl} className="timeline-video" controls playsInline src={previewUrl} />
           <div className="render-meta">
             <span>{formatBytes(plan.output_size_bytes)}</span>
             <span>{formatTime(plan.runtime_seconds)}</span>
             <span>{plan.voiceover ? "AAC narration" : "No audio"}</span>
+            {isTrimmedExcerpt && narrationCoverage && (
+              <span>{formatSeconds(narrationCoverage.uncoveredSeconds)} narration not yet covered</span>
+            )}
             <a href={plan.output_url} target="_blank" rel="noreferrer">Open video file</a>
           </div>
         </section>
