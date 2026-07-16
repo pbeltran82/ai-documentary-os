@@ -1,9 +1,9 @@
 .sidebar-footer::before {
-  content: "v1.7.0";
+  content: "v1.7.1";
 }
 
 .sidebar-footer::after {
-  content: "Tech & Behavior Motion";
+  content: "Truthful Tech Routing";
 }
 
 .asset-workspace .project-topbar .status-pill,
@@ -13,7 +13,7 @@
 
 .asset-workspace .project-topbar .status-pill::after,
 .timeline-workspace .project-topbar .status-pill::after {
-  content: "Modular Exact Visuals v1.7";
+  content: "Truthful Tech Routing v1.7.1";
   font-size: 0.75rem;
 }
 
@@ -35,7 +35,7 @@
 }
 
 .exact-visual-family-recommendation + .finance-motion-section-heading p::after {
-  content: "The director preselects the strongest route, but every modular family remains available per scene.";
+  content: "The director preselects the strongest route, flags real-footage opportunities, and keeps every modular family available per scene.";
   font-size: 0.78rem;
 }
 
