@@ -1,9 +1,9 @@
 .sidebar-footer::before {
-  content: "v1.7.2";
+  content: "v1.8.0";
 }
 
 .sidebar-footer::after {
-  content: "Playback Polish";
+  content: "Batch Production Console";
 }
 
 .asset-workspace .project-topbar .status-pill,
@@ -13,7 +13,7 @@
 
 .asset-workspace .project-topbar .status-pill::after,
 .timeline-workspace .project-topbar .status-pill::after {
-  content: "Playback Polish v1.7.2";
+  content: "Batch Production Console v1.8.0";
   font-size: 0.75rem;
 }
 
@@ -25,7 +25,7 @@
 }
 
 .finance-motion-header > div > span::after {
-  content: "Direct rights-clean 1080p scenes with finance, character, or technology motion.";
+  content: "Direct one rights-clean 1080p scene or manufacture the full project visual plan locally.";
   font-size: 1rem;
 }
 
