@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { AnimationScriptLauncher } from "./components/AnimationScriptLauncher";
 import { FinanceMotionLauncher } from "./components/FinanceMotionLauncher";
 import "./styles.css";
 import "./asset-planner.css";
@@ -18,6 +19,7 @@ import "./release-v170.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
+    <AnimationScriptLauncher />
     <FinanceMotionLauncher />
   </StrictMode>,
 );
