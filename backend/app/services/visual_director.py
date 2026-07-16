@@ -260,28 +260,40 @@ def provider_priority(media_type: str, brief: ShotBrief, configured: Iterable[st
 
 
 def candidate_text(candidate: AssetCandidate) -> str:
+    """Only provider-native descriptive metadata may count as concept evidence."""
     return " ".join(
         [
             candidate.description,
             " ".join(candidate.keywords),
-            candidate.attribution,
-            candidate.source_url,
         ]
     ).lower()
 
 
+def phrase_words(phrase: str) -> set[str]:
+    return words(phrase) - GENERIC_QUERY_WORDS
+
+
 def phrase_match_score(phrase: str, candidate_words: set[str]) -> int:
-    phrase_words = words(phrase) - GENERIC_QUERY_WORDS
-    if not phrase_words:
+    """Score complete evidence strongly and reject loose half-phrase coincidences."""
+    required = phrase_words(phrase)
+    if not required:
         return 0
-    overlap = len(phrase_words & candidate_words)
-    if overlap == len(phrase_words):
-        return 14
-    if overlap >= max(1, math.ceil(len(phrase_words) / 2)):
+    overlap = len(required & candidate_words)
+    if overlap == len(required):
+        return 24
+    if len(required) >= 4 and overlap >= math.ceil(len(required) * 0.75):
         return 8
-    if overlap:
-        return 3
     return 0
+
+
+def avoid_phrase_matches(phrase: str, candidate_words: set[str]) -> bool:
+    required = phrase_words(phrase)
+    if not required:
+        return False
+    overlap = len(required & candidate_words)
+    if len(required) == 1:
+        return overlap == 1
+    return overlap == len(required)
 
 
 def score_candidate(
@@ -290,32 +302,41 @@ def score_candidate(
     candidate: AssetCandidate,
     selected_creators: set[str],
 ) -> AssetCandidate:
-    text = candidate_text(candidate)
-    candidate_words = words(text)
-    score = 35.0
+    candidate_words = words(candidate_text(candidate))
+    score = 22.0
     reasons: list[str] = []
     warnings: list[str] = []
 
-    must_scores = [phrase_match_score(phrase, candidate_words) for phrase in brief.must_show]
-    best_must = max(must_scores, default=0)
-    must_matches = sum(value > 0 for value in must_scores)
-    score += min(30, sum(sorted(must_scores, reverse=True)[:2]))
-    if best_must >= 8:
-        reasons.append("Matches a must-show concept")
-    elif must_matches == 0:
-        score -= 18
-        warnings.append("No clear must-show match in provider metadata")
+    matched_concepts = [
+        phrase
+        for phrase in brief.must_show
+        if phrase_match_score(phrase, candidate_words) >= 24
+    ]
+    near_concepts = [
+        phrase
+        for phrase in brief.must_show
+        if phrase_match_score(phrase, candidate_words) == 8
+    ]
 
-    query_score = phrase_match_score(candidate.query_variant, candidate_words)
-    score += query_score
-    if query_score >= 8:
-        reasons.append(f"Strong match for “{candidate.query_variant}”")
+    if matched_concepts:
+        score += 32
+        score += min(16, max(0, len(matched_concepts) - 1) * 8)
+        reasons.append(f"Provider metadata explicitly supports “{matched_concepts[0]}”")
+        if len(matched_concepts) > 1:
+            reasons.append("Multiple must-show concepts are supported")
+    else:
+        warnings.append("No complete must-show concept in provider metadata")
+        if near_concepts:
+            warnings.append("Partial keyword overlap was rejected as insufficient evidence")
 
-    for phrase in brief.must_avoid:
-        avoid_words = words(phrase) - GENERIC_QUERY_WORDS
-        if avoid_words and len(avoid_words & candidate_words) >= max(1, math.ceil(len(avoid_words) / 2)):
-            score -= 28
-            warnings.append(f"Possible avoid concept: {phrase}")
+    blocked_phrases = [
+        phrase
+        for phrase in brief.must_avoid
+        if avoid_phrase_matches(phrase, candidate_words)
+    ]
+    if blocked_phrases:
+        score -= 45
+        warnings.append(f"Must-avoid evidence detected: {blocked_phrases[0]}")
 
     width = candidate.width
     height = candidate.height
@@ -349,9 +370,14 @@ def score_candidate(
         score -= 7
         warnings.append("Creator already appears elsewhere in this project")
 
+    if not matched_concepts:
+        score = min(score, 39.0)
+    if blocked_phrases:
+        score = min(score, 20.0)
+
     score = max(0.0, min(100.0, round(score, 1)))
     if not reasons:
-        reasons.append("Technically usable candidate")
+        reasons.append("Technically usable, but concept evidence is unverified")
 
     return candidate.model_copy(
         update={
@@ -389,7 +415,7 @@ def director_shortlist(
     seen: set[tuple[str, str]] = set()
     for candidate in scored:
         identity = (candidate.provider, candidate.provider_asset_id)
-        if identity in seen or candidate.director_score < 42:
+        if identity in seen or candidate.director_score < 58:
             continue
         if per_provider.get(candidate.provider, 0) >= 3:
             continue

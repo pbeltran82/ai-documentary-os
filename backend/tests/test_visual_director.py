@@ -105,6 +105,51 @@ class VisualDirectorTests(unittest.TestCase):
         self.assertGreater(shortlist[0].director_score, 70)
         self.assertNotIn("dice", [item.provider_asset_id for item in shortlist])
 
+    def test_search_query_is_not_visual_evidence(self) -> None:
+        _project, scene = self.project_with_scene(
+            "Spoiler alert: there’s never anything left.",
+        )
+        brief = build_shot_brief(scene, "video")
+        unrelated = self.candidate(
+            "stock-chart",
+            "stock market graph finance analytics investment",
+        )
+
+        shortlist = director_shortlist(scene, brief, [unrelated], set(), 6)
+
+        self.assertEqual(shortlist, [])
+
+    def test_partial_phrase_overlap_is_not_a_strong_match(self) -> None:
+        _project, scene = self.project_with_scene(
+            "Spoiler alert: there’s never anything left.",
+        )
+        brief = build_shot_brief(scene, "video")
+        partial = self.candidate(
+            "partial",
+            "bank account balance chart finance business",
+        )
+
+        shortlist = director_shortlist(scene, brief, [partial], set(), 6)
+
+        self.assertEqual(shortlist, [])
+
+    def test_attribution_and_source_url_are_not_concept_evidence(self) -> None:
+        _project, scene = self.project_with_scene(
+            "Spoiler alert: there’s never anything left.",
+        )
+        brief = build_shot_brief(scene, "video")
+        misleading = self.candidate("misleading", "abstract people standing on platform")
+        misleading = misleading.model_copy(
+            update={
+                "attribution": "zero bank balance empty wallet",
+                "source_url": "https://example.com/empty-wallet-zero-balance",
+            }
+        )
+
+        shortlist = director_shortlist(scene, brief, [misleading], set(), 6)
+
+        self.assertEqual(shortlist, [])
+
     def test_rejected_candidate_is_removed_from_future_shortlists(self) -> None:
         _project, scene = self.project_with_scene(
             "Spoiler alert: there’s never anything left.",
