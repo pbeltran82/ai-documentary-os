@@ -5,6 +5,7 @@ import "./styles.css";
 import "./asset-planner.css";
 import "./provider-hub.css";
 import "./timeline-builder.css";
+import "./narration.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
