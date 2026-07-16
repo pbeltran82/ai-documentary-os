@@ -8,7 +8,7 @@ from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import TimelinePlanResponse, TimelineStyleUpdate
 from ..services.render_invalidation import invalidate_render_artifacts
-from ..services.timeline_subject_motion import render_first_cut, write_timeline_plan
+from ..services.timeline_playback_polish import render_first_cut, write_timeline_plan
 from ..services.voiceover import remove_voiceover, save_voiceover
 
 router = APIRouter(prefix="/projects", tags=["timeline"])
