@@ -6,7 +6,7 @@ from PIL import ImageChops
 
 from app.models import Project, Scene
 from app.services import exact_visuals
-from app.services import tech_behavior_truthful as tech
+from app.services import tech_behavior_route_patch as tech
 
 
 class TruthfulTechRoutingTests(unittest.TestCase):
