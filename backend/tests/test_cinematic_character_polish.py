@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from app.services import animation_script_runtime as runtime
 from app.services import character_expressive as character
+from app.services import character_pose_stability as pose_stability
 from app.services import cinematic_character_polish as cinematic
 from app.services import finance_motion_art as art
 from app.services.visual_staging import CharacterPlacement
@@ -42,6 +44,27 @@ class CinematicCharacterPolishTests(unittest.TestCase):
             values.append(cinematic._restrained_performance_pulse())
         self.assertLessEqual(max(abs(value) for value in values), 0.051)
         self.assertEqual(values[-1], 0.0)
+
+    def test_unsupported_script_pose_keeps_template_pose(self) -> None:
+        runtime._ACTIVE_PLAN = {
+            "pose_sequence": ["recoil"],
+            "expression_sequence": ["shocked"],
+        }
+        character._CURRENT_TIME = 3.0
+        character._CURRENT_DURATION = 6.0
+        try:
+            with patch.object(runtime, "_ORIGINAL_PERSON") as person:
+                pose_stability._stable_planned_person(
+                    MagicMock(),
+                    (100, 100),
+                    {},
+                    pose="phone",
+                    mood="neutral",
+                )
+            self.assertEqual(person.call_args.kwargs["pose"], "phone")
+            self.assertEqual(person.call_args.kwargs["mood"], "surprised")
+        finally:
+            runtime._ACTIVE_PLAN = None
 
     def test_wallet_anchor_stays_inside_character_gesture_reach(self) -> None:
         placement = CharacterPlacement(255, 840, 1.06, 1)
