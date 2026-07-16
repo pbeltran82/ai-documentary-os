@@ -1,9 +1,9 @@
 .sidebar-footer::before {
-  content: "v1.7.1";
+  content: "v1.7.2";
 }
 
 .sidebar-footer::after {
-  content: "Truthful Tech Routing";
+  content: "Playback Polish";
 }
 
 .asset-workspace .project-topbar .status-pill,
@@ -13,7 +13,7 @@
 
 .asset-workspace .project-topbar .status-pill::after,
 .timeline-workspace .project-topbar .status-pill::after {
-  content: "Truthful Tech Routing v1.7.1";
+  content: "Playback Polish v1.7.2";
   font-size: 0.75rem;
 }
 
