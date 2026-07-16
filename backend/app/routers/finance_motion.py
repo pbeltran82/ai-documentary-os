@@ -14,6 +14,7 @@ from ..services.exact_visuals import (
     CHARACTER_FAMILY_ID,
     DEFAULT_STYLE_ID,
     FINANCE_FAMILY_ID,
+    TECH_FAMILY_ID,
     family_catalog,
     recommend_family,
     render_exact_visual,
@@ -32,6 +33,12 @@ router = APIRouter(tags=["exact-visuals"])
 FAMILY_LABELS = {
     FINANCE_FAMILY_ID: "Finance Motion",
     CHARACTER_FAMILY_ID: "Character Explainer",
+    TECH_FAMILY_ID: "Tech & Behavior Motion",
+}
+FAMILY_SLUGS = {
+    FINANCE_FAMILY_ID: "finance",
+    CHARACTER_FAMILY_ID: "character",
+    TECH_FAMILY_ID: "tech",
 }
 
 
@@ -180,7 +187,7 @@ def generate_exact_visual(
         old_paths = {asset.local_path, asset.local_preview_path}
 
     family_label = FAMILY_LABELS[resolved_family]
-    family_slug = "character" if resolved_family == CHARACTER_FAMILY_ID else "finance"
+    family_slug = FAMILY_SLUGS[resolved_family]
     now = datetime.now(timezone.utc)
     values = {
         "provider": "generated",
@@ -204,8 +211,8 @@ def generate_exact_visual(
         "license_name": "Project-owned generated media",
         "license_url": "",
         "attribution": (
-            "Generated locally by AI Documentary OS Exact Visual Studio · "
-            f"Visual Staging v1.5 · {family_label} · {generated.style.label}"
+            "Generated locally by AI Documentary OS Exact Visual Studio v1.7 · "
+            f"{family_label} · {generated.style.label}"
         ),
         "local_path": generated.media_relative_path,
         "local_preview_path": generated.preview_relative_path,
