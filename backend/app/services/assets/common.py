@@ -42,7 +42,7 @@ def json_request(
         url,
         headers={
             "Accept": "application/json",
-            "User-Agent": "AI-Documentary-OS/0.4",
+            "User-Agent": "AI-Documentary-OS/0.9.1",
             **(headers or {}),
         },
     )
