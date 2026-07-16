@@ -6,7 +6,7 @@ from PIL import Image
 from ..models import Scene
 from . import character_staging_clean as character
 from . import finance_motion_choreography as finance
-from . import tech_behavior_truthful as tech
+from . import tech_behavior_route_patch as tech
 
 FINANCE_FAMILY_ID = "finance_motion"
 CHARACTER_FAMILY_ID = "character_explainer"
