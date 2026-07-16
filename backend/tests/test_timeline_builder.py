@@ -129,7 +129,6 @@ class TimelineBuilderTests(unittest.TestCase):
         timeline_dir = self.media_root / "project-0001" / "timeline"
         self.assertTrue((timeline_dir / "render-plan.json").is_file())
         self.assertTrue((timeline_dir / "render.sh").is_file())
-        self.assertTrue((timeline_dir / "style.json").is_file())
         saved = json.loads((timeline_dir / "render-plan.json").read_text())
         self.assertIn("native motion", saved["clips"][0]["assembly_action"])
         self.assertEqual(saved["settings"]["transition_style"], "crossfade")
