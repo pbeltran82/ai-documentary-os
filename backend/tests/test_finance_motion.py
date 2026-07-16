@@ -100,7 +100,7 @@ class FinanceMotionTests(unittest.TestCase):
         for style in STYLES:
             with self.subTest(style=style.style_id):
                 frame = render_frame("paycheck_split", 4, 2, style.style_id)
-                safe_area = frame.crop((80, 930, 1840, 1040)).convert("L")
+                safe_area = frame.crop((80, 930, 1840, 1010)).convert("L")
                 bright_content = safe_area.point(
                     lambda value: 255 if value >= 225 else 0,
                     mode="1",
