@@ -21,7 +21,7 @@ const pipeline = [
   { name: "Script", description: "Narration and story arc" },
   { name: "Scenes", description: "Timing and visual intent" },
   { name: "Assets", description: "Direct, rank, approve" },
-  { name: "Timeline", description: "Automatic first assembly" },
+  { name: "Timeline", description: "Motion, transitions, narration" },
   { name: "Export", description: "Polish and publish" },
 ];
 
@@ -221,8 +221,8 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <span>v0.8.0</span>
-          <span>Visual Director</span>
+          <span>v0.9.0</span>
+          <span>Timeline Motion</span>
         </div>
       </aside>
 
@@ -262,16 +262,16 @@ function App() {
           <header className="topbar">
             <div>
               <p className="eyebrow">MISSION CONTROL</p>
-              <h2>What documentary are we making today?</h2>
+              <h2>Documentary production, without the busywork.</h2>
             </div>
             <button className="primary-button" onClick={() => setShowForm(true)}>
-              + New documentary
+              New project
             </button>
           </header>
 
           {error && <div className="error-banner">{error}</div>}
 
-          <section className="stats-grid" aria-label="Project overview">
+          <section className="stats-grid">
             <article className="stat-card">
               <span>Projects</span>
               <strong>{projects.length}</strong>
@@ -281,29 +281,25 @@ function App() {
               <strong>{totalMinutes} min</strong>
             </article>
             <article className="stat-card accent">
-              <span>Current focus</span>
-              <strong>Visual Director</strong>
+              <span>Active milestone</span>
+              <strong>{activePipelineStage}</strong>
             </article>
           </section>
 
           <section className="panel">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">BIRD’S-EYE VIEW</p>
-                <h3>The documentary production pipeline</h3>
+                <p className="eyebrow">PRODUCTION PIPELINE</p>
+                <h3>Research → Script → Scenes → Assets → Timeline → Export</h3>
               </div>
-              <span className="status-pill">Phase 4 active</span>
             </div>
-
             <div className="pipeline-grid">
               {pipeline.map((stage, index) => (
                 <article
-                  className={`pipeline-card ${
-                    stage.name === activePipelineStage ? "active-stage" : ""
-                  }`}
                   key={stage.name}
+                  className={`pipeline-card ${stage.name === activePipelineStage ? "active-stage" : ""}`}
                 >
-                  <span className="stage-number">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="stage-number">0{index + 1}</span>
                   <h4>{stage.name}</h4>
                   <p>{stage.description}</p>
                 </article>
@@ -315,21 +311,17 @@ function App() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">PROJECTS</p>
-                <h3>Recent documentaries</h3>
+                <h3>Current documentaries</h3>
               </div>
-              <span className="subtle-text">
-                {loading ? "Loading…" : `${projects.length} total`}
-              </span>
             </div>
 
-            {!loading && projects.length === 0 ? (
+            {loading ? (
+              <div className="empty-state"><p>Loading projects…</p></div>
+            ) : projects.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">🎬</div>
-                <h4>Your production slate is empty.</h4>
-                <p>Create the first documentary project and begin building the workflow.</p>
-                <button className="secondary-button" onClick={() => setShowForm(true)}>
-                  Create first project
-                </button>
+                <h4>No projects yet</h4>
+                <p>Create the first documentary workspace.</p>
               </div>
             ) : (
               <div className="project-grid">
@@ -348,113 +340,97 @@ function App() {
                     <h4>{project.title}</h4>
                     <p>{project.topic}</p>
                     <div className="project-meta">
-                      <span>{project.target_minutes} min</span>
-                      <span>{project.tone}</span>
-                      <span>{formatDate(project.created_at)}</span>
+                      <span>{project.target_minutes} min target</span>
+                      <span>{project.visual_style}</span>
+                      <span>{formatDate(project.updated_at)}</span>
                     </div>
                     <button className="project-open-button" onClick={() => void openProject(project)}>
-                      Open production →
+                      Open workspace
                     </button>
                   </article>
                 ))}
               </div>
             )}
           </section>
-        </main>
-      )}
 
-      {showForm && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">NEW PRODUCTION</p>
-                <h3 id="new-project-title">Create a documentary project</h3>
-              </div>
-              <button className="icon-button" onClick={() => setShowForm(false)} aria-label="Close">
-                ×
-              </button>
-            </div>
-
-            <form className="project-form" onSubmit={handleSubmit}>
-              <label>
-                Project title
-                <input
-                  required
-                  minLength={2}
-                  value={form.title}
-                  placeholder="The Rise and Fall of Kodak"
-                  onChange={(event) => setForm({ ...form, title: event.target.value })}
-                />
-              </label>
-
-              <label className="wide-field">
-                Topic and story angle
-                <textarea
-                  required
-                  minLength={5}
-                  rows={5}
-                  value={form.topic}
-                  placeholder="Investigate how Kodak invented the digital camera but failed to lead the revolution."
-                  onChange={(event) => setForm({ ...form, topic: event.target.value })}
-                />
-              </label>
-
-              <label>
-                Target runtime
-                <div className="input-with-suffix">
-                  <input
-                    required
-                    type="number"
-                    min={1}
-                    max={180}
-                    value={form.target_minutes}
-                    onChange={(event) =>
-                      setForm({ ...form, target_minutes: Number(event.target.value) })
-                    }
-                  />
-                  <span>minutes</span>
+          {showForm && (
+            <div className="modal-backdrop" role="presentation">
+              <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">NEW DOCUMENTARY</p>
+                    <h3 id="new-project-title">Create a project workspace</h3>
+                  </div>
+                  <button className="icon-button" onClick={() => setShowForm(false)}>×</button>
                 </div>
-              </label>
 
-              <label>
-                Audience
-                <input
-                  required
-                  value={form.audience}
-                  onChange={(event) => setForm({ ...form, audience: event.target.value })}
-                />
-              </label>
-
-              <label>
-                Tone
-                <input
-                  required
-                  value={form.tone}
-                  onChange={(event) => setForm({ ...form, tone: event.target.value })}
-                />
-              </label>
-
-              <label>
-                Visual style
-                <input
-                  required
-                  value={form.visual_style}
-                  onChange={(event) => setForm({ ...form, visual_style: event.target.value })}
-                />
-              </label>
-
-              <div className="form-actions wide-field">
-                <button type="button" className="ghost-button" onClick={() => setShowForm(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary-button" disabled={saving}>
-                  {saving ? "Creating…" : "Create project"}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
+                <form className="project-form" onSubmit={handleSubmit}>
+                  <label>
+                    Project title
+                    <input
+                      required
+                      minLength={2}
+                      value={form.title}
+                      onChange={(event) => setForm({ ...form, title: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Target runtime
+                    <div className="input-with-suffix">
+                      <input
+                        type="number"
+                        min={1}
+                        max={180}
+                        value={form.target_minutes}
+                        onChange={(event) => setForm({ ...form, target_minutes: Number(event.target.value) })}
+                      />
+                      <span>minutes</span>
+                    </div>
+                  </label>
+                  <label className="wide-field">
+                    Topic or documentary promise
+                    <textarea
+                      required
+                      minLength={5}
+                      rows={4}
+                      value={form.topic}
+                      onChange={(event) => setForm({ ...form, topic: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Audience
+                    <input
+                      value={form.audience}
+                      onChange={(event) => setForm({ ...form, audience: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Tone
+                    <input
+                      value={form.tone}
+                      onChange={(event) => setForm({ ...form, tone: event.target.value })}
+                    />
+                  </label>
+                  <label className="wide-field">
+                    Visual style
+                    <input
+                      value={form.visual_style}
+                      onChange={(event) => setForm({ ...form, visual_style: event.target.value })}
+                    />
+                  </label>
+                  <div className="form-actions wide-field">
+                    <button type="button" className="ghost-button" onClick={() => setShowForm(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="primary-button" disabled={saving}>
+                      {saving ? "Creating…" : "Create project"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          )}
+        </main>
       )}
     </div>
   );
