@@ -7,13 +7,16 @@ from fastapi import HTTPException
 from PIL import ImageChops
 
 from app.models import Project, Scene
-from app.services.finance_motion_polish import (
+from app.services.finance_motion_art import (
+    DEFAULT_STYLE_ID,
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
+    STYLES,
     TEMPLATES,
-    _background,
     ffmpeg_encoder_command,
     render_frame,
+    style_catalog,
+    styled_background,
     suggest_template,
 )
 
@@ -73,23 +76,42 @@ class FinanceMotionTests(unittest.TestCase):
     def test_every_template_renders_a_portable_1080p_frame(self) -> None:
         for template in TEMPLATES:
             with self.subTest(template=template.template_id):
-                frame = render_frame(template.template_id, 4, 1.5)
+                frame = render_frame(template.template_id, 4, 1.5, DEFAULT_STYLE_ID)
                 self.assertEqual(frame.size, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
                 self.assertEqual(frame.mode, "RGB")
 
+    def test_all_house_styles_render_and_are_visually_distinct(self) -> None:
+        frames = [
+            render_frame("paycheck_split", 4, 2.0, style.style_id)
+            for style in STYLES
+        ]
+        for frame in frames:
+            self.assertEqual(frame.size, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
+            self.assertEqual(frame.mode, "RGB")
+        self.assertIsNotNone(ImageChops.difference(frames[0], frames[1]).getbbox())
+        self.assertIsNotNone(ImageChops.difference(frames[1], frames[2]).getbbox())
+
+    def test_style_catalog_exposes_three_house_styles(self) -> None:
+        catalog = style_catalog()
+        self.assertEqual(len(catalog), 3)
+        self.assertEqual(DEFAULT_STYLE_ID, "premium_motion")
+        self.assertTrue(all(len(item["swatches"]) == 4 for item in catalog))
+
     def test_exports_leave_the_footer_safe_area_unbranded(self) -> None:
-        frame = render_frame("paycheck_split", 4, 2)
-        clean_background = _background()
-        safe_area = (80, 930, 1840, 1040)
-        difference = ImageChops.difference(
-            frame.crop(safe_area),
-            clean_background.crop(safe_area),
-        )
-        self.assertIsNone(difference.getbbox())
+        for style in STYLES:
+            with self.subTest(style=style.style_id):
+                frame = render_frame("paycheck_split", 4, 2, style.style_id)
+                clean_background = styled_background(style.style_id, 2)
+                safe_area = (80, 930, 1840, 1040)
+                difference = ImageChops.difference(
+                    frame.crop(safe_area),
+                    clean_background.crop(safe_area),
+                )
+                self.assertIsNone(difference.getbbox())
 
     def test_paycheck_template_has_real_motion_between_keyframes(self) -> None:
-        early = render_frame("paycheck_split", 4, 0.45)
-        settled = render_frame("paycheck_split", 4, 2.0)
+        early = render_frame("paycheck_split", 4, 0.45, DEFAULT_STYLE_ID)
+        settled = render_frame("paycheck_split", 4, 2.0, DEFAULT_STYLE_ID)
         self.assertIsNotNone(ImageChops.difference(early, settled).getbbox())
 
     def test_encoder_uses_raw_frames_not_optional_drawtext_filter(self) -> None:
@@ -100,9 +122,11 @@ class FinanceMotionTests(unittest.TestCase):
         self.assertNotIn("drawtext", rendered)
         self.assertNotIn("-vf", command)
 
-    def test_unknown_template_is_rejected(self) -> None:
+    def test_unknown_template_and_style_are_rejected(self) -> None:
         with self.assertRaises(HTTPException):
-            render_frame("not-a-template", 4, 1)
+            render_frame("not-a-template", 4, 1, DEFAULT_STYLE_ID)
+        with self.assertRaises(HTTPException):
+            render_frame("paycheck_split", 4, 1, "not-a-style")
 
 
 if __name__ == "__main__":
