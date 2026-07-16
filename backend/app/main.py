@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=f"{APP_NAME} API",
     version=VERSION,
-    description="Local-first documentary production command center.",
+    description="Local-first documentary command center with a universal visual feed and editorial motion.",
     lifespan=lifespan,
 )
 
