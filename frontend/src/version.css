@@ -3,11 +3,11 @@
 }
 
 .sidebar-footer::before {
-  content: "v0.9.3";
+  content: "v1.0.0";
 }
 
 .sidebar-footer::after {
-  content: "Adaptive Visual Feed";
+  content: "Finance Motion Studio";
 }
 
 .asset-workspace .project-topbar .status-pill {
@@ -15,6 +15,6 @@
 }
 
 .asset-workspace .project-topbar .status-pill::after {
-  content: "Adaptive Visual Feed v0.9.3";
+  content: "Visual Director + Motion v1.0";
   font-size: 0.75rem;
 }
