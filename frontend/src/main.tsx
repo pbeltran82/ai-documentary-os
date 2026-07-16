@@ -13,6 +13,7 @@ import "./character-explainer.css";
 import "./release-v140.css";
 import "./release-v150.css";
 import "./release-v160.css";
+import "./release-v170.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
