@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from fastapi import HTTPException
 
 from app.models import Project, Scene
-from app.services.finance_motion import TEMPLATES, build_filter_chain, suggest_template
+from app.services.finance_motion import (
+    OUTPUT_HEIGHT,
+    OUTPUT_WIDTH,
+    TEMPLATES,
+    ffmpeg_encoder_command,
+    render_frame,
+    suggest_template,
+)
 
 
 class FinanceMotionTests(unittest.TestCase):
@@ -60,17 +68,24 @@ class FinanceMotionTests(unittest.TestCase):
         )
         self.assertEqual(template.template_id, "compound_growth")
 
-    def test_every_template_builds_a_1080p_safe_filter_chain(self) -> None:
+    def test_every_template_renders_a_portable_1080p_frame(self) -> None:
         for template in TEMPLATES:
             with self.subTest(template=template.template_id):
-                chain = build_filter_chain(template.template_id, 4)
-                self.assertIn("drawtext", chain)
-                self.assertIn("fade=t=in", chain)
-                self.assertTrue(chain.endswith("format=yuv420p"))
+                frame = render_frame(template.template_id, 4, 1.5)
+                self.assertEqual(frame.size, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
+                self.assertEqual(frame.mode, "RGB")
+
+    def test_encoder_uses_raw_frames_not_optional_drawtext_filter(self) -> None:
+        command = ffmpeg_encoder_command("ffmpeg", Path("output.mp4"))
+        rendered = " ".join(command)
+        self.assertIn("rawvideo", rendered)
+        self.assertIn("rgb24", rendered)
+        self.assertNotIn("drawtext", rendered)
+        self.assertNotIn("-vf", command)
 
     def test_unknown_template_is_rejected(self) -> None:
         with self.assertRaises(HTTPException):
-            build_filter_chain("not-a-template", 4)
+            render_frame("not-a-template", 4, 1)
 
 
 if __name__ == "__main__":
