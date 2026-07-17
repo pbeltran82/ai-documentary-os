@@ -12,7 +12,13 @@ from PIL import Image, ImageDraw
 from ..models import Scene
 from . import finance_motion as engine
 from . import finance_motion_art as art
+from . import engagement_cta as engagement
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
+from .video_format import (
+    format_exact_visual_frame,
+    project_video_format,
+    video_format_profile,
+)
 
 
 @dataclass(frozen=True)
@@ -39,6 +45,9 @@ class TechDirectedMotion:
     size_bytes: int
     checksum_sha256: str
     duration_seconds: float
+    width: int
+    height: int
+    video_format: str
 
 
 TEMPLATES = (
@@ -83,10 +92,18 @@ TEMPLATES = (
         "A behavioral twin estimates what you may do next.",
     ),
     TechTemplate(
+        "machine_choice_explainer",
+        "Machine Choice Explainer",
+        "Contrast one visible viewer action with the hidden ranking field behind it.",
+        tuple("choose choice machine ranked ranking opportunity invisible decision recommendation click play".split()),
+        "THE RANKING BEHIND THE CHOICE",
+        "One visible action. A field of hidden scores.",
+    ),
+    TechTemplate(
         "machine_choice_cta",
         "Machine Choice CTA",
-        "End on the unresolved question of human choice versus machine ranking.",
-        tuple("choose choice machine subscribe awake watch moment final question".split()),
+        "End on the unresolved question, then land on clear Like and Subscribe actions.",
+        tuple("choose choice machine subscribe like support awake watch moment final question".split()),
         "WHO CHOSE THIS MOMENT?",
         "You pressed play. The machine ranked the opportunity.",
     ),
@@ -128,10 +145,15 @@ BEATS_BY_TEMPLATE = {
         ("MODELING", "Transfer repeated signals into the twin.", 0.52),
         ("ANTICIPATION", "Show the twin estimating the next action.", 0.86),
     ),
+    "machine_choice_explainer": (
+        ("ACTION", "Establish the viewer's visible play decision.", 0.16),
+        ("RANKING FIELD", "Reveal the hidden alternatives and model scores.", 0.52),
+        ("SELECTED", "Connect the visible action to the ranked opportunity.", 0.86),
+    ),
     "machine_choice_cta": (
         ("YOUR CHOICE", "Begin with the viewer's visible action.", 0.16),
         ("MACHINE RANK", "Reveal the ranking system behind the opportunity.", 0.52),
-        ("STILL AWAKE?", "Land on the unresolved final question.", 0.86),
+        ("LIKE + SUBSCRIBE", "Finish on two clear engagement actions.", 0.86),
     ),
 }
 
@@ -142,6 +164,7 @@ CAMERA_PROFILES = {
     "life_event_timeline": ((0.24, 0.55), (0.76, 0.50), 0.012),
     "digital_footprint_collector": ((0.30, 0.58), (0.70, 0.48), 0.014),
     "behavioral_twin": ((0.30, 0.54), (0.70, 0.52), 0.014),
+    "machine_choice_explainer": ((0.34, 0.52), (0.66, 0.50), 0.014),
     "machine_choice_cta": ((0.42, 0.52), (0.58, 0.50), 0.018),
 }
 
@@ -544,31 +567,112 @@ def _behavioral_twin(
     engine._text(draw, (960, 405), "SIGNALS BECOME A PREDICTIVE COUNTERPART", 22, palette["muted"], bold=True, anchor="mm")
 
 
+MACHINE_CHOICE_BAR_START_Y = 490
+MACHINE_CHOICE_BAR_STEP_Y = 31
+MACHINE_CHOICE_BAR_HEIGHT = 16
+MACHINE_CHOICE_LABEL_Y = 735
+
+
 def _machine_choice_cta(
     draw: ImageDraw.ImageDraw,
     progress: float,
     palette: dict[str, tuple[int, int, int]],
 ) -> None:
     reveal = _phase(progress, 0.12, 0.72)
-    question = _phase(progress, 0.62, 0.92)
-    _panel(draw, (130, 385, 860, 825), palette, outline=palette["white"])
-    engine._text(draw, (495, 455), "YOU CHOSE", 31, palette["white"], bold=True, anchor="mm")
-    _node(draw, (495, 610), 72, palette["white"], label="PLAY")
-    engine._text(draw, (495, 745), "VISIBLE ACTION", 20, palette["muted"], bold=True, anchor="mm")
+    subscribe_reveal = _phase(progress, 0.42, 0.72)
+    like_reveal = _phase(progress, 0.66, 0.90)
+    _panel(draw, (130, 365, 860, 790), palette, outline=palette["white"])
+    engine._text(draw, (495, 430), "YOU CHOSE", 31, palette["white"], bold=True, anchor="mm")
+    _node(draw, (495, 570), 72, palette["white"], label="PLAY")
+    engine._text(draw, (495, 710), "VISIBLE ACTION", 24, palette["muted"], bold=True, anchor="mm")
 
-    _panel(draw, (1060, 385, 1790, 825), palette, outline=palette["accent"])
-    engine._text(draw, (1425, 455), "MACHINE RANKED", 31, palette["accent"], bold=True, anchor="mm")
+    _panel(draw, (1060, 365, 1790, 790), palette, outline=palette["accent"])
+    engine._text(draw, (1425, 430), "MACHINE RANKED", 31, palette["accent"], bold=True, anchor="mm")
     for index in range(7):
         width = round((110 + index * 33) * reveal)
-        y = 525 + index * 35
+        y = MACHINE_CHOICE_BAR_START_Y + index * MACHINE_CHOICE_BAR_STEP_Y
         draw.rounded_rectangle((1190, y, 1190 + width, y + 16), radius=8, fill=palette["accent_alt"] if index < 6 else palette["good"])
-    engine._text(draw, (1425, 745), "INVISIBLE OPPORTUNITY", 20, palette["muted"], bold=True, anchor="mm")
+    engine._text(draw, (1425, MACHINE_CHOICE_LABEL_Y), "INVISIBLE OPPORTUNITY", 24, palette["muted"], bold=True, anchor="mm")
 
-    if question > 0.1:
-        alpha_pulse = (math.sin(progress * math.pi * 8) + 1) / 2
-        outline = palette["warning"] if alpha_pulse > 0.4 else palette["accent"]
-        draw.rounded_rectangle((570, 860, 1350, 950), radius=45, fill=palette["panel_alt"], outline=outline, width=4)
-        engine._text(draw, (960, 905), "SUBSCRIBE IF YOU'RE STILL AWAKE", 27, palette["white"], bold=True, anchor="mm")
+    engine._text(draw, (960, 820), "SUPPORT THE NEXT STORY", 24, palette["muted"], bold=True, anchor="mm")
+    engagement.draw_subscribe_like(
+        draw,
+        subscribe_center=(790, 910),
+        like_center=(1215, 910),
+        subscribe_reveal=subscribe_reveal,
+        like_reveal=like_reveal,
+        pulse=(math.sin(progress * math.pi * 6) + 1) / 2,
+        subscribe_scale=0.78,
+        like_scale=0.88,
+    )
+
+
+def _machine_choice_explainer(
+    draw: ImageDraw.ImageDraw,
+    progress: float,
+    palette: dict[str, tuple[int, int, int]],
+) -> None:
+    reveal = _phase(progress, 0.10, 0.74)
+    selection = _phase(progress, 0.58, 0.90)
+
+    _panel(draw, (110, 375, 660, 865), palette, outline=palette["white"])
+    engine._text(draw, (385, 430), "VISIBLE ACTION", 29, palette["white"], bold=True, anchor="mm")
+    _node(draw, (385, 610), 72, palette["white"], label="PLAY")
+    _pill(
+        draw,
+        (385, 770),
+        "ONE DECISION",
+        palette,
+        fill=palette["panel_alt"],
+        width=270,
+        text_fill=palette["muted"],
+    )
+
+    _panel(draw, (820, 350, 1810, 885), palette, outline=palette["accent"])
+    engine._text(draw, (1315, 405), "HIDDEN RANKING FIELD", 29, palette["accent"], bold=True, anchor="mm")
+    candidate_y = (500, 565, 630, 695, 760)
+    for index, y in enumerate(candidate_y):
+        local = _phase(reveal, index * 0.10, min(1.0, index * 0.10 + 0.42))
+        bar_width = round((160 + index * 75) * local)
+        color = palette["good"] if index == 3 and selection > 0.35 else palette["accent_alt"]
+        _node(draw, (930, y), 13, color)
+        draw.rounded_rectangle(
+            (980, y - 10, 980 + bar_width, y + 10),
+            radius=10,
+            fill=color,
+        )
+        engine._text(
+            draw,
+            (1690, y),
+            f"{round((0.54 + index * 0.08) * 100)}",
+            22,
+            palette["muted"],
+            bold=True,
+            anchor="mm",
+        )
+    cursor_x = round(980 + 520 * selection)
+    draw.line((cursor_x, 465, cursor_x, 810), fill=palette["good"], width=4)
+    _pill(
+        draw,
+        (1315, 830),
+        "OPPORTUNITY SELECTED" if selection > 0.55 else "SCORING OPPORTUNITIES",
+        palette,
+        fill=palette["good"] if selection > 0.55 else palette["panel_alt"],
+        width=390,
+        text_fill=palette["ink"] if selection > 0.55 else palette["muted"],
+    )
+
+    draw.line((680, 610, 790, 610), fill=palette["accent"], width=7)
+    draw.polygon(((790, 610), (760, 590), (760, 630)), fill=palette["accent"])
+    engine._text(
+        draw,
+        (960, 940),
+        "ONE CLICK • MANY HIDDEN SCORES",
+        27,
+        palette["warning"],
+        bold=True,
+        anchor="mm",
+    )
 
 
 RENDERERS = {
@@ -577,6 +681,7 @@ RENDERERS = {
     "life_event_timeline": _life_event_timeline,
     "digital_footprint_collector": _digital_footprint_collector,
     "behavioral_twin": _behavioral_twin,
+    "machine_choice_explainer": _machine_choice_explainer,
     "machine_choice_cta": _machine_choice_cta,
 }
 
@@ -657,9 +762,11 @@ def _encode_frames(
     style: art.MotionStyle,
     duration_seconds: float,
     output_path: Path,
+    video_format: str = "youtube",
 ) -> None:
+    profile = video_format_profile(video_format)
     process = subprocess.Popen(
-        ffmpeg_encoder_command(ffmpeg, output_path),
+        ffmpeg_encoder_command(ffmpeg, output_path, profile.width, profile.height),
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -669,12 +776,18 @@ def _encode_frames(
     try:
         assert process.stdin is not None
         for index in range(frame_count):
+            frame = render_frame(
+                template.template_id,
+                duration_seconds,
+                min(duration_seconds, index / OUTPUT_FPS),
+                style.style_id,
+            )
             process.stdin.write(
-                render_frame(
+                format_exact_visual_frame(
+                    frame,
+                    video_format,
+                    "tech_behavior_motion",
                     template.template_id,
-                    duration_seconds,
-                    min(duration_seconds, index / OUTPUT_FPS),
-                    style.style_id,
                 ).tobytes()
             )
         process.stdin.close()
@@ -712,11 +825,14 @@ def render_tech_motion(
         raise HTTPException(status_code=422, detail="FFmpeg is required to encode Tech & Behavior Motion videos.")
 
     duration = round(max(1.0, float(scene.duration_seconds)), 3)
+    video_format = project_video_format(scene)
+    profile = video_format_profile(video_format)
     asset_directory = project_directory(scene.project_id) / "assets"
     asset_directory.mkdir(parents=True, exist_ok=True)
     stem = asset_directory / (
         f"scene-{scene.scene_number:03d}-tech-"
-        f"{safe_component(template.template_id)}-{safe_component(style.style_id)}"
+        f"{safe_component(template.template_id)}-{safe_component(style.style_id)}-"
+        f"{video_format}"
     )
     media_path = stem.with_suffix(".mp4")
     preview_path = Path(f"{stem}-poster.jpg")
@@ -726,9 +842,14 @@ def render_tech_motion(
     temporary_preview.unlink(missing_ok=True)
 
     try:
-        _encode_frames(ffmpeg, template, style, duration, temporary_media)
+        _encode_frames(ffmpeg, template, style, duration, temporary_media, video_format)
         poster_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
-        render_frame(template.template_id, duration, poster_time, style.style_id).save(
+        format_exact_visual_frame(
+            render_frame(template.template_id, duration, poster_time, style.style_id),
+            video_format,
+            "tech_behavior_motion",
+            template.template_id,
+        ).save(
             temporary_preview,
             format="JPEG",
             quality=93,
@@ -763,4 +884,7 @@ def render_tech_motion(
         size_bytes=media_path.stat().st_size,
         checksum_sha256=engine._checksum(media_path),
         duration_seconds=duration,
+        width=profile.width,
+        height=profile.height,
+        video_format=video_format,
     )

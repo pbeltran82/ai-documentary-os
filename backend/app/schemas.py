@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+VideoFormat = Literal["youtube", "shorts"]
+
 
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
@@ -15,6 +17,11 @@ class ProjectCreate(BaseModel):
     visual_style: str = Field(
         default="Cinematic documentary", min_length=2, max_length=200
     )
+    video_format: VideoFormat = "youtube"
+
+
+class ProjectUpdate(BaseModel):
+    video_format: VideoFormat
 
 
 class ProjectRead(ProjectCreate):
@@ -270,6 +277,14 @@ class VoiceoverRead(BaseModel):
     uploaded_at: str
 
 
+class CaptionTrackRead(BaseModel):
+    format: str
+    cue_count: int
+    relative_path: str
+    public_url: str
+    exists: bool
+
+
 class TimelinePlanResponse(BaseModel):
     schema_version: str
     generated_at: str
@@ -282,6 +297,7 @@ class TimelinePlanResponse(BaseModel):
     missing_scenes: list[TimelineMissingScene] = Field(default_factory=list)
     settings: dict[str, Any]
     voiceover: VoiceoverRead | None = None
+    captions: CaptionTrackRead
     alignment_status: str
     duration_delta_seconds: float | None = None
     alignment_message: str

@@ -4,7 +4,8 @@ import "../batch-production.css";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
-type ProjectSummary = { id: number; title: string };
+type VideoFormat = "youtube" | "shorts";
+type ProjectSummary = { id: number; title: string; video_format: VideoFormat };
 type SceneSummary = {
   id: number;
   scene_number: number;
@@ -43,6 +44,9 @@ type MotionSuggestion = {
   templates_by_family: Record<string, TemplateOption[]>;
   styles: StyleOption[];
   default_style_id: string;
+  video_format: VideoFormat;
+  output_width: number;
+  output_height: number;
 };
 type StoryBeat = {
   label: string;
@@ -54,6 +58,9 @@ type Storyboard = {
   template_id: string;
   duration_seconds: number;
   beats: StoryBeat[];
+  video_format: VideoFormat;
+  output_width: number;
+  output_height: number;
 };
 type GeneratedAsset = {
   preview_url: string;
@@ -567,7 +574,7 @@ export function FinanceMotionLauncher() {
                             <h3>{selectedTemplate?.label ?? "Exact visual"} · {selectedStyle?.label ?? "Art direction"}</h3>
                             <p>Review how the scene establishes the situation, animates the behavior or system, and lands on the result before rendering.</p>
                           </div>
-                          <div className="finance-motion-storyboard">
+                          <div className={`finance-motion-storyboard ${storyboard.video_format}`}>
                             {storyboard.beats.map((beat, index) => (
                               <figure key={`${beat.label}-${beat.time_seconds}`}>
                                 <div><span>{String(index + 1).padStart(2, "0")}</span><strong>{beat.label}</strong></div>
@@ -580,7 +587,9 @@ export function FinanceMotionLauncher() {
                       ) : null}
 
                       <button className="finance-motion-generate" disabled={busy || batch.active} onClick={() => void generate()}>
-                        {busy ? `Rendering ${selectedFamily?.label ?? "exact"} 1080p visual…` : `Generate ${selectedStyle?.label ?? "art-directed"} ${selectedFamily?.label ?? "visual"}`}
+                        {busy
+                          ? `Rendering ${selectedFamily?.label ?? "exact"} ${suggestion.video_format === "shorts" ? "vertical" : "1080p"} visual…`
+                          : `Generate ${selectedStyle?.label ?? "art-directed"} ${selectedFamily?.label ?? "visual"}`}
                       </button>
                     </>
                   )}
@@ -606,7 +615,7 @@ export function FinanceMotionLauncher() {
               <div>
                 <span>{batch.active ? "BATCH RENDER IN PROGRESS" : "BATCH PRODUCTION COMPLETE"}</span>
                 <h2>{project?.title ?? "Exact visual project"}</h2>
-                <p>{batch.active ? "Keep this tab open while local 1080p scenes are rendered and attached." : "Review the results before returning to the timeline."}</p>
+                <p>{batch.active ? `Keep this tab open while local ${project?.video_format === "shorts" ? "vertical Shorts" : "1080p"} scenes are rendered and attached.` : "Review the results before returning to the timeline."}</p>
               </div>
               <strong>{batchPercent}%</strong>
             </header>

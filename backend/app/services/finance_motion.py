@@ -14,6 +14,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ..models import Scene
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
+from .video_format import (
+    format_exact_visual_frame,
+    project_video_format,
+    video_format_profile,
+)
 
 OUTPUT_WIDTH = 1920
 OUTPUT_HEIGHT = 1080
@@ -59,6 +64,9 @@ class GeneratedMotion:
     size_bytes: int
     checksum_sha256: str
     duration_seconds: float
+    width: int
+    height: int
+    video_format: str
 
 
 TEMPLATES = (
@@ -291,10 +299,15 @@ def render_frame(template_id: str, duration_seconds: float, time_seconds: float)
     return Image.blend(Image.new("RGB", image.size, BG_TOP), image, visibility) if visibility < 1 else image
 
 
-def ffmpeg_encoder_command(ffmpeg: str, output_path: Path) -> list[str]:
+def ffmpeg_encoder_command(
+    ffmpeg: str,
+    output_path: Path,
+    width: int = OUTPUT_WIDTH,
+    height: int = OUTPUT_HEIGHT,
+) -> list[str]:
     return [
         ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-vcodec", "rawvideo",
-        "-pix_fmt", "rgb24", "-s", f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}", "-r", str(OUTPUT_FPS),
+        "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(OUTPUT_FPS),
         "-i", "-", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "19",
         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output_path),
     ]
@@ -307,13 +320,37 @@ def _compact_error(value: bytes | str | None) -> str:
     return " ".join(meaningful[-6:])[-1200:] or "Unknown encoder error"
 
 
-def _encode_frames(ffmpeg: str, template: MotionTemplate, duration_seconds: float, output_path: Path) -> None:
-    process = subprocess.Popen(ffmpeg_encoder_command(ffmpeg, output_path), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+def _encode_frames(
+    ffmpeg: str,
+    template: MotionTemplate,
+    duration_seconds: float,
+    output_path: Path,
+    video_format: str = "youtube",
+) -> None:
+    profile = video_format_profile(video_format)
+    process = subprocess.Popen(
+        ffmpeg_encoder_command(ffmpeg, output_path, profile.width, profile.height),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
     frame_count = max(1, math.ceil(duration_seconds * OUTPUT_FPS))
     try:
         assert process.stdin is not None
         for index in range(frame_count):
-            process.stdin.write(render_frame(template.template_id, duration_seconds, min(duration_seconds, index / OUTPUT_FPS)).tobytes())
+            frame = render_frame(
+                template.template_id,
+                duration_seconds,
+                min(duration_seconds, index / OUTPUT_FPS),
+            )
+            process.stdin.write(
+                format_exact_visual_frame(
+                    frame,
+                    video_format,
+                    "finance_motion",
+                    template.template_id,
+                ).tobytes()
+            )
         process.stdin.close()
         code = process.wait(timeout=RENDER_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as exc:
@@ -349,9 +386,11 @@ def render_finance_motion(scene: Scene, template_id: str | None = None) -> Gener
     if ffmpeg is None:
         raise HTTPException(status_code=422, detail="FFmpeg is required to encode Finance Motion Studio videos.")
     duration = round(max(1.0, float(scene.duration_seconds)), 3)
+    video_format = project_video_format(scene)
+    profile = video_format_profile(video_format)
     asset_directory = project_directory(scene.project_id) / "assets"
     asset_directory.mkdir(parents=True, exist_ok=True)
-    stem = asset_directory / f"scene-{scene.scene_number:03d}-finance-{safe_component(template.template_id)}"
+    stem = asset_directory / f"scene-{scene.scene_number:03d}-finance-{safe_component(template.template_id)}-{video_format}"
     media_path = stem.with_suffix(".mp4")
     preview_path = Path(f"{stem}-poster.jpg")
     temporary_media = Path(f"{media_path}.part.mp4")
@@ -359,9 +398,14 @@ def render_finance_motion(scene: Scene, template_id: str | None = None) -> Gener
     temporary_media.unlink(missing_ok=True)
     temporary_preview.unlink(missing_ok=True)
     try:
-        _encode_frames(ffmpeg, template, duration, temporary_media)
+        _encode_frames(ffmpeg, template, duration, temporary_media, video_format)
         poster_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
-        render_frame(template.template_id, duration, poster_time).save(temporary_preview, format="JPEG", quality=92, optimize=True)
+        format_exact_visual_frame(
+            render_frame(template.template_id, duration, poster_time),
+            video_format,
+            "finance_motion",
+            template.template_id,
+        ).save(temporary_preview, format="JPEG", quality=92, optimize=True)
         temporary_media.replace(media_path)
         temporary_preview.replace(preview_path)
     except HTTPException:
@@ -386,4 +430,7 @@ def render_finance_motion(scene: Scene, template_id: str | None = None) -> Gener
         size_bytes=media_path.stat().st_size,
         checksum_sha256=_checksum(media_path),
         duration_seconds=duration,
+        width=profile.width,
+        height=profile.height,
+        video_format=video_format,
     )

@@ -14,6 +14,7 @@ const emptyProject: ProjectCreate = {
   audience: "General audience",
   tone: "Cinematic and informative",
   visual_style: "Cinematic documentary",
+  video_format: "youtube",
 };
 
 const pipeline = [
@@ -76,6 +77,23 @@ function App() {
 
   useEffect(() => {
     void refreshProjects();
+  }, []);
+
+  useEffect(() => {
+    const openTimeline = (event: Event) => {
+      const projectId = Number((event as CustomEvent<{ projectId?: number }>).detail?.projectId);
+      if (!projectId) return;
+      setProjectLoading(true);
+      setError("");
+      void api.getProject(projectId).then((project) => {
+        setSelectedProject(project);
+        setWorkspaceMode("timeline");
+      }).catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Unable to open Timeline Builder");
+      }).finally(() => setProjectLoading(false));
+    };
+    window.addEventListener("atlas:open-timeline", openTimeline);
+    return () => window.removeEventListener("atlas:open-timeline", openTimeline);
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -244,6 +262,10 @@ function App() {
             onBack={returnToMissionControl}
             onOpenAssets={() => setWorkspaceMode("assets")}
             onOpenScenes={() => setWorkspaceMode("scenes")}
+            onProjectChanged={() => Promise.all([
+              refreshSelectedProject(selectedProject.id),
+              refreshProjects(),
+            ]).then(() => undefined)}
           />
         ) : (
           <ProjectWorkspace
@@ -341,6 +363,7 @@ function App() {
                     <p>{project.topic}</p>
                     <div className="project-meta">
                       <span>{project.target_minutes} min target</span>
+                      <span>{project.video_format === "shorts" ? "Shorts · 9:16" : "YouTube · 16:9"}</span>
                       <span>{project.visual_style}</span>
                       <span>{formatDate(project.updated_at)}</span>
                     </div>
@@ -418,6 +441,31 @@ function App() {
                       onChange={(event) => setForm({ ...form, visual_style: event.target.value })}
                     />
                   </label>
+                  <div className="wide-field new-project-format">
+                    <span>Delivery format</span>
+                    <div className="format-switch" role="group" aria-label="New project video format">
+                      <button
+                        type="button"
+                        className={form.video_format === "youtube" ? "active" : ""}
+                        aria-pressed={form.video_format === "youtube"}
+                        onClick={() => setForm({ ...form, video_format: "youtube" })}
+                      >
+                        <span className="format-glyph landscape" aria-hidden="true" />
+                        <strong>YouTube</strong>
+                        <small>16:9 · 1920×1080</small>
+                      </button>
+                      <button
+                        type="button"
+                        className={form.video_format === "shorts" ? "active" : ""}
+                        aria-pressed={form.video_format === "shorts"}
+                        onClick={() => setForm({ ...form, video_format: "shorts" })}
+                      >
+                        <span className="format-glyph portrait" aria-hidden="true" />
+                        <strong>Shorts</strong>
+                        <small>9:16 · 1080×1920</small>
+                      </button>
+                    </div>
+                  </div>
                   <div className="form-actions wide-field">
                     <button type="button" className="ghost-button" onClick={() => setShowForm(false)}>
                       Cancel

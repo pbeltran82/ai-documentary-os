@@ -13,6 +13,11 @@ from . import finance_motion as engine
 from . import finance_motion_art as art
 from . import finance_motion_composition as composition
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
+from .video_format import (
+    format_exact_visual_frame,
+    project_video_format,
+    video_format_profile,
+)
 
 # Character Explainer v1.4 is an editorial icon-figure system for scenes where
 # human behavior is the story. It deliberately shares Finance Motion Studio's
@@ -791,9 +796,11 @@ def _encode_frames(
     style: art.MotionStyle,
     duration_seconds: float,
     output_path: Path,
+    video_format: str = "youtube",
 ) -> None:
+    profile = video_format_profile(video_format)
     process = subprocess.Popen(
-        ffmpeg_encoder_command(ffmpeg, output_path),
+        ffmpeg_encoder_command(ffmpeg, output_path, profile.width, profile.height),
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -803,12 +810,18 @@ def _encode_frames(
     try:
         assert process.stdin is not None
         for index in range(frame_count):
+            frame = render_frame(
+                template.template_id,
+                duration_seconds,
+                min(duration_seconds, index / engine.OUTPUT_FPS),
+                style.style_id,
+            )
             process.stdin.write(
-                render_frame(
+                format_exact_visual_frame(
+                    frame,
+                    video_format,
+                    "character_explainer",
                     template.template_id,
-                    duration_seconds,
-                    min(duration_seconds, index / engine.OUTPUT_FPS),
-                    style.style_id,
                 ).tobytes()
             )
         process.stdin.close()
@@ -844,11 +857,14 @@ def render_character_motion(
         raise HTTPException(status_code=422, detail="FFmpeg is required to encode Character Explainer videos.")
 
     duration = round(max(1.0, float(scene.duration_seconds)), 3)
+    video_format = project_video_format(scene)
+    profile = video_format_profile(video_format)
     asset_directory = project_directory(scene.project_id) / "assets"
     asset_directory.mkdir(parents=True, exist_ok=True)
     stem = asset_directory / (
         f"scene-{scene.scene_number:03d}-character-"
-        f"{safe_component(template.template_id)}-{safe_component(style.style_id)}"
+        f"{safe_component(template.template_id)}-{safe_component(style.style_id)}-"
+        f"{video_format}"
     )
     media_path = stem.with_suffix(".mp4")
     preview_path = Path(f"{stem}-poster.jpg")
@@ -858,9 +874,14 @@ def render_character_motion(
     temporary_preview.unlink(missing_ok=True)
 
     try:
-        _encode_frames(ffmpeg, template, style, duration, temporary_media)
+        _encode_frames(ffmpeg, template, style, duration, temporary_media, video_format)
         poster_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
-        render_frame(template.template_id, duration, poster_time, style.style_id).save(
+        format_exact_visual_frame(
+            render_frame(template.template_id, duration, poster_time, style.style_id),
+            video_format,
+            "character_explainer",
+            template.template_id,
+        ).save(
             temporary_preview,
             format="JPEG",
             quality=93,
@@ -892,4 +913,7 @@ def render_character_motion(
         size_bytes=media_path.stat().st_size,
         checksum_sha256=engine._checksum(media_path),
         duration_seconds=duration,
+        width=profile.width,
+        height=profile.height,
+        video_format=video_format,
     )

@@ -273,6 +273,7 @@ def normalized_photo_filter(
     processed_duration: float,
 ) -> str:
     index = clip["input_index"]
+    width, height = base.output_dimensions(clip)
     motion = str(clip["motion_effect"])
     frames = max(2, int(round(processed_duration * base.OUTPUT_FPS)))
     background_label = f"photo_bg_{index}"
@@ -290,13 +291,13 @@ def normalized_photo_filter(
         "setpts=PTS-STARTPTS,"
         f"split=2[{background_label}][{foreground_label}];"
         f"[{background_label}]"
-        f"scale={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,"
-        f"crop={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT},"
+        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},"
         f"gblur=sigma={sigma},"
         f"eq=brightness={brightness:.3f}:saturation={saturation:.3f},"
         f"setsar=1[{blurred_label}];"
         f"[{foreground_label}]"
-        f"scale={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         "eq=contrast=1.035:saturation=1.035,"
         f"setsar=1[{framed_label}];"
         f"[{blurred_label}][{framed_label}]"
@@ -315,7 +316,7 @@ def normalized_photo_filter(
         + f"zoompan=z='{zoom}':"
         f"x='{x_position}':"
         f"y='{y_position}':"
-        f"d=1:s={base.OUTPUT_WIDTH}x{base.OUTPUT_HEIGHT}:fps={base.OUTPUT_FPS},"
+        f"d=1:s={width}x{height}:fps={base.OUTPUT_FPS},"
         "format=yuv420p"
     )
 
@@ -334,7 +335,7 @@ def apply_edit_decisions(
 
 def build_timeline_plan(project, style=None) -> dict[str, Any]:
     plan = _original_build_timeline_plan(project, style)
-    plan["schema_version"] = "0.4"
+    plan["schema_version"] = "0.5"
     plan["settings"]["still_direction"] = "subject_aware"
     return plan
 

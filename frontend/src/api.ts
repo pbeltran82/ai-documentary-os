@@ -16,6 +16,7 @@ import type {
   TimelineManifestResponse,
   TimelinePlan,
   TimelineStyle,
+  VideoFormat,
   VisualDirectorResponse,
   VisualFeedback,
   VisualFeedbackReason,
@@ -60,6 +61,11 @@ export const api = {
   createProject: (payload: ProjectCreate) =>
     request<Project>("/projects", {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateProject: (id: number, payload: { video_format: VideoFormat }) =>
+    request<Project>(`/projects/${id}`, {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
   deleteProject: (id: number) =>

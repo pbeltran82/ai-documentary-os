@@ -88,6 +88,12 @@
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
 }
 
+.finance-motion-storyboard.shorts img {
+  max-height: 520px;
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+}
+
 .finance-motion-storyboard figcaption {
   color: #9ca8ba;
   font-size: 0.72rem;

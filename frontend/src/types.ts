@@ -19,6 +19,7 @@ export type AssetStatus = "missing" | "searching" | "selected" | "ready";
 export type MediaType = "video" | "photo";
 export type ProviderName = "pixabay" | "unsplash" | "wikimedia" | "nasa" | "pexels";
 export type NarrationAlignmentStatus = "missing" | "aligned" | "shorter" | "longer";
+export type VideoFormat = "youtube" | "shorts";
 export type TransitionStyle = "cut" | "crossfade" | "fade_black";
 export type PhotoMotion = "editorial" | "static" | "zoom_in" | "zoom_out" | "alternate";
 export type VisualFeedbackReason =
@@ -162,6 +163,7 @@ export interface Project {
   audience: string;
   tone: string;
   visual_style: string;
+  video_format: VideoFormat;
   status: ProjectStatus;
   created_at: string;
   updated_at: string;
@@ -178,6 +180,7 @@ export interface ProjectCreate {
   audience: string;
   tone: string;
   visual_style: string;
+  video_format: VideoFormat;
 }
 
 export interface SceneGeneratePayload {
@@ -254,6 +257,14 @@ export interface Voiceover {
   uploaded_at: string;
 }
 
+export interface CaptionTrack {
+  format: string;
+  cue_count: number;
+  relative_path: string;
+  public_url: string;
+  exists: boolean;
+}
+
 export interface TimelinePlan {
   schema_version: string;
   generated_at: string;
@@ -265,6 +276,9 @@ export interface TimelinePlan {
   clip_count: number;
   missing_scenes: TimelineMissingScene[];
   settings: {
+    video_format: VideoFormat;
+    format_label: string;
+    aspect_ratio: "16:9" | "9:16";
     width: number;
     height: number;
     fps: number;
@@ -280,6 +294,7 @@ export interface TimelinePlan {
     edge_fade_seconds: number;
   };
   voiceover: Voiceover | null;
+  captions: CaptionTrack;
   alignment_status: NarrationAlignmentStatus;
   duration_delta_seconds: number | null;
   alignment_message: string;

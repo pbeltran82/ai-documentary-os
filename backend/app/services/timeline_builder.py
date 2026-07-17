@@ -14,8 +14,10 @@ from fastapi import HTTPException
 
 from ..models import Project, Scene
 from ..schemas import TimelineStyleUpdate
+from .caption_builder import write_caption_track
 from .exact_visual_timing import effective_scene_duration, exact_visual_identity
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, resolve_media_path
+from .video_format import SHORTS_FORMAT, video_format_profile
 from .voiceover import load_voiceover
 
 OUTPUT_WIDTH = int(os.getenv("TIMELINE_OUTPUT_WIDTH", "1920"))
@@ -28,6 +30,7 @@ AUDIO_BITRATE = os.getenv("TIMELINE_AUDIO_BITRATE", "192k")
 ALIGNMENT_TOLERANCE_SECONDS = float(
     os.getenv("NARRATION_ALIGNMENT_TOLERANCE_SECONDS", "0.25")
 )
+EXACT_VISUAL_TEXT_TRANSITION_MAX_SECONDS = 0.24
 
 DEFAULT_STYLE = {
     "transition_style": "crossfade",
@@ -39,6 +42,14 @@ TRANSITION_FILTERS = {
     "crossfade": "fade",
     "fade_black": "fadeblack",
 }
+
+
+def output_dimensions(values: dict[str, Any] | None = None) -> tuple[int, int]:
+    values = values or {}
+    return (
+        int(values.get("output_width", OUTPUT_WIDTH)),
+        int(values.get("output_height", OUTPUT_HEIGHT)),
+    )
 
 
 def utc_iso() -> str:
@@ -144,6 +155,16 @@ def transition_duration_for_boundary(
         0.75,
     )
     return round(max(0.0, min(requested_seconds, safe_limit)), 3)
+
+
+def is_exact_visual_boundary(
+    previous_clip: dict[str, Any],
+    next_clip: dict[str, Any],
+) -> bool:
+    return bool(
+        previous_clip.get("exact_visual_family_id")
+        and next_clip.get("exact_visual_family_id")
+    )
 
 
 READABILITY_WORDS = {
@@ -270,6 +291,11 @@ def scene_clip(
             "duration_seconds": duration,
             "source_scene_duration_seconds": scene_duration,
             "source_duration_seconds": source_duration,
+            "source_width": int(asset.width or 0),
+            "source_height": int(asset.height or 0),
+            "output_width": int(style.get("output_width", OUTPUT_WIDTH)),
+            "output_height": int(style.get("output_height", OUTPUT_HEIGHT)),
+            "video_format": str(style.get("video_format", "youtube")),
             "duration_extension_seconds": round(duration - scene_duration, 3),
             "processed_duration_seconds": duration,
             "narration": scene.narration,
@@ -308,13 +334,28 @@ def apply_edit_decisions(
         transition_seconds = 0.0
         transition_out = "cut"
         if index < len(clips) - 1 and transition_style != "cut":
+            next_clip = clips[index + 1]
+            boundary_style = transition_style
+            boundary_request = requested
+            if (
+                transition_style == "crossfade"
+                and is_exact_visual_boundary(clip, next_clip)
+            ):
+                # Text-heavy exact visuals should never dissolve two titles and
+                # two panel systems over each other. A short dip preserves the
+                # transition rhythm while keeping every frame readable.
+                boundary_style = "fade_black"
+                boundary_request = min(
+                    requested,
+                    EXACT_VISUAL_TEXT_TRANSITION_MAX_SECONDS,
+                )
             transition_seconds = transition_duration_for_boundary(
                 clip,
-                clips[index + 1],
-                requested,
+                next_clip,
+                boundary_request,
             )
             if transition_seconds > 0:
-                transition_out = transition_style
+                transition_out = boundary_style
 
         clip["transition_out"] = transition_out
         clip["transition_duration_seconds"] = transition_seconds
@@ -323,10 +364,11 @@ def apply_edit_decisions(
             3,
         )
 
+        aspect_ratio = "9:16" if clip.get("video_format") == SHORTS_FORMAT else "16:9"
         base_action = (
-            f"Loop if needed, trim to {clip['duration_seconds']:g}s, fit 16:9"
+            f"Loop if needed, trim to {clip['duration_seconds']:g}s, fit {aspect_ratio}"
             if clip["media_type"] == "video"
-            else f"Hold for {clip['duration_seconds']:g}s, fit 16:9"
+            else f"Hold for {clip['duration_seconds']:g}s, fit {aspect_ratio}"
         )
         motion_label = {
             "zoom_in": "gentle zoom in",
@@ -375,12 +417,25 @@ def normalized_video_filter(
     processed_duration: float,
 ) -> str:
     index = clip["input_index"]
+    width, height = output_dimensions(clip)
+    vertical_stock = (
+        str(clip.get("video_format")) == SHORTS_FORMAT
+        and str(clip.get("provider", "")).lower() != "generated"
+    )
+    fit = (
+        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},"
+        if vertical_stock
+        else (
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        )
+    )
     return (
         f"[{index}:v]"
         f"trim=duration={processed_duration:.3f},"
         "setpts=PTS-STARTPTS,"
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
-        f"pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"{fit}"
         "setsar=1,"
         f"fps={OUTPUT_FPS},"
         "format=yuv420p"
@@ -406,6 +461,7 @@ def normalized_photo_filter(
     processed_duration: float,
 ) -> str:
     index = clip["input_index"]
+    width, height = output_dimensions(clip)
     motion = clip["motion_effect"]
     frames = max(2, int(round(processed_duration * OUTPUT_FPS)))
     background_label = f"photo_bg_{index}"
@@ -419,13 +475,13 @@ def normalized_photo_filter(
         "setpts=PTS-STARTPTS,"
         f"split=2[{background_label}][{foreground_label}];"
         f"[{background_label}]"
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,"
-        f"crop={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
+        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},"
         "gblur=sigma=28,"
         "eq=brightness=-0.18:saturation=0.78,"
         f"setsar=1[{blurred_label}];"
         f"[{foreground_label}]"
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"setsar=1[{framed_label}];"
         f"[{blurred_label}][{framed_label}]"
         "overlay=(W-w)/2:(H-h)/2:shortest=1,"
@@ -443,7 +499,7 @@ def normalized_photo_filter(
         + f"zoompan=z='{zoom}':"
         f"x='{x_position}':"
         f"y='{y_position}':"
-        f"d=1:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:fps={OUTPUT_FPS},"
+        f"d=1:s={width}x{height}:fps={OUTPUT_FPS},"
         "format=yuv420p"
     )
 
@@ -483,11 +539,20 @@ def build_filter_graph(
     else:
         previous_label = "v0"
         timeline_offset = 0.0
-        transition_filter = TRANSITION_FILTERS[str(style["transition_style"])]
         for index in range(1, len(clips)):
             timeline_offset += float(clips[index - 1]["duration_seconds"])
             transition_seconds = float(
                 clips[index - 1]["transition_duration_seconds"]
+            )
+            boundary_style = str(
+                clips[index - 1].get(
+                    "transition_out",
+                    style["transition_style"],
+                )
+            )
+            transition_filter = TRANSITION_FILTERS.get(
+                boundary_style,
+                TRANSITION_FILTERS[str(style["transition_style"])],
             )
             output_label = "outv" if index == len(clips) - 1 else f"x{index}"
             filters.append(
@@ -598,11 +663,18 @@ def build_timeline_plan(
     project: Project,
     style: TimelineStyleUpdate | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    normalized_style = (
+    saved_style = (
         save_timeline_style(project.id, style)
         if style is not None
         else load_timeline_style(project.id)
     )
+    profile = video_format_profile(project)
+    normalized_style = {
+        **saved_style,
+        "video_format": profile.format_id,
+        "output_width": profile.width,
+        "output_height": profile.height,
+    }
     clips: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
 
@@ -623,6 +695,8 @@ def build_timeline_plan(
 
     timeline_dir = timeline_directory(project.id)
     output_path = timeline_dir / "first-cut.mp4"
+    caption_path = timeline_dir / "captions.srt"
+    caption_cue_count = write_caption_track(project.scenes, caption_path)
     executable = ffmpeg_executable()
     source_runtime = max(
         (float(scene.end_seconds) for scene in project.scenes),
@@ -651,9 +725,10 @@ def build_timeline_plan(
         else []
     )
     output_relative_path = relative_media_path(output_path)
+    caption_relative_path = relative_media_path(caption_path)
 
     return {
-        "schema_version": "0.4",
+        "schema_version": "0.5",
         "generated_at": utc_iso(),
         "project_id": project.id,
         "project_title": project.title,
@@ -663,8 +738,11 @@ def build_timeline_plan(
         "clip_count": len(clips),
         "missing_scenes": missing,
         "settings": {
-            "width": OUTPUT_WIDTH,
-            "height": OUTPUT_HEIGHT,
+            "video_format": profile.format_id,
+            "format_label": profile.label,
+            "aspect_ratio": profile.aspect_ratio,
+            "width": profile.width,
+            "height": profile.height,
             "fps": OUTPUT_FPS,
             "video_codec": "libx264",
             "pixel_format": "yuv420p",
@@ -675,6 +753,13 @@ def build_timeline_plan(
             **normalized_style,
         },
         "voiceover": voiceover,
+        "captions": {
+            "format": "SubRip",
+            "cue_count": caption_cue_count,
+            "relative_path": caption_relative_path,
+            "public_url": public_media_url(caption_relative_path),
+            "exists": caption_cue_count > 0 and caption_path.is_file(),
+        },
         "alignment_status": alignment_status,
         "duration_delta_seconds": duration_delta,
         "alignment_message": alignment_message,

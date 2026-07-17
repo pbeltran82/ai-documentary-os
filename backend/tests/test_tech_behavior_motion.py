@@ -5,11 +5,13 @@ import unittest
 from pathlib import Path
 
 from fastapi import HTTPException
-from PIL import ImageChops
+from PIL import Image, ImageChops, ImageDraw
 
 from app.models import Project, Scene
 from app.services import exact_visuals
+from app.services import engagement_cta
 from app.services import tech_behavior_motion as tech
+from app.services import tech_behavior_truthful as truthful
 
 
 class TechBehaviorMotionTests(unittest.TestCase):
@@ -41,9 +43,40 @@ class TechBehaviorMotionTests(unittest.TestCase):
         project.scenes = [scene]
         return scene
 
+    def project_scenes(self, narrations: list[str]) -> list[Scene]:
+        project = Project(
+            id=22,
+            title="Behavioral Ranking",
+            topic="AI prediction and behavioral modeling",
+            target_minutes=1,
+            audience="General audience",
+            tone="Tense documentary",
+            visual_style="Cinematic technology documentary",
+            status="assets",
+        )
+        project.scenes = [
+            Scene(
+                id=100 + index,
+                project_id=project.id,
+                scene_number=index,
+                start_seconds=(index - 1) * 6,
+                end_seconds=index * 6,
+                duration_seconds=6,
+                narration=narration,
+                visual_intent="",
+                search_keywords=[],
+                preferred_asset_type="stock_video",
+                asset_status="missing",
+            )
+            for index, narration in enumerate(narrations, 1)
+        ]
+        for scene in project.scenes:
+            scene.project = project
+        return project.scenes
+
     def test_catalog_exposes_six_tech_templates(self) -> None:
         catalog = tech.template_catalog()
-        self.assertEqual(len(catalog), 6)
+        self.assertEqual(len(catalog), 7)
         self.assertEqual(
             {item["template_id"] for item in catalog},
             {
@@ -52,6 +85,7 @@ class TechBehaviorMotionTests(unittest.TestCase):
                 "life_event_timeline",
                 "digital_footprint_collector",
                 "behavioral_twin",
+                "machine_choice_explainer",
                 "machine_choice_cta",
             },
         )
@@ -113,6 +147,72 @@ class TechBehaviorMotionTests(unittest.TestCase):
                 template, confidence, _reason = tech.suggest_template(self.scene(narration))
                 self.assertEqual(template.template_id, expected)
                 self.assertGreater(confidence, 0.50)
+
+    def test_cta_is_reserved_for_the_terminal_scene(self) -> None:
+        scenes = self.project_scenes(
+            [
+                "Did you choose, or did the machine choose the moment?",
+                "Did you choose, or did the machine choose the moment? Like and subscribe.",
+            ]
+        )
+
+        early, _confidence, _reason = tech.suggest_template(scenes[0])
+        terminal, _confidence, _reason = tech.suggest_template(scenes[1])
+
+        self.assertEqual(early.template_id, "machine_choice_explainer")
+        self.assertEqual(terminal.template_id, "machine_choice_cta")
+
+    def test_project_sequence_avoids_recent_exact_template_repeats(self) -> None:
+        scenes = self.project_scenes(
+            [
+                "This exact video would reach you through a recommendation system.",
+                "Artificial intelligence predicts behavior from every signal.",
+                "Your digital footprint collects every scroll and click.",
+                "Life records estimate job changes and future health events.",
+                "Artificial intelligence predicts behavior from every signal.",
+                "Your digital footprint collects every scroll and click.",
+                "Those signals create a behavioral twin of you.",
+                "A recommendation system ranked the opportunity.",
+                "Did you choose, or did the machine choose the moment?",
+                "Systems that learn how to navigate us create a behavioral version of you.",
+                "Did you choose, or did the machine choose the moment? Like and subscribe.",
+            ]
+        )
+        selected = [tech.suggest_template(scene)[0].template_id for scene in scenes]
+
+        for index, template_id in enumerate(selected):
+            with self.subTest(scene=index + 1, template=template_id):
+                self.assertNotIn(template_id, selected[max(0, index - 3):index])
+        self.assertNotIn("machine_choice_cta", selected[:-1])
+        self.assertEqual(selected[-1], "machine_choice_cta")
+
+    def test_behavioral_twin_uses_finished_clothed_characters(self) -> None:
+        palette = tech._palette(tech.DEFAULT_STYLE_ID)
+        character_palette = truthful.tech_character_palette(palette)
+        canvas = Image.new("RGB", (tech.OUTPUT_WIDTH, tech.OUTPUT_HEIGHT), palette["background"])
+
+        truthful._truthful_behavioral_twin(ImageDraw.Draw(canvas), 0.78, palette)
+
+        pixels = list(canvas.getdata())
+        self.assertGreater(pixels.count(character_palette["skin"]), 1200)
+        self.assertGreater(pixels.count(character_palette["denim"]), 900)
+        self.assertGreater(pixels.count(character_palette["denim_alt"]), 900)
+
+    def test_tech_end_card_uses_shared_red_subscribe_and_blue_like_actions(self) -> None:
+        palette = tech._palette(tech.DEFAULT_STYLE_ID)
+        canvas = Image.new("RGB", (tech.OUTPUT_WIDTH, tech.OUTPUT_HEIGHT), palette["background"])
+
+        tech._machine_choice_cta(ImageDraw.Draw(canvas), 0.92, palette)
+
+        pixels = list(canvas.getdata())
+        self.assertGreater(pixels.count(engagement_cta.SUBSCRIBE_RED), 3500)
+        self.assertGreater(pixels.count(engagement_cta.LIKE_BLUE), 1500)
+        final_bar_bottom = (
+            tech.MACHINE_CHOICE_BAR_START_Y
+            + 6 * tech.MACHINE_CHOICE_BAR_STEP_Y
+            + tech.MACHINE_CHOICE_BAR_HEIGHT
+        )
+        self.assertGreaterEqual(tech.MACHINE_CHOICE_LABEL_Y - final_bar_bottom, 35)
 
     def test_all_tech_templates_render_distinct_1080p_frames(self) -> None:
         signatures: set[str] = set()

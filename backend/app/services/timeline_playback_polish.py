@@ -29,6 +29,38 @@ def generated_edge_trim_seconds(clip: dict[str, Any]) -> float:
     )
 
 
+def generated_fit_filter(clip: dict[str, Any]) -> str:
+    width, height = base.output_dimensions(clip)
+    source_width = int(clip.get("source_width") or 0)
+    source_height = int(clip.get("source_height") or 0)
+    output_is_portrait = height > width
+    source_is_portrait = source_height > source_width
+    if source_width > 0 and source_height > 0 and output_is_portrait != source_is_portrait:
+        index = clip["input_index"]
+        background = f"generated_bg_{index}"
+        foreground = f"generated_fg_{index}"
+        blurred = f"generated_blur_{index}"
+        framed = f"generated_frame_{index}"
+        return (
+            f"split=2[{background}][{foreground}];"
+            f"[{background}]"
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height},"
+            "gblur=sigma=32,"
+            "eq=brightness=-0.22:saturation=0.75,"
+            f"setsar=1[{blurred}];"
+            f"[{foreground}]"
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"setsar=1[{framed}];"
+            f"[{blurred}][{framed}]"
+            "overlay=(W-w)/2:(H-h)/2:shortest=1,"
+        )
+    return (
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+    )
+
+
 def normalized_video_filter(
     clip: dict[str, Any],
     processed_duration: float,
@@ -37,6 +69,7 @@ def normalized_video_filter(
         return _original_normalized_video_filter(clip, processed_duration)
 
     index = clip["input_index"]
+    fit_filter = generated_fit_filter(clip)
     if is_subscribe_cta_clip(clip):
         source_duration = max(
             0.2,
@@ -61,8 +94,7 @@ def normalized_video_filter(
             "setpts=PTS-STARTPTS,"
             f"tpad=stop_mode=clone:stop_duration={hold_duration:.3f},"
             f"trim=duration={float(processed_duration):.3f},"
-            f"scale={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
-            f"pad={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"{fit_filter}"
             "setsar=1,"
             f"fps={base.OUTPUT_FPS},"
             "format=yuv420p"
@@ -81,8 +113,7 @@ def normalized_video_filter(
         f"[{index}:v]"
         f"trim=start={edge_trim:.3f}:duration={core_duration:.3f},"
         f"setpts=(PTS-STARTPTS)*{stretch:.6f},"
-        f"scale={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
-        f"pad={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"{fit_filter}"
         "setsar=1,"
         f"fps={base.OUTPUT_FPS},"
         "format=yuv420p"
