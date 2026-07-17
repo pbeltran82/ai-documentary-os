@@ -180,6 +180,31 @@ class TimelineBuilderTests(unittest.TestCase):
         )
         self.assertEqual(plan["command"][plan["command"].index("-t") + 1], "10.000")
 
+    def test_generated_subscribe_cta_gets_a_readable_four_second_close(self) -> None:
+        project = self.make_project("video")
+        scene = project.scenes[0]
+        scene.duration_seconds = 1.75
+        scene.end_seconds = 1.75
+        scene.selected_asset.provider = "generated"
+        scene.selected_asset.provider_asset_id = (
+            "finance-subscribe_cta-premium_motion-scene-10"
+        )
+        scene.selected_asset.source_url = (
+            "local://exact-visual/finance_motion/subscribe_cta/premium_motion"
+        )
+        scene.selected_asset.duration_seconds = 1.75
+
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(project)
+
+        clip = plan["clips"][0]
+        self.assertEqual(plan["runtime_seconds"], 4.0)
+        self.assertEqual(clip["duration_seconds"], 4.0)
+        self.assertEqual(clip["source_duration_seconds"], 1.75)
+        self.assertEqual(clip["duration_extension_seconds"], 2.25)
+        self.assertEqual(clip["exact_visual_template_id"], "subscribe_cta")
+        self.assertEqual(plan["command"][plan["command"].index("-t") + 1], "4.000")
+
     def test_fade_black_and_clean_cut_generate_distinct_graphs(self) -> None:
         project = self.make_project("video")
         project.scenes.append(

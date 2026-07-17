@@ -4,6 +4,7 @@ from typing import Any
 
 from . import timeline_subject_motion as subject
 from . import timeline_builder as base
+from .exact_visual_timing import is_subscribe_cta_clip
 
 
 GENERATED_EDGE_TRIM_MAX_SECONDS = 0.12
@@ -36,6 +37,37 @@ def normalized_video_filter(
         return _original_normalized_video_filter(clip, processed_duration)
 
     index = clip["input_index"]
+    if is_subscribe_cta_clip(clip):
+        source_duration = max(
+            0.2,
+            float(clip.get("source_duration_seconds") or clip["duration_seconds"]),
+        )
+        source_clip = {**clip, "duration_seconds": source_duration}
+        edge_trim = generated_edge_trim_seconds(source_clip)
+        source_fade = max(0.15, min(0.35, source_duration / 6))
+        clear_duration = max(
+            0.1,
+            source_duration - edge_trim - source_fade - (1 / base.OUTPUT_FPS),
+        )
+        hold_duration = max(0.0, float(processed_duration) - clear_duration)
+
+        # The CTA owns its entrance animation, while Timeline Builder owns the
+        # closing fade. Stop on the last fully clear Like + Subscribe frame and
+        # hold it. This also upgrades older short CTA assets without replaying
+        # their entrance or exposing their baked-in exit fade.
+        return (
+            f"[{index}:v]"
+            f"trim=start={edge_trim:.3f}:duration={clear_duration:.3f},"
+            "setpts=PTS-STARTPTS,"
+            f"tpad=stop_mode=clone:stop_duration={hold_duration:.3f},"
+            f"trim=duration={float(processed_duration):.3f},"
+            f"scale={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={base.OUTPUT_WIDTH}:{base.OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            "setsar=1,"
+            f"fps={base.OUTPUT_FPS},"
+            "format=yuv420p"
+        )
+
     scene_duration = max(0.2, float(clip["duration_seconds"]))
     edge_trim = generated_edge_trim_seconds(clip)
     core_duration = max(0.1, scene_duration - edge_trim * 2)

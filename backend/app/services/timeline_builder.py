@@ -14,6 +14,7 @@ from fastapi import HTTPException
 
 from ..models import Project, Scene
 from ..schemas import TimelineStyleUpdate
+from .exact_visual_timing import effective_scene_duration, exact_visual_identity
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, resolve_media_path
 from .voiceover import load_voiceover
 
@@ -246,7 +247,13 @@ def scene_clip(
     if source is None or not source.is_file():
         return None, "Local asset file is missing"
 
-    duration = round(float(scene.duration_seconds), 3)
+    scene_duration = round(float(scene.duration_seconds), 3)
+    duration = round(effective_scene_duration(scene), 3)
+    source_duration = round(
+        float(asset.duration_seconds or scene.duration_seconds),
+        3,
+    )
+    exact_visual_family_id, exact_visual_template_id = exact_visual_identity(asset)
     motion, motion_reason = photo_motion_for_clip(
         scene,
         input_index,
@@ -261,6 +268,9 @@ def scene_clip(
             "start_seconds": float(scene.start_seconds),
             "end_seconds": float(scene.end_seconds),
             "duration_seconds": duration,
+            "source_scene_duration_seconds": scene_duration,
+            "source_duration_seconds": source_duration,
+            "duration_extension_seconds": round(duration - scene_duration, 3),
             "processed_duration_seconds": duration,
             "narration": scene.narration,
             "visual_intent": scene.visual_intent,
@@ -271,6 +281,8 @@ def scene_clip(
             "local_url": asset.download_url,
             "preview_url": asset.preview_url,
             "source_url": asset.source_url,
+            "exact_visual_family_id": exact_visual_family_id,
+            "exact_visual_template_id": exact_visual_template_id,
             "creator": asset.creator,
             "license_name": asset.license_name,
             "attribution": asset.attribution,
@@ -612,7 +624,15 @@ def build_timeline_plan(
     timeline_dir = timeline_directory(project.id)
     output_path = timeline_dir / "first-cut.mp4"
     executable = ffmpeg_executable()
-    runtime = max((float(scene.end_seconds) for scene in project.scenes), default=0.0)
+    source_runtime = max(
+        (float(scene.end_seconds) for scene in project.scenes),
+        default=0.0,
+    )
+    runtime = round(
+        source_runtime
+        + sum(float(clip.get("duration_extension_seconds", 0.0)) for clip in clips),
+        3,
+    )
     voiceover = load_voiceover(project.id)
     alignment_status, duration_delta, alignment_message = narration_alignment(
         voiceover,

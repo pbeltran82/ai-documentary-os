@@ -13,6 +13,10 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 from ..models import Scene
 from . import finance_motion as engine
 from . import finance_motion_polish as polish
+from .exact_visual_timing import (
+    FINANCE_FAMILY_ID,
+    effective_exact_visual_duration,
+)
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
 
 
@@ -348,7 +352,14 @@ def render_finance_motion(
             detail="FFmpeg is required to encode Finance Motion Studio videos.",
         )
 
-    duration = round(max(1.0, float(scene.duration_seconds)), 3)
+    duration = round(
+        effective_exact_visual_duration(
+            FINANCE_FAMILY_ID,
+            template.template_id,
+            scene.duration_seconds,
+        ),
+        3,
+    )
     asset_directory = project_directory(scene.project_id) / "assets"
     asset_directory.mkdir(parents=True, exist_ok=True)
     stem = asset_directory / (

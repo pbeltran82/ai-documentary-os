@@ -26,6 +26,7 @@ from ..services.exact_visuals import (
     suggest_template,
     template_catalog,
 )
+from ..services.exact_visual_timing import effective_exact_visual_duration
 from ..services.manifest_events import defer_manifest_refresh, refresh_project_manifests
 from ..services.media_library import resolve_media_path
 from .assets import update_project_asset_status
@@ -121,7 +122,11 @@ def exact_visual_storyboard(
     scene = get_scene_or_404(scene_id, db)
     resolved_family = _resolved_family_id(scene, family_id)
     resolved_template = _resolved_template_id(scene, resolved_family, template_id)
-    duration = max(1.0, float(scene.duration_seconds))
+    duration = effective_exact_visual_duration(
+        resolved_family,
+        resolved_template,
+        scene.duration_seconds,
+    )
     return {
         "family_id": resolved_family,
         "template_id": resolved_template,
@@ -142,7 +147,11 @@ def exact_visual_preview(
     scene = get_scene_or_404(scene_id, db)
     resolved_family = _resolved_family_id(scene, family_id)
     resolved_template = _resolved_template_id(scene, resolved_family, template_id)
-    duration = max(1.0, float(scene.duration_seconds))
+    duration = effective_exact_visual_duration(
+        resolved_family,
+        resolved_template,
+        scene.duration_seconds,
+    )
     preview_time = (
         min(duration - 0.03, max(0.0, float(time_seconds)))
         if time_seconds is not None
