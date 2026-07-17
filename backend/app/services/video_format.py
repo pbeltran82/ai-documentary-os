@@ -5,7 +5,6 @@ from typing import Any
 
 from PIL import Image
 
-from . import documentary_final_pass as _documentary_final_pass
 from .documentary_visual_polish import (
     compose_documentary_shorts,
     install_landscape_character_patch,
@@ -114,9 +113,6 @@ def format_exact_visual_frame(
     finished character rig. Shorts gets a native mobile story with stronger
     visual variety, a hard first-frame hook, and a thesis-led ending.
     """
-    # This is intentionally installed at render time. Tech Behavior imports this
-    # module before defining its legacy wireframe helper, so delaying the patch
-    # avoids a circular import and guarantees the finished rig wins.
     install_landscape_character_patch()
 
     profile = video_format_profile(video_format)
