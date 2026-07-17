@@ -347,7 +347,7 @@ export function TimelineBuilder({
           {switchingFormat
             ? "Switching canvas and rebuilding the render plan…"
             : project.video_format === "shorts"
-              ? "Vertical-safe reflow is active. Regenerate exact visuals for the strongest native Shorts composition."
+              ? "Native Shorts composition is active. Regenerate exact visuals to build full-size vertical story beats."
               : "Landscape production is active. Existing projects remain on this format by default."}
         </p>
       </section>

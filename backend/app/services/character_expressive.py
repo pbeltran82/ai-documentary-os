@@ -300,7 +300,12 @@ def _expressive_person(
     alternate: bool = False,
     hair_style: str | None = None,
     hair_color: tuple[int, int, int] | None = None,
+    performance_role: str = "directed",
 ) -> None:
+    # ``performance_role`` is consumed by the optional direction layer.  The
+    # finished rig also accepts it directly so authored template poses remain
+    # compatible regardless of which patch module was imported first.
+    _ = performance_role
     x, ground_y = center
     body = palette["person_alt"] if alternate else palette["person"]
     skin = palette["skin"]

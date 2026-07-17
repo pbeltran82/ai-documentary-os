@@ -12,7 +12,9 @@ from app.database import Base
 from app.models import Project
 from app.routers.projects import update_project
 from app.schemas import ProjectCreate, ProjectUpdate
+from app.services import exact_visuals
 from app.services.finance_motion import ffmpeg_encoder_command
+from app.services.native_shorts import COMPOSITIONS
 from app.services.video_format import (
     SHORTS_FORMAT,
     YOUTUBE_FORMAT,
@@ -47,14 +49,24 @@ class VideoFormatTests(unittest.TestCase):
         self.assertEqual(normalize_video_format("square"), YOUTUBE_FORMAT)
         self.assertEqual(video_format_profile(None).format_id, YOUTUBE_FORMAT)
 
-    def test_landscape_frame_is_preserved_and_shorts_gets_vertical_reflow(self) -> None:
+    def test_landscape_frame_is_preserved_and_shorts_gets_native_composition(self) -> None:
         source = self.sample_frame()
-        youtube = format_exact_visual_frame(source, YOUTUBE_FORMAT)
+        youtube = format_exact_visual_frame(
+            source,
+            YOUTUBE_FORMAT,
+            "character_explainer",
+            "paycheck_arrival",
+            progress=0.82,
+            title="A title that must not change landscape pixels",
+        )
         shorts = format_exact_visual_frame(
             source,
             SHORTS_FORMAT,
             "character_explainer",
             "paycheck_arrival",
+            progress=0.5,
+            title="THE PAYCHECK ARRIVES",
+            subtitle="The first decision happens before lifestyle spending.",
         )
 
         self.assertEqual(youtube.size, (1920, 1080))
@@ -62,52 +74,84 @@ class VideoFormatTests(unittest.TestCase):
         self.assertEqual(shorts.size, (1080, 1920))
         self.assertEqual(shorts.mode, "RGB")
         self.assertGreater(len(set(shorts.resize((54, 96)).getdata())), 25)
-        # Both story halves survive the vertical reflow.
-        self.assertGreater(shorts.crop((80, 360, 1000, 1040)).getbbox()[2], 800)
-        self.assertGreater(shorts.crop((80, 1150, 1000, 1830)).getbbox()[2], 800)
+        # Native mobile typography and one full-size focus stage occupy the
+        # Shorts-safe area instead of three miniature landscape panels.
+        self.assertIsNotNone(shorts.crop((58, 130, 946, 380)).getbbox())
+        self.assertIsNotNone(shorts.crop((58, 410, 946, 1458)).getbbox())
+        self.assertIsNotNone(shorts.crop((58, 1490, 946, 1690)).getbbox())
 
     def test_encoder_accepts_vertical_raw_frame_dimensions(self) -> None:
         command = ffmpeg_encoder_command("ffmpeg", Path("short.mp4"), 1080, 1920)
         self.assertEqual(command[command.index("-s") + 1], "1080x1920")
 
-    def test_three_column_tech_story_becomes_three_intact_shorts_panels(self) -> None:
+    def test_three_column_tech_story_progresses_one_large_focus_at_a_time(self) -> None:
         source = Image.new("RGB", (1920, 1080), (8, 16, 28))
         draw = ImageDraw.Draw(source)
         draw.rectangle((65, 340, 640, 999), fill=(220, 45, 55))
         draw.rectangle((662, 340, 1238, 999), fill=(35, 205, 105))
         draw.rectangle((1277, 340, 1853, 999), fill=(45, 105, 230))
 
-        shorts = format_exact_visual_frame(
-            source,
-            SHORTS_FORMAT,
-            "tech_behavior_motion",
-            "algorithm_chose_you",
-        )
-
-        self.assertEqual(shorts.getpixel((540, 560)), (220, 45, 55))
-        self.assertEqual(shorts.getpixel((540, 1080)), (35, 205, 105))
-        self.assertEqual(shorts.getpixel((540, 1600)), (45, 105, 230))
+        colors = ((0.15, (220, 45, 55)), (0.50, (35, 205, 105)), (0.85, (45, 105, 230)))
+        for progress, expected in colors:
+            with self.subTest(progress=progress):
+                shorts = format_exact_visual_frame(
+                    source,
+                    SHORTS_FORMAT,
+                    "tech_behavior_motion",
+                    "algorithm_chose_you",
+                    progress=progress,
+                    title="THE ALGORITHM CHOSE THE MOMENT",
+                    subtitle="Thousands of possibilities. One ranked outcome.",
+                )
+                self.assertEqual(shorts.getpixel((540, 900)), expected)
 
     def test_tech_terminal_cta_keeps_subscribe_and_like_together(self) -> None:
         source = Image.new("RGB", (1920, 1080), (8, 16, 28))
         draw = ImageDraw.Draw(source)
-        subscribe = (246, 42, 63)
-        like = (45, 139, 224)
-        draw.rectangle((620, 865, 980, 965), fill=subscribe)
-        draw.rectangle((1080, 865, 1350, 965), fill=like)
+        subscribe = (220, 53, 69)
+        like = (48, 126, 218)
+        for progress in (0.25, 0.90):
+            with self.subTest(progress=progress):
+                shorts = format_exact_visual_frame(
+                    source,
+                    SHORTS_FORMAT,
+                    "tech_behavior_motion",
+                    "machine_choice_cta",
+                    progress=progress,
+                    title="WHO CHOSE THIS MOMENT?",
+                    subtitle="You pressed play. The machine ranked the opportunity.",
+                )
+                colors = shorts.getcolors(maxcolors=shorts.width * shorts.height) or []
+                counts = {color: count for count, color in colors}
+                self.assertGreater(counts.get(subscribe, 0), 30_000)
+                self.assertGreater(counts.get(like, 0), 15_000)
 
+    def test_unknown_future_template_uses_native_three_beat_fallback(self) -> None:
+        source = self.sample_frame()
         shorts = format_exact_visual_frame(
             source,
             SHORTS_FORMAT,
-            "tech_behavior_motion",
-            "machine_choice_cta",
+            "future_documentary_family",
+            "new_template_added_later",
+            progress=0.52,
+            title="A NEW DOCUMENTARY IDEA",
+            subtitle="Future templates receive a safe native vertical story automatically.",
         )
+        self.assertEqual(shorts.size, (1080, 1920))
+        self.assertGreater(len(set(shorts.resize((54, 96)).getdata())), 25)
 
-        bottom = shorts.crop((34, 1372, 1046, 1874))
-        colors = bottom.getcolors(maxcolors=bottom.width * bottom.height) or []
-        counts = {color: count for count, color in colors}
-        self.assertGreater(counts.get(subscribe, 0), 20_000)
-        self.assertGreater(counts.get(like, 0), 15_000)
+    def test_every_current_exact_visual_has_a_semantic_shorts_mapping(self) -> None:
+        current_templates = {
+            (family_id, item["template_id"])
+            for family_id in (
+                exact_visuals.FINANCE_FAMILY_ID,
+                exact_visuals.CHARACTER_FAMILY_ID,
+                exact_visuals.TECH_FAMILY_ID,
+            )
+            for item in exact_visuals.template_catalog(family_id)
+        }
+
+        self.assertEqual(current_templates, current_templates & set(COMPOSITIONS))
 
     def test_project_format_update_persists_and_invalidates_old_render(self) -> None:
         engine = create_engine("sqlite:///:memory:")

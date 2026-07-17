@@ -313,10 +313,11 @@ def _encode_frames(
     try:
         assert process.stdin is not None
         for index in range(frame_count):
+            time_value = min(duration_seconds, index / engine.OUTPUT_FPS)
             frame = render_frame(
                 template.template_id,
                 duration_seconds,
-                min(duration_seconds, index / engine.OUTPUT_FPS),
+                time_value,
                 style.style_id,
             )
             process.stdin.write(
@@ -325,6 +326,9 @@ def _encode_frames(
                     video_format,
                     "finance_motion",
                     template.template_id,
+                    progress=time_value / max(0.001, duration_seconds),
+                    title=template.title,
+                    subtitle=template.subtitle,
                 ).tobytes()
             )
         process.stdin.close()
@@ -405,6 +409,9 @@ def render_finance_motion(
             video_format,
             "finance_motion",
             template.template_id,
+            progress=poster_time / max(0.001, duration),
+            title=template.title,
+            subtitle=template.subtitle,
         ).save(temporary_preview, format="JPEG", quality=93, optimize=True)
         temporary_media.replace(media_path)
         temporary_preview.replace(preview_path)

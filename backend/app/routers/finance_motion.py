@@ -25,6 +25,7 @@ from ..services.exact_visuals import (
     style_catalog,
     suggest_template,
     template_catalog,
+    template_definition,
 )
 from ..services.exact_visual_timing import effective_exact_visual_duration
 from ..services.manifest_events import defer_manifest_refresh, refresh_project_manifests
@@ -188,11 +189,15 @@ def exact_visual_preview(
             preview_time,
             style_id or DEFAULT_STYLE_ID,
         )
+    template = template_definition(resolved_family, resolved_template)
     frame = format_exact_visual_frame(
         frame,
         project_video_format(scene),
         resolved_family,
         resolved_template,
+        progress=preview_time / max(0.001, duration),
+        title=template.title,
+        subtitle=template.subtitle,
     )
     output = BytesIO()
     frame.save(output, format="PNG", optimize=True)

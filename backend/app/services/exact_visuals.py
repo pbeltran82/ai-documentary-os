@@ -216,6 +216,24 @@ def template_catalog(family_id: str) -> list[dict[str, object]]:
     return finance.template_catalog()
 
 
+def template_definition(family_id: str, template_id: str):
+    """Return the renderer's canonical template copy for previews and formats."""
+    resolved = _validate_family(family_id)
+    if resolved == CHARACTER_FAMILY_ID:
+        templates = character.CHARACTER_TEMPLATES
+    elif resolved == TECH_FAMILY_ID:
+        templates = tech.TEMPLATES
+    else:
+        templates = finance.TEMPLATES
+    template = next(
+        (candidate for candidate in templates if candidate.template_id == template_id),
+        None,
+    )
+    if template is None:
+        raise HTTPException(status_code=422, detail="Unknown exact visual template")
+    return template
+
+
 def suggest_template(
     scene: Scene,
     family_id: str,
