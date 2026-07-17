@@ -5,9 +5,10 @@ import unittest
 from pathlib import Path
 
 from fastapi import HTTPException
-from PIL import ImageChops
+from PIL import Image, ImageChops, ImageDraw
 
 from app.models import Project, Scene
+from app.services import finance_motion_composition as composition
 from app.services.finance_motion_choreography import (
     DEFAULT_STYLE_ID,
     OUTPUT_HEIGHT,
@@ -122,6 +123,32 @@ class FinanceMotionTests(unittest.TestCase):
         ]
         self.assertIsNotNone(ImageChops.difference(frames[0], frames[1]).getbbox())
         self.assertIsNotNone(ImageChops.difference(frames[1], frames[2]).getbbox())
+
+    def test_end_card_uses_a_slim_red_subscribe_and_blue_like_action(self) -> None:
+        canvas = Image.new("RGB", (OUTPUT_WIDTH, OUTPUT_HEIGHT), (255, 255, 255))
+        composition._cta_composed(ImageDraw.Draw(canvas), 2.5)
+        pixels = list(canvas.getdata())
+        self.assertGreater(pixels.count(composition.SUBSCRIBE_RED), 5000)
+        self.assertGreater(pixels.count(composition.LIKE_BLUE), 2000)
+
+        red_rows = [
+            y
+            for y in range(350, 700)
+            for x in range(1040, 1800)
+            if canvas.getpixel((x, y)) == composition.SUBSCRIBE_RED
+        ]
+        self.assertLess(max(red_rows) - min(red_rows), 120)
+
+    def test_like_action_arrives_on_the_final_cta_beat(self) -> None:
+        early = Image.new("RGB", (OUTPUT_WIDTH, OUTPUT_HEIGHT), (255, 255, 255))
+        final = Image.new("RGB", (OUTPUT_WIDTH, OUTPUT_HEIGHT), (255, 255, 255))
+        composition._cta_composed(ImageDraw.Draw(early), 0.7)
+        composition._cta_composed(ImageDraw.Draw(final), 2.5)
+        self.assertEqual(list(early.getdata()).count(composition.LIKE_BLUE), 0)
+        self.assertGreater(list(final.getdata()).count(composition.LIKE_BLUE), 2000)
+
+        beats = storyboard_beats("subscribe_cta", 7)
+        self.assertEqual(beats[-1]["label"], "LIKE + SUBSCRIBE")
 
     def test_exports_leave_the_footer_safe_area_unbranded(self) -> None:
         for style in STYLES:
