@@ -432,13 +432,16 @@ def _cinematic_finance_choreography(
         draw.ellipse((x - 28, y - 28, x + 28, y + 28), fill=(*TEAL_LIGHT, 230))
         engine._text(draw, (x, y), "10", 25, (20, 48, 42), bold=True, anchor="mm")
     elif template_id == "subscribe_cta":
+        reveal = engine._progress(time_seconds, 0.52, 0.56)
+        if reveal <= 0.14:
+            return
         pulse = (math.sin(time_seconds * 3.2) + 1) / 2
-        radius = round(20 + 20 * pulse)
+        radius = round(8 + 10 * pulse)
         draw.rounded_rectangle(
-            (1010 - radius, 370 - radius // 2, 1640 + radius, 700 + radius // 2),
-            radius=54,
-            outline=(*AMBER, round(58 + 58 * (1 - pulse))),
-            width=4,
+            (1140 - radius, 464 - radius // 2, 1660 + radius, 576 + radius // 2),
+            radius=34,
+            outline=(*CORAL, round(45 + 50 * (1 - pulse))),
+            width=3,
         )
 
 
