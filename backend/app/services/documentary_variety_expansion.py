@@ -78,30 +78,10 @@ BEATS = {
 
 
 PHRASE_WEIGHTS = {
-    "attention_auction": {
-        "highest bidder": 15,
-        "compete for your attention": 15,
-        "attention": 5,
-        "targeting": 7,
-    },
-    "signal_feedback_loop": {
-        "change your behavior": 14,
-        "what reaches you": 9,
-        "next signal": 13,
-        "feedback loop": 15,
-    },
-    "profile_forecast": {
-        "personality traits": 11,
-        "future events": 12,
-        "likely outcome": 11,
-        "profile": 7,
-    },
-    "consequence_map": {
-        "what reaches you": 13,
-        "help us navigate the world": 10,
-        "shapes what": 11,
-        "next choice": 10,
-    },
+    "attention_auction": {"highest bidder": 15, "compete for your attention": 15, "attention": 5, "targeting": 7},
+    "signal_feedback_loop": {"change your behavior": 14, "what reaches you": 9, "next signal": 13, "feedback loop": 15},
+    "profile_forecast": {"personality traits": 11, "future events": 12, "likely outcome": 11, "profile": 7},
+    "consequence_map": {"what reaches you": 13, "help us navigate the world": 10, "shapes what": 11, "next choice": 10},
 }
 
 
@@ -109,17 +89,16 @@ def _landscape_attention_auction(draw: ImageDraw.ImageDraw, progress: float, pal
     q = base._phase(progress, 0.05, 0.90)
     bidders = (("NEWS", 0.62), ("VIDEO", 0.88), ("SHOP", 0.71), ("SOCIAL", 0.79))
     base._panel(draw, (110, 365, 1810, 900), palette, outline=palette["accent_alt"])
-    engine = base.engine
-    engine._text(draw, (960, 415), "HIDDEN ATTENTION MARKET", 28, palette["accent"], bold=True, anchor="mm")
+    base.engine._text(draw, (960, 415), "HIDDEN ATTENTION MARKET", 28, palette["accent"], bold=True, anchor="mm")
     for index, (label, score) in enumerate(bidders):
         y = 510 + index * 92
-        engine._text(draw, (250, y), label, 24, palette["white"], bold=True, anchor="lm")
+        base.engine._text(draw, (250, y), label, 24, palette["white"], bold=True, anchor="lm")
         draw.rounded_rectangle((440, y - 16, 1510, y + 16), radius=16, fill=palette["panel_alt"])
         width = round(1070 * score * q)
         color = palette["good"] if label == "VIDEO" else palette["accent_alt"]
         if width:
             draw.rounded_rectangle((440, y - 16, 440 + width, y + 16), radius=16, fill=color)
-        engine._text(draw, (1600, y), f"{round(score * q * 100)}", 23, color, bold=True, anchor="mm")
+        base.engine._text(draw, (1600, y), f"{round(score * q * 100)}", 23, color, bold=True, anchor="mm")
     if q > 0.70:
         base._pill(draw, (960, 850), "VIDEO WINS THE NEXT MOMENT", palette, fill=palette["good"], width=470, text_fill=palette["ink"])
 
@@ -133,8 +112,7 @@ def _landscape_feedback_loop(draw: ImageDraw.ImageDraw, progress: float, palette
         color = palette["accent"] if index % 2 == 0 else palette["accent_alt"]
         base._node(draw, (x, y), 62, color if active else palette["panel_alt"], label=str(index + 1))
         base.engine._text(draw, (x, y + 105), label, 23, palette["white"] if active else palette["muted"], bold=True, anchor="mm")
-    links = ((0, 1), (1, 2), (2, 3), (3, 0))
-    for index, (start, end) in enumerate(links):
+    for index, (start, end) in enumerate(((0, 1), (1, 2), (2, 3), (3, 0))):
         if q > index * 0.17:
             x1, y1, _ = points[start]
             x2, y2, _ = points[end]
@@ -155,8 +133,7 @@ def _landscape_profile_forecast(draw: ImageDraw.ImageDraw, progress: float, pale
     draw.polygon(((960, 635), (920, 610), (920, 660)), fill=palette["accent"])
     base._panel(draw, (1010, 360, 1820, 910), palette, outline=palette["good"])
     base.engine._text(draw, (1415, 415), "FORECAST RANGE", 27, palette["good"], bold=True, anchor="mm")
-    outcomes = (("WATCH", 0.82), ("IGNORE", 0.46), ("BUY", 0.31))
-    for index, (label, score) in enumerate(outcomes):
+    for index, (label, score) in enumerate((("WATCH", 0.82), ("IGNORE", 0.46), ("BUY", 0.31))):
         y = 535 + index * 125
         base.engine._text(draw, (1110, y), label, 23, palette["white"], bold=True)
         draw.rounded_rectangle((1290, y, 1690, y + 34), radius=17, fill=palette["panel_alt"])
@@ -241,32 +218,22 @@ def _shorts_consequence(canvas: Image.Image, progress: float, accent: shorts.RGB
 
 
 def install(route: Any) -> None:
-    """Register expansion templates exactly once."""
     if "attention_auction" in base.TEMPLATE_BY_ID:
         return
-
     base.TEMPLATES = (*base.TEMPLATES, *EXPANSION_TEMPLATES)
     base.TEMPLATE_BY_ID = {template.template_id: template for template in base.TEMPLATES}
     base.BEATS_BY_TEMPLATE.update(BEATS)
     base.CAMERA_PROFILES.update({template.template_id: ((0.28, 0.52), (0.72, 0.52), 0.012) for template in EXPANSION_TEMPLATES})
-    base.RENDERERS.update({
-        "attention_auction": _landscape_attention_auction,
-        "signal_feedback_loop": _landscape_feedback_loop,
-        "profile_forecast": _landscape_profile_forecast,
-        "consequence_map": _landscape_consequence_map,
-    })
-
+    base.RENDERERS.update({"attention_auction": _landscape_attention_auction, "signal_feedback_loop": _landscape_feedback_loop, "profile_forecast": _landscape_profile_forecast, "consequence_map": _landscape_consequence_map})
     truthful.TEMPLATE_PHRASE_WEIGHTS.update(PHRASE_WEIGHTS)
     truthful.TEMPLATES = base.TEMPLATES
     truthful.TEMPLATE_BY_ID = base.TEMPLATE_BY_ID
-
     route.base.TEMPLATES = base.TEMPLATES
     route.base.TEMPLATE_BY_ID = base.TEMPLATE_BY_ID
     route.truthful.TEMPLATES = base.TEMPLATES
     route.truthful.TEMPLATE_BY_ID = base.TEMPLATE_BY_ID
     route.SEMANTIC_VARIANT_GROUPS["ranking"].update({"attention_auction", "consequence_map"})
     route.SEMANTIC_VARIANT_GROUPS["behavioral_signals"].update({"signal_feedback_loop", "profile_forecast"})
-
     shorts.COMPOSITIONS.update({
         ("tech_behavior_motion", "attention_auction"): shorts.ShortsComposition("ATTENTION IS A COMPETITION"),
         ("tech_behavior_motion", "signal_feedback_loop"): shorts.ShortsComposition("OUTPUT BECOMES NEW EVIDENCE"),
@@ -279,3 +246,11 @@ def install(route: Any) -> None:
         ("tech_behavior_motion", "profile_forecast"): _shorts_forecast,
         ("tech_behavior_motion", "consequence_map"): _shorts_consequence,
     })
+
+
+# This module is imported from app.services.__init__. At this point the base Tech
+# renderer is complete; importing the route patch finishes its final-pass setup,
+# then the expansion is registered for both selection and rendering.
+from . import tech_behavior_route_patch as _route  # noqa: E402
+
+install(_route)
