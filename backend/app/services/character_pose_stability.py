@@ -15,6 +15,7 @@ SUPPORTED_POSES = {
     "celebrate",
     "relaxed",
     "slump",
+    "step_in",
     "walk",
     "run",
     "look",
@@ -107,7 +108,7 @@ def _stable_planned_person(*args, pose: str = "idle", mood: str = "neutral", **k
         beats=plan.get("animation_beats"),
     )
     blend = max(pose_blend, mood_blend)
-    if current_pose != next_pose and {current_pose, next_pose} & {"walk", "run"}:
+    if current_pose != next_pose and {current_pose, next_pose} & {"step_in", "walk", "run"}:
         # Blending two full rigs across locomotion poses creates doubled feet.
         # A clean planted cut is less visible and preserves the ground contact.
         blend = 0.0
