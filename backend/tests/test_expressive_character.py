@@ -40,6 +40,67 @@ class ExpressiveCharacterTests(unittest.TestCase):
                     frames.append(canvas)
                 self.assertIsNotNone(ImageChops.difference(*frames).getbbox())
 
+    def test_walk_alternates_the_planted_foot(self) -> None:
+        from PIL import Image
+
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (139, 92, 246),
+            "person_alt": (34, 211, 238),
+            "skin": (251, 191, 145),
+            "accent": (34, 211, 238),
+        }
+
+        def foot_bottoms(time_seconds: float) -> tuple[int, int]:
+            canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+            expressive._CURRENT_TIME = time_seconds
+            expressive._CURRENT_DURATION = 2.0
+            expressive._expressive_person(
+                ImageDraw.Draw(canvas),
+                (350, 620),
+                palette,
+                scale=1.2,
+                pose="walk",
+            )
+            body = palette["person"]
+            left = [y for y in range(520, 680) for x in range(180, 350) if canvas.getpixel((x, y)) == body]
+            right = [y for y in range(520, 680) for x in range(350, 530) if canvas.getpixel((x, y)) == body]
+            return max(left), max(right)
+
+        left_planted = foot_bottoms(0.25)
+        right_planted = foot_bottoms(0.75)
+        self.assertGreater(left_planted[0], left_planted[1])
+        self.assertGreater(right_planted[1], right_planted[0])
+
+    def test_celebration_keeps_open_hands_out_of_stick_up_zone(self) -> None:
+        from PIL import Image
+
+        canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (139, 92, 246),
+            "person_alt": (34, 211, 238),
+            "skin": (251, 191, 145),
+            "accent": (34, 211, 238),
+        }
+        expressive._CURRENT_TIME = 0.75
+        expressive._CURRENT_DURATION = 4.0
+        expressive._expressive_person(
+            ImageDraw.Draw(canvas),
+            (350, 620),
+            palette,
+            scale=1.3,
+            pose="celebrate",
+            mood="happy",
+        )
+        raised_outer_pixels = sum(
+            1
+            for y in range(0, 330)
+            for x in (*range(0, 270), *range(430, 700))
+            if canvas.getpixel((x, y)) == palette["person"]
+        )
+        self.assertLess(raised_outer_pixels, 20)
+
     def test_character_family_routes_through_expressive_renderer(self) -> None:
         self.assertIs(exact_visuals.character, expressive)
 
