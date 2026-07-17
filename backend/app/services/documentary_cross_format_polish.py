@@ -14,6 +14,19 @@ _ORIGINAL_NATIVE_COMPOSE = shorts.compose_native_shorts
 _WRAPPED = False
 
 
+def _blend(
+    muted: tuple[int, int, int],
+    vivid: tuple[int, int, int],
+    amount: float,
+) -> tuple[int, int, int]:
+    """Blend two RGB colors without depending on another patch module."""
+    amount = max(0.0, min(1.0, float(amount)))
+    return tuple(
+        round(start + (end - start) * amount)
+        for start, end in zip(muted, vivid, strict=True)
+    )
+
+
 def _upright_landscape_person(
     draw: ImageDraw.ImageDraw,
     center: tuple[int, int],
@@ -122,10 +135,9 @@ def _family_story_cta(canvas: Image.Image, progress: float) -> None:
     panel = (48, 1080, 1032, 1665)
     draw.rounded_rectangle(panel, radius=42, fill=(5, 12, 24), outline=(27, 48, 74), width=3)
 
-    blend = polish._blend
-    shorts._text(draw, (shorts.SAFE_LEFT, 1135), label, 21, blend((55, 68, 89), shorts.CYAN, thesis_reveal), bold=True)
-    shorts._text(draw, (shorts.SAFE_LEFT, 1190), thesis, 39, blend((66, 76, 94), shorts.WHITE, thesis_reveal), bold=True)
-    support = blend((50, 61, 78), shorts.MUTED, thesis_reveal)
+    shorts._text(draw, (shorts.SAFE_LEFT, 1135), label, 21, _blend((55, 68, 89), shorts.CYAN, thesis_reveal), bold=True)
+    shorts._text(draw, (shorts.SAFE_LEFT, 1190), thesis, 39, _blend((66, 76, 94), shorts.WHITE, thesis_reveal), bold=True)
+    support = _blend((50, 61, 78), shorts.MUTED, thesis_reveal)
     shorts._text(draw, (shorts.SAFE_LEFT, 1260), support_top, 27, support, bold=True)
     shorts._text(draw, (shorts.SAFE_LEFT, 1302), support_bottom, 27, support, bold=True)
 
@@ -133,16 +145,16 @@ def _family_story_cta(canvas: Image.Image, progress: float) -> None:
         shorts._text(draw, (shorts.SAFE_LEFT, 1515), "AI DOCUMENTARY OS", 19, (78, 91, 112), bold=True)
         return
 
-    red = blend((46, 31, 42), shorts.RED, cta_reveal)
-    blue = blend((24, 42, 66), shorts.BLUE, cta_reveal)
-    button_text = blend((92, 100, 115), shorts.WHITE, cta_reveal)
+    red = _blend((46, 31, 42), shorts.RED, cta_reveal)
+    blue = _blend((24, 42, 66), shorts.BLUE, cta_reveal)
+    button_text = _blend((92, 100, 115), shorts.WHITE, cta_reveal)
     y = 1435
     draw.rounded_rectangle((shorts.SAFE_LEFT, y, 650, y + 92), radius=22, fill=red)
     draw.polygon(((118, y + 26), (118, y + 66), (151, y + 46)), fill=button_text)
     shorts._text(draw, (390, y + 46), "SUBSCRIBE", 36, button_text, bold=True, anchor="mm")
     draw.rounded_rectangle((680, y, shorts.SAFE_RIGHT, y + 92), radius=46, fill=blue)
     shorts._text(draw, (845, y + 46), "LIKE  👍", 32, button_text, bold=True, anchor="mm")
-    shorts._text(draw, (shorts.SAFE_LEFT, 1585), "KEEP BUILDING THE SYSTEM", 22, blend((52, 62, 78), (122, 138, 162), cta_reveal), bold=True)
+    shorts._text(draw, (shorts.SAFE_LEFT, 1585), "KEEP BUILDING THE SYSTEM", 22, _blend((52, 62, 78), (122, 138, 162), cta_reveal), bold=True)
 
 
 def _tracked_native_compose(*args, **kwargs):
