@@ -1,125 +1,112 @@
 from __future__ import annotations
 
+import math
+from collections import OrderedDict
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from statistics import median
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageStat
 
 
 SHORTS_WIDTH = 1080
 SHORTS_HEIGHT = 1920
-SAFE_LEFT = 58
-SAFE_RIGHT = 946
+SAFE_LEFT = 70
+SAFE_RIGHT = 1010
 
 Box = tuple[float, float, float, float]
 RGB = tuple[int, int, int]
 
+_CUTOUT_CACHE: OrderedDict[
+    tuple[int, Box], tuple[Image.Image, Image.Image]
+] = OrderedDict()
+_CUTOUT_CACHE_SIZE = 6
+
 
 @dataclass(frozen=True)
 class ShortsComposition:
-    regions: tuple[Box, ...]
-    beat_labels: tuple[str, ...]
+    """One durable visual thesis for a vertical documentary scene."""
+
+    hero_region: Box
+    focus_label: str
     terminal_cta: bool = False
 
 
 DEFAULT_COMPOSITION = ShortsComposition(
-    regions=(
-        (0.02, 0.30, 0.39, 0.95),
-        (0.315, 0.30, 0.685, 0.95),
-        (0.61, 0.30, 0.98, 0.95),
-    ),
-    beat_labels=("ESTABLISH", "DEVELOP", "RESOLVE"),
+    hero_region=(0.18, 0.27, 0.82, 0.93),
+    focus_label="THE KEY IDEA",
 )
 
 
+# These regions deliberately sit inside the source cards. The foreground
+# extractor removes their dark panels, borders, and grids before the selected
+# visual is placed on a clean Shorts canvas.
 COMPOSITIONS: dict[tuple[str, str], ShortsComposition] = {
     # Finance Motion
     ("finance_motion", "paycheck_split"): ShortsComposition(
-        ((0.05, 0.29, 0.38, 0.88), (0.50, 0.29, 0.96, 0.60), (0.50, 0.55, 0.96, 0.89)),
-        ("PAYCHECK", "LIFE + EXPENSES", "FUTURE FUNDED"),
+        (0.48, 0.61, 0.90, 0.82), "FUTURE FUNDED"
     ),
     ("finance_motion", "expense_breakdown"): ShortsComposition(
-        ((0.04, 0.30, 0.36, 0.89), (0.38, 0.30, 0.83, 0.62), (0.49, 0.56, 0.79, 0.92)),
-        ("INCOME", "EXPENSE DRAIN", "NOTHING LEFT"),
+        (0.38, 0.34, 0.79, 0.82), "THE EXPENSE DRAIN"
     ),
     ("finance_motion", "empty_balance"): ShortsComposition(
-        ((0.10, 0.28, 0.53, 0.92), (0.54, 0.30, 0.96, 0.91)),
-        ("BALANCE", "DECLINED"),
+        (0.58, 0.38, 0.86, 0.75), "PAYMENT DECLINED"
     ),
     ("finance_motion", "recurring_transfer"): ShortsComposition(
-        ((0.04, 0.30, 0.38, 0.90), (0.34, 0.30, 0.66, 0.90), (0.62, 0.30, 0.96, 0.90)),
-        ("PAYDAY", "AUTO-TRANSFER", "CONFIRMED"),
+        (0.36, 0.36, 0.87, 0.83), "TRANSFER CONFIRMED"
     ),
     ("finance_motion", "index_growth"): ShortsComposition(
-        ((0.04, 0.29, 0.31, 0.90), (0.26, 0.29, 0.64, 0.90), (0.58, 0.29, 0.96, 0.90)),
-        ("CONTRIBUTE", "MARKET TIME", "COMPOUND BASE"),
+        (0.28, 0.38, 0.91, 0.83), "LONG-TERM MARKET GROWTH"
     ),
     ("finance_motion", "compound_growth"): ShortsComposition(
-        ((0.04, 0.29, 0.38, 0.91), (0.33, 0.29, 0.69, 0.91), (0.64, 0.29, 0.96, 0.91)),
-        ("CONSISTENCY", "RETURNS", "ACCELERATION"),
+        (0.34, 0.42, 0.90, 0.84), "COMPOUNDING ACCELERATES"
     ),
     ("finance_motion", "pay_self_comparison"): ShortsComposition(
-        ((0.04, 0.30, 0.49, 0.92), (0.51, 0.30, 0.96, 0.92)),
-        ("SPEND FIRST", "INVEST FIRST"),
+        (0.53, 0.39, 0.90, 0.84), "INVEST FIRST"
     ),
     ("finance_motion", "subscribe_cta"): ShortsComposition(
-        ((0.08, 0.29, 0.56, 0.93),),
-        ("BLUEPRINT READY",),
-        terminal_cta=True,
+        (0.12, 0.42, 0.50, 0.84), "BLUEPRINT READY", terminal_cta=True
     ),
 
     # Character Explainer
     ("character_explainer", "paycheck_arrival"): ShortsComposition(
-        ((0.04, 0.30, 0.41, 0.93), (0.46, 0.30, 0.96, 0.62), (0.46, 0.57, 0.96, 0.93)),
-        ("PAYDAY", "FIRST 10%", "FUTURE FUNDED"),
+        (0.14, 0.43, 0.39, 0.82), "PAYDAY"
     ),
     ("character_explainer", "spend_first"): ShortsComposition(
-        ((0.03, 0.30, 0.40, 0.93), (0.42, 0.30, 0.84, 0.63), (0.49, 0.57, 0.78, 0.94)),
-        ("GET PAID", "SPEND", "NOTHING LEFT"),
+        (0.43, 0.37, 0.79, 0.85), "THE SPEND-FIRST CYCLE"
     ),
     ("character_explainer", "empty_balance_reaction"): ShortsComposition(
-        ((0.04, 0.30, 0.41, 0.93), (0.43, 0.30, 0.96, 0.93)),
-        ("CHECK", "DECLINED"),
+        (0.51, 0.48, 0.91, 0.78), "NOTHING LEFT"
     ),
     ("character_explainer", "pay_self_character_comparison"): ShortsComposition(
-        ((0.03, 0.30, 0.49, 0.94), (0.51, 0.30, 0.97, 0.94)),
-        ("SPEND FIRST", "PAY SELF FIRST"),
+        (0.54, 0.40, 0.93, 0.84), "PAY SELF FIRST"
     ),
     ("character_explainer", "automatic_investing_habit"): ShortsComposition(
-        ((0.03, 0.30, 0.40, 0.93), (0.41, 0.30, 0.97, 0.93)),
-        ("SET THE RULE", "LET IT RUN"),
+        (0.43, 0.39, 0.90, 0.80), "LET THE SYSTEM RUN"
     ),
 
     # Tech & Behavior Motion
     ("tech_behavior_motion", "algorithm_chose_you"): ShortsComposition(
-        ((0.035, 0.315, 0.335, 0.925), (0.345, 0.315, 0.645, 0.925), (0.665, 0.315, 0.965, 0.925)),
-        ("POSSIBILITIES", "RANKING", "SELECTED"),
+        (0.75, 0.45, 0.88, 0.67), "THE SELECTED OUTCOME"
     ),
     ("tech_behavior_motion", "behavior_prediction_engine"): ShortsComposition(
-        ((0.040, 0.335, 0.385, 0.835), (0.380, 0.335, 0.640, 0.835), (0.660, 0.335, 0.955, 0.835)),
-        ("SIGNALS", "MODEL", "PROBABILITY"),
+        (0.68, 0.62, 0.93, 0.75), "PREDICTED PROBABILITY"
     ),
     ("tech_behavior_motion", "life_event_timeline"): ShortsComposition(
-        ((0.035, 0.315, 0.500, 0.735), (0.500, 0.315, 0.965, 0.735)),
-        ("PAST RECORDS", "FUTURE ESTIMATES"),
+        (0.50, 0.53, 0.88, 0.68), "FUTURE ESTIMATES"
     ),
     ("tech_behavior_motion", "digital_footprint_collector"): ShortsComposition(
-        ((0.040, 0.320, 0.390, 0.920), (0.500, 0.320, 0.960, 0.920)),
-        ("INTERACTIONS", "BEHAVIORAL RECORD"),
+        (0.60, 0.46, 0.90, 0.77), "THE BEHAVIORAL RECORD"
     ),
     ("tech_behavior_motion", "behavioral_twin"): ShortsComposition(
-        ((0.035, 0.350, 0.320, 0.930), (0.325, 0.350, 0.675, 0.930), (0.680, 0.350, 0.965, 0.930)),
-        ("PERSON", "SIGNALS", "BEHAVIORAL TWIN"),
+        (0.72, 0.39, 0.87, 0.84), "BEHAVIORAL TWIN"
     ),
     ("tech_behavior_motion", "machine_choice_explainer"): ShortsComposition(
-        ((0.035, 0.320, 0.400, 0.850), (0.425, 0.300, 0.960, 0.850)),
-        ("VISIBLE ACTION", "HIDDEN RANKING"),
+        (0.50, 0.44, 0.76, 0.73), "THE HIDDEN RANKING"
     ),
     ("tech_behavior_motion", "machine_choice_cta"): ShortsComposition(
-        ((0.040, 0.320, 0.480, 0.755), (0.520, 0.320, 0.960, 0.755)),
-        ("YOUR CHOICE", "MACHINE RANK"),
-        terminal_cta=True,
+        (0.61, 0.44, 0.80, 0.66), "THE MACHINE RANK", terminal_cta=True
     ),
 }
 
@@ -222,52 +209,126 @@ def _fit(image: Image.Image, width: int, height: int) -> Image.Image:
     )
 
 
-def _cover(image: Image.Image, width: int, height: int) -> Image.Image:
-    scale = max(width / image.width, height / image.height)
-    resized = image.resize(
-        (max(1, round(image.width * scale)), max(1, round(image.height * scale))),
-        Image.Resampling.BILINEAR,
-    )
-    left = max(0, (resized.width - width) // 2)
-    top = max(0, (resized.height - height) // 2)
-    return resized.crop((left, top, left + width, top + height))
+def _edge_background_colors(image: Image.Image) -> tuple[RGB, ...]:
+    """Estimate the dark panel colors from a sparse sample around the crop."""
+    sample = image.convert("RGB").resize((48, 32), Image.Resampling.BILINEAR)
+    pixels = sample.load()
+    edge: list[RGB] = []
+    for x in range(sample.width):
+        edge.extend((pixels[x, 0], pixels[x, 1], pixels[x, sample.height - 2], pixels[x, sample.height - 1]))
+    for y in range(1, sample.height - 1):
+        edge.extend((pixels[0, y], pixels[1, y], pixels[sample.width - 2, y], pixels[sample.width - 1, y]))
+
+    # The median is dependable for a uniform panel. Four edge quadrants make
+    # the extraction robust to the gentle gradients used by the house styles.
+    colors: list[RGB] = []
+    for group in (edge, edge[: len(edge) // 2], edge[len(edge) // 2 :], edge[::2], edge[1::2]):
+        if not group:
+            continue
+        colors.append(tuple(round(median(pixel[channel] for pixel in group)) for channel in range(3)))
+    return tuple(dict.fromkeys(colors))
 
 
-def _ambient_background(source: Image.Image) -> Image.Image:
-    small = _cover(source, SHORTS_WIDTH // 4, SHORTS_HEIGHT // 4)
-    small = small.filter(ImageFilter.GaussianBlur(radius=18))
-    small = ImageEnhance.Brightness(small).enhance(0.27)
-    small = ImageEnhance.Color(small).enhance(0.72)
-    canvas = small.resize((SHORTS_WIDTH, SHORTS_HEIGHT), Image.Resampling.BILINEAR).convert("RGB")
-    overlay = Image.new("RGBA", canvas.size, (1, 5, 14, 138))
-    return Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
+def _distance_from_color(image: Image.Image, color: RGB) -> Image.Image:
+    difference = ImageChops.difference(image, Image.new("RGB", image.size, color))
+    red, green, blue = difference.split()
+    return ImageChops.lighter(ImageChops.lighter(red, green), blue)
 
 
-def _focus_surface(region: Image.Image, size: tuple[int, int], accent: RGB) -> Image.Image:
-    width, height = size
-    background = _cover(region, width, height).filter(ImageFilter.GaussianBlur(radius=22))
-    background = ImageEnhance.Brightness(background).enhance(0.34).convert("RGB")
-    fitted = _fit(region, width - 28, height - 28)
-    background.paste(fitted, ((width - fitted.width) // 2, (height - fitted.height) // 2))
+def _foreground_mask(image: Image.Image) -> Image.Image:
+    distances = [_distance_from_color(image, color) for color in _edge_background_colors(image)]
+    distance = distances[0]
+    for candidate in distances[1:]:
+        distance = ImageChops.darker(distance, candidate)
 
-    mask = Image.new("L", (width, height), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, width - 1, height - 1), radius=34, fill=255)
-    surface = Image.new("RGB", (width, height), (4, 10, 22))
-    surface.paste(background, (0, 0), mask)
-    draw = ImageDraw.Draw(surface)
-    draw.rounded_rectangle((1, 1, width - 2, height - 2), radius=34, outline=accent, width=3)
-    return surface
+    def resolved_mask(threshold: int) -> Image.Image:
+        raw = distance.point(lambda value: 255 if value >= threshold else 0, mode="L")
+        raw = _suppress_long_rules(raw)
+        # Opening removes the thin grids and card outlines. The final, slightly
+        # larger dilation restores antialiased edges and dark character detail
+        # around the remaining solid shapes.
+        return raw.filter(ImageFilter.MinFilter(5)).filter(ImageFilter.MaxFilter(9))
+
+    mask = resolved_mask(34)
+    if ImageStat.Stat(mask).mean[0] / 255 > 0.62:
+        mask = resolved_mask(50)
+    return mask.filter(ImageFilter.GaussianBlur(1.2))
 
 
-def _focus_state(progress: float, count: int) -> tuple[int, int | None, float]:
-    if count <= 1:
-        return 0, None, 0.0
-    position = _clamp(progress) * count
-    current = min(count - 1, int(position))
-    local = position - current
-    if current >= count - 1 or local < 0.78:
-        return current, None, 0.0
-    return current, current + 1, _smooth((local - 0.78) / 0.22)
+def _suppress_long_rules(mask: Image.Image) -> Image.Image:
+    """Remove full-width grid rules and panel edges without harming subjects."""
+    cleaned = mask.copy()
+    draw = ImageDraw.Draw(cleaned)
+
+    def runs(values: list[int], threshold: int, maximum_thickness: int):
+        start: int | None = None
+        for index, value in enumerate(values + [0]):
+            if value >= threshold and start is None:
+                start = index
+            elif value < threshold and start is not None:
+                if index - start <= maximum_thickness:
+                    yield start, index - 1
+                start = None
+
+    row_coverage = list(mask.resize((1, mask.height), Image.Resampling.BOX).getdata())
+    for top, bottom in runs(row_coverage, 150, max(10, round(mask.height * 0.035))):
+        draw.rectangle((0, max(0, top - 2), mask.width, min(mask.height - 1, bottom + 2)), fill=0)
+
+    column_coverage = list(cleaned.resize((cleaned.width, 1), Image.Resampling.BOX).getdata())
+    for left, right in runs(column_coverage, 150, max(10, round(mask.width * 0.035))):
+        draw.rectangle((max(0, left - 2), 0, min(mask.width - 1, right + 2), mask.height), fill=0)
+    return cleaned
+
+
+def _foreground_cutout(region: Image.Image) -> Image.Image:
+    source = region.convert("RGB")
+    mask = _foreground_mask(source)
+    solid_bbox = mask.point(lambda value: 255 if value >= 18 else 0, mode="L").getbbox()
+    if solid_bbox is None:
+        # Future renderers still get a useful image, but never inherit the
+        # source's full bordered card as a second frame.
+        inset = max(6, min(source.size) // 24)
+        source = source.crop((inset, inset, source.width - inset, source.height - inset))
+        mask = Image.new("L", source.size, 255)
+        solid_bbox = (0, 0, source.width, source.height)
+    else:
+        source = source.crop(solid_bbox)
+        mask = mask.crop(solid_bbox)
+    cutout = source.convert("RGBA")
+    cutout.putalpha(mask)
+    return cutout
+
+
+def _cached_foreground_cutout(source: Image.Image, box: Box) -> Image.Image:
+    key = (id(source), box)
+    cached = _CUTOUT_CACHE.get(key)
+    if cached is not None and cached[0] is source:
+        _CUTOUT_CACHE.move_to_end(key)
+        return cached[1]
+    cutout = _foreground_cutout(_relative_crop(source, box))
+    _CUTOUT_CACHE[key] = (source, cutout)
+    _CUTOUT_CACHE.move_to_end(key)
+    while len(_CUTOUT_CACHE) > _CUTOUT_CACHE_SIZE:
+        _CUTOUT_CACHE.popitem(last=False)
+    return cutout
+
+
+@lru_cache(maxsize=4)
+def _clean_background(accent: RGB) -> Image.Image:
+    top = (3, 7, 15)
+    bottom = (8, 12, 24)
+    gradient = Image.new("RGB", (1, SHORTS_HEIGHT))
+    pixels = gradient.load()
+    for y in range(SHORTS_HEIGHT):
+        mix = y / max(1, SHORTS_HEIGHT - 1)
+        pixels[0, y] = tuple(round(top[channel] + (bottom[channel] - top[channel]) * mix) for channel in range(3))
+    canvas = gradient.resize((SHORTS_WIDTH, SHORTS_HEIGHT))
+
+    glow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    glow_draw.ellipse((-170, 300, 1250, 1600), fill=(*accent, 34))
+    glow = glow.filter(ImageFilter.GaussianBlur(190))
+    return Image.alpha_composite(canvas.convert("RGBA"), glow).convert("RGB")
 
 
 def _draw_header(
@@ -280,135 +341,114 @@ def _draw_header(
 ) -> None:
     draw = ImageDraw.Draw(canvas)
     family_label = FAMILY_COPY.get(family_id or "", ("DOCUMENTARY VISUAL", accent))[0]
-    pill_width = max(220, round(_font(22, True).getlength(family_label)) + 54)
+    pill_width = max(218, round(_font(21, True).getlength(family_label)) + 50)
     draw.rounded_rectangle(
-        (SAFE_LEFT, 62, SAFE_LEFT + pill_width, 118),
-        radius=28,
-        fill=(24, 34, 55),
-        outline=accent,
-        width=2,
+        (SAFE_LEFT, 68, SAFE_LEFT + pill_width, 120),
+        radius=26,
+        fill=(18, 28, 47),
     )
-    _text(draw, (SAFE_LEFT + pill_width // 2, 90), family_label, 22, accent, bold=True, anchor="mm")
+    _text(draw, (SAFE_LEFT + pill_width // 2, 94), family_label, 21, accent, bold=True, anchor="mm")
 
     resolved_title = str(title or "DOCUMENTARY VISUAL").upper()
-    title_size = 62 if len(resolved_title) <= 30 else 54 if len(resolved_title) <= 44 else 48
+    title_size = 61 if len(resolved_title) <= 30 else 53 if len(resolved_title) <= 44 else 47
     title_lines = _wrap_text(resolved_title, SAFE_RIGHT - SAFE_LEFT, title_size, bold=True, maximum_lines=2)
-    y = 148
+    y = 151
     for line in title_lines:
         _text(draw, (SAFE_LEFT, y), line, title_size, (248, 250, 252), bold=True)
-        y += title_size + 11
+        y += title_size + 10
 
-    subtitle_lines = _wrap_text(subtitle, SAFE_RIGHT - SAFE_LEFT, 29, bold=False, maximum_lines=2)
-    y += 5
+    subtitle_lines = _wrap_text(subtitle, SAFE_RIGHT - SAFE_LEFT, 28, bold=False, maximum_lines=2)
+    y += 4
     for line in subtitle_lines:
-        _text(draw, (SAFE_LEFT, y), line, 29, (171, 184, 204))
-        y += 39
-    draw.rounded_rectangle((SAFE_LEFT, 371, SAFE_RIGHT, 379), radius=4, fill=(30, 42, 67))
-    draw.rounded_rectangle((SAFE_LEFT, 371, SAFE_LEFT + 260, 379), radius=4, fill=accent)
+        _text(draw, (SAFE_LEFT, y), line, 28, (174, 187, 207))
+        y += 38
 
 
-def _draw_beat_footer(
+def _draw_hero(
     canvas: Image.Image,
+    cutout: Image.Image,
     *,
-    labels: tuple[str, ...],
-    active_index: int,
     progress: float,
-    accent: RGB,
+    terminal_cta: bool,
 ) -> None:
-    draw = ImageDraw.Draw(canvas)
-    count = max(1, len(labels))
-    label = labels[min(active_index, count - 1)] if labels else "STORY BEAT"
-    _text(draw, (SAFE_LEFT, 1498), f"BEAT {active_index + 1:02d} / {count:02d}", 24, (139, 154, 178), bold=True)
-    lines = _wrap_text(label.upper(), SAFE_RIGHT - SAFE_LEFT, 48, bold=True, maximum_lines=2)
-    y = 1545
-    for line in lines:
-        _text(draw, (SAFE_LEFT, y), line, 48, (248, 250, 252), bold=True)
-        y += 58
+    stage = (SAFE_LEFT, 410, SAFE_RIGHT, 1155 if terminal_cta else 1450)
+    max_width = stage[2] - stage[0] - 24
+    max_height = stage[3] - stage[1] - 24
+    hero = _fit(cutout, max_width, max_height)
 
-    gap = 14
-    segment_width = (SAFE_RIGHT - SAFE_LEFT - gap * (count - 1)) // count
-    y = 1672
-    for index in range(count):
-        left = SAFE_LEFT + index * (segment_width + gap)
-        draw.rounded_rectangle((left, y, left + segment_width, y + 12), radius=6, fill=(38, 50, 76))
-        if index < active_index:
-            amount = 1.0
-        elif index > active_index:
-            amount = 0.0
-        else:
-            segment_position = _clamp(progress) * count - active_index
-            amount = max(0.08, min(1.0, segment_position))
-        if amount > 0:
-            draw.rounded_rectangle((left, y, left + round(segment_width * amount), y + 12), radius=6, fill=accent)
-    _text(draw, (SAFE_LEFT, 1742), "AI DOCUMENTARY OS", 20, (101, 116, 139), bold=True)
+    # One uninterrupted visual idea: a restrained 1.8% camera push and a
+    # six-pixel float replace the previous carousel and crossfades.
+    camera = 0.982 + 0.018 * _smooth(progress)
+    hero = hero.resize(
+        (max(1, round(hero.width * camera)), max(1, round(hero.height * camera))),
+        Image.Resampling.LANCZOS,
+    )
+    x = round((SHORTS_WIDTH - hero.width) / 2)
+    float_y = round(6 * math.sin(_clamp(progress) * math.pi))
+    y = round(stage[1] + (stage[3] - stage[1] - hero.height) / 2 - float_y)
+
+    shadow_alpha = hero.getchannel("A").filter(ImageFilter.GaussianBlur(18))
+    shadow_alpha = shadow_alpha.point(lambda value: round(value * 0.48), mode="L")
+    shadow = Image.new("RGBA", hero.size, (0, 0, 0, 0))
+    shadow.putalpha(shadow_alpha)
+    canvas.paste(shadow, (x + 12, y + 18), shadow)
+    canvas.paste(hero, (x, y), hero)
+
+
+def _draw_focus_label(canvas: Image.Image, label: str, accent: RGB) -> None:
+    draw = ImageDraw.Draw(canvas)
+    _text(draw, (SAFE_LEFT, 1513), "KEY IDEA", 21, accent, bold=True)
+    lines = _wrap_text(label.upper(), SAFE_RIGHT - SAFE_LEFT, 47, bold=True, maximum_lines=2)
+    y = 1552
+    for line in lines:
+        _text(draw, (SAFE_LEFT, y), line, 47, (248, 250, 252), bold=True)
+        y += 57
+    _text(draw, (SAFE_LEFT, 1770), "AI DOCUMENTARY OS", 19, (91, 106, 130), bold=True)
 
 
 def _draw_like_icon(draw: ImageDraw.ImageDraw, center: tuple[int, int]) -> None:
     x, y = center
-    draw.rounded_rectangle((x - 35, y - 12, x - 17, y + 27), radius=5, fill=(248, 250, 252))
+    draw.rounded_rectangle((x - 31, y - 10, x - 15, y + 24), radius=4, fill=(248, 250, 252))
     hand = (
-        (x - 12, y + 24), (x + 20, y + 24), (x + 29, y + 15),
-        (x + 31, y - 5), (x + 25, y - 12), (x + 8, y - 12),
-        (x + 14, y - 30), (x + 10, y - 39), (x + 2, y - 40),
-        (x - 8, y - 19), (x - 14, y - 10),
+        (x - 10, y + 21), (x + 18, y + 21), (x + 27, y + 13),
+        (x + 29, y - 5), (x + 23, y - 11), (x + 7, y - 11),
+        (x + 13, y - 28), (x + 9, y - 36), (x + 2, y - 37),
+        (x - 7, y - 17), (x - 12, y - 9),
     )
     draw.polygon(hand, fill=(248, 250, 252))
 
 
-def _draw_terminal_cta(canvas: Image.Image, progress: float, accent: RGB) -> None:
+def _draw_terminal_cta(canvas: Image.Image, progress: float) -> None:
     draw = ImageDraw.Draw(canvas)
-    _text(draw, (SAFE_LEFT, 1268), "SUPPORT THE NEXT STORY", 34, (190, 201, 218), bold=True)
+    _text(draw, (SAFE_LEFT, 1217), "SUPPORT THE NEXT STORY", 30, (187, 199, 217), bold=True)
 
-    subscribe = _smooth((progress - 0.04) / 0.08)
-    like = _smooth((progress - 0.10) / 0.08)
-    y = 1450
+    subscribe = _smooth((progress - 0.02) / 0.09)
+    like = _smooth((progress - 0.07) / 0.09)
+    y = 1382
     if subscribe > 0.02:
-        width = round(560 * (0.86 + 0.14 * subscribe))
-        left = SAFE_LEFT + (560 - width) // 2
-        top = round(y - 61 + (1 - subscribe) * 24)
+        width = round(540 * (0.90 + 0.10 * subscribe))
+        left = SAFE_LEFT + (540 - width) // 2
+        top = round(y - 48 + (1 - subscribe) * 18)
         right = left + width
-        bottom = top + 122
-        draw.rounded_rectangle((left + 8, top + 9, right + 8, bottom + 9), radius=30, fill=(3, 6, 14))
-        draw.rounded_rectangle(
-            (left, top, right, bottom),
-            radius=30,
-            fill=(220, 53, 69),
-            outline=(254, 202, 202),
-            width=3,
-        )
-        play_x = left + 68
-        draw.polygon(((play_x - 12, y - 24), (play_x - 12, y + 24), (play_x + 25, y)), fill=(248, 250, 252))
-        _text(draw, (left + round(width * 0.61), y), "SUBSCRIBE", 43, (248, 250, 252), bold=True, anchor="mm")
+        bottom = top + 96
+        draw.rounded_rectangle((left + 7, top + 8, right + 7, bottom + 8), radius=24, fill=(2, 5, 12))
+        draw.rounded_rectangle((left, top, right, bottom), radius=24, fill=(220, 53, 69))
+        play_x = left + 61
+        draw.polygon(((play_x - 10, y - 20), (play_x - 10, y + 20), (play_x + 21, y)), fill=(248, 250, 252))
+        _text(draw, (left + round(width * 0.61), y), "SUBSCRIBE", 38, (248, 250, 252), bold=True, anchor="mm")
 
     if like > 0.02:
-        width = round(276 * (0.82 + 0.18 * like))
+        width = round(274 * (0.88 + 0.12 * like))
         right = SAFE_RIGHT
         left = right - width
-        top = round(y - 53 + (1 - like) * 24)
-        bottom = top + 106
-        draw.rounded_rectangle((left + 7, top + 8, right + 7, bottom + 8), radius=53, fill=(3, 6, 14))
-        draw.rounded_rectangle(
-            (left, top, right, bottom),
-            radius=53,
-            fill=(48, 126, 218),
-            outline=(160, 211, 255),
-            width=3,
-        )
-        _draw_like_icon(draw, (left + 62, y))
-        _text(draw, (left + round(width * 0.69), y), "LIKE", 35, (248, 250, 252), bold=True, anchor="mm")
+        top = round(y - 48 + (1 - like) * 18)
+        bottom = top + 96
+        draw.rounded_rectangle((left + 7, top + 8, right + 7, bottom + 8), radius=48, fill=(2, 5, 12))
+        draw.rounded_rectangle((left, top, right, bottom), radius=48, fill=(48, 126, 218))
+        _draw_like_icon(draw, (left + 59, y))
+        _text(draw, (left + round(width * 0.70), y), "LIKE", 32, (248, 250, 252), bold=True, anchor="mm")
 
-    draw.rounded_rectangle((SAFE_LEFT, 1586, SAFE_RIGHT, 1598), radius=6, fill=(38, 50, 76))
-    draw.rounded_rectangle(
-        (
-            SAFE_LEFT,
-            1586,
-            SAFE_LEFT + round((SAFE_RIGHT - SAFE_LEFT) * _clamp(progress)),
-            1598,
-        ),
-        radius=6,
-        fill=accent,
-    )
-    _text(draw, (SAFE_LEFT, 1643), "THANKS FOR WATCHING", 25, (139, 154, 178), bold=True)
+    _text(draw, (SAFE_LEFT, 1506), "THANKS FOR WATCHING", 23, (122, 138, 162), bold=True)
 
 
 def compose_native_shorts(
@@ -420,62 +460,43 @@ def compose_native_shorts(
     title: str | None = None,
     subtitle: str | None = None,
 ) -> Image.Image:
-    """Build a native 9:16 story from semantic regions of a 16:9 exact visual.
+    """Compose one clean, persistent visual thesis for a 9:16 scene.
 
-    Known templates receive deliberate focus regions. Unknown future templates
-    automatically progress through overlapping left, center, and right beats.
-    Only one large visual idea is presented at a time, preserving mobile-scale
-    readability without changing the source family's 16:9 renderer.
+    Source panels are treated as raw art, not as a second layout. Their grids,
+    card borders, and dark backgrounds are removed before the selected hero is
+    placed on a clean vertical canvas. Progress controls only a subtle camera
+    push; it never swaps ideas within the scene.
     """
-    source = source.convert("RGB")
+    source = source if source.mode == "RGB" else source.convert("RGB")
     resolved_progress = _clamp(progress)
     composition = COMPOSITIONS.get((family_id or "", template_id or ""), DEFAULT_COMPOSITION)
     accent = FAMILY_COPY.get(family_id or "", ("DOCUMENTARY VISUAL", (84, 214, 194)))[1]
-    canvas = _ambient_background(source)
+    canvas = _clean_background(accent).copy()
 
     resolved_title = title or str(template_id or "documentary visual").replace("_", " ")
     _draw_header(
         canvas,
         family_id=family_id,
         title=resolved_title,
-        subtitle=subtitle or "A focused visual story, composed for vertical viewing.",
+        subtitle=subtitle or "One clear documentary idea, composed for vertical viewing.",
         accent=accent,
     )
-
-    focus_box = (SAFE_LEFT, 410, SAFE_RIGHT, 1208 if composition.terminal_cta else 1458)
-    focus_width = focus_box[2] - focus_box[0]
-    focus_height = focus_box[3] - focus_box[1]
-    current, following, blend = _focus_state(resolved_progress, len(composition.regions))
-    current_surface = _focus_surface(
-        _relative_crop(source, composition.regions[current]),
-        (focus_width, focus_height),
-        accent,
+    _draw_hero(
+        canvas,
+        _cached_foreground_cutout(source, composition.hero_region),
+        progress=resolved_progress,
+        terminal_cta=composition.terminal_cta,
     )
-    if following is not None and blend > 0:
-        following_surface = _focus_surface(
-            _relative_crop(source, composition.regions[following]),
-            (focus_width, focus_height),
-            accent,
-        )
-        current_surface = Image.blend(current_surface, following_surface, blend)
-    canvas.paste(current_surface, (focus_box[0], focus_box[1]))
 
-    active = following if following is not None and blend >= 0.5 else current
     if composition.terminal_cta:
-        _draw_terminal_cta(canvas, resolved_progress, accent)
+        _draw_terminal_cta(canvas, resolved_progress)
     else:
-        _draw_beat_footer(
-            canvas,
-            labels=composition.beat_labels,
-            active_index=active,
-            progress=resolved_progress,
-            accent=accent,
-        )
+        _draw_focus_label(canvas, composition.focus_label, accent)
 
     visibility = min(
-        _smooth(resolved_progress / 0.035),
-        _smooth((1.0 - resolved_progress) / 0.035),
+        _smooth(resolved_progress / 0.045),
+        _smooth((1.0 - resolved_progress) / 0.045),
     )
     if visibility < 1:
-        return Image.blend(Image.new("RGB", canvas.size, (3, 8, 18)), canvas, visibility)
+        return Image.blend(Image.new("RGB", canvas.size, (3, 7, 15)), canvas, visibility)
     return canvas

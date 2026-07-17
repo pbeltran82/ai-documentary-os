@@ -18,6 +18,7 @@ from app.services.native_shorts import COMPOSITIONS
 from app.services.video_format import (
     SHORTS_FORMAT,
     YOUTUBE_FORMAT,
+    exact_visual_source_time,
     format_exact_visual_frame,
     normalize_video_format,
     video_format_catalog,
@@ -74,8 +75,8 @@ class VideoFormatTests(unittest.TestCase):
         self.assertEqual(shorts.size, (1080, 1920))
         self.assertEqual(shorts.mode, "RGB")
         self.assertGreater(len(set(shorts.resize((54, 96)).getdata())), 25)
-        # Native mobile typography and one full-size focus stage occupy the
-        # Shorts-safe area instead of three miniature landscape panels.
+        # Native mobile typography and one full-size hero occupy the safe area
+        # without carrying the source panel's landscape chrome into Shorts.
         self.assertIsNotNone(shorts.crop((58, 130, 946, 380)).getbbox())
         self.assertIsNotNone(shorts.crop((58, 410, 946, 1458)).getbbox())
         self.assertIsNotNone(shorts.crop((58, 1490, 946, 1690)).getbbox())
@@ -84,15 +85,13 @@ class VideoFormatTests(unittest.TestCase):
         command = ffmpeg_encoder_command("ffmpeg", Path("short.mp4"), 1080, 1920)
         self.assertEqual(command[command.index("-s") + 1], "1080x1920")
 
-    def test_three_column_tech_story_progresses_one_large_focus_at_a_time(self) -> None:
+    def test_shorts_holds_one_hero_instead_of_cycling_source_beats(self) -> None:
         source = Image.new("RGB", (1920, 1080), (8, 16, 28))
         draw = ImageDraw.Draw(source)
-        draw.rectangle((65, 340, 640, 999), fill=(220, 45, 55))
-        draw.rectangle((662, 340, 1238, 999), fill=(35, 205, 105))
-        draw.rectangle((1277, 340, 1853, 999), fill=(45, 105, 230))
+        draw.ellipse((1350, 410, 1790, 900), fill=(45, 105, 230))
 
-        colors = ((0.15, (220, 45, 55)), (0.50, (35, 205, 105)), (0.85, (45, 105, 230)))
-        for progress, expected in colors:
+        samples: list[Image.Image] = []
+        for progress in (0.15, 0.50, 0.85):
             with self.subTest(progress=progress):
                 shorts = format_exact_visual_frame(
                     source,
@@ -103,7 +102,48 @@ class VideoFormatTests(unittest.TestCase):
                     title="THE ALGORITHM CHOSE THE MOMENT",
                     subtitle="Thousands of possibilities. One ranked outcome.",
                 )
-                self.assertEqual(shorts.getpixel((540, 900)), expected)
+                samples.append(shorts)
+                blue_pixels = sum(
+                    1
+                    for red, green, blue in shorts.crop((70, 410, 1010, 1450)).getdata()
+                    if blue > red * 1.5 and blue > green * 1.15
+                )
+                self.assertGreater(blue_pixels, 70_000)
+        # Progress may move the camera gently, but it must not swap the hero.
+        self.assertNotEqual(samples[0].tobytes(), samples[-1].tobytes())
+
+    def test_shorts_uses_a_fixed_mature_source_state_only(self) -> None:
+        duration = 8.0
+        source_times = {
+            exact_visual_source_time(SHORTS_FORMAT, duration, output_time)
+            for output_time in (0.0, 2.0, 4.0, 7.9)
+        }
+        self.assertEqual(len(source_times), 1)
+        self.assertAlmostEqual(source_times.pop(), 6.56)
+        self.assertEqual(exact_visual_source_time(YOUTUBE_FORMAT, duration, 2.0), 2.0)
+        self.assertEqual(exact_visual_source_time(YOUTUBE_FORMAT, duration, 7.9), 7.9)
+
+    def test_shorts_does_not_reuse_source_grid_or_nested_card_border(self) -> None:
+        source = Image.new("RGB", (1920, 1080), (8, 16, 28))
+        draw = ImageDraw.Draw(source)
+        grid = (40, 72, 108)
+        for x in range(1275, 1855, 70):
+            draw.line((x, 350, x, 980), fill=grid, width=2)
+        for y in range(350, 981, 70):
+            draw.line((1275, y, 1855, y), fill=grid, width=2)
+        draw.ellipse((1400, 480, 1740, 860), fill=(45, 180, 230))
+
+        shorts = format_exact_visual_frame(
+            source,
+            SHORTS_FORMAT,
+            "tech_behavior_motion",
+            "algorithm_chose_you",
+            progress=0.5,
+            title="ONE CLEAN IDEA",
+            subtitle="The source grid should not become the Shorts background.",
+        )
+        exact_grid_pixels = sum(1 for color in shorts.getdata() if color == grid)
+        self.assertLess(exact_grid_pixels, 120)
 
     def test_tech_terminal_cta_keeps_subscribe_and_like_together(self) -> None:
         source = Image.new("RGB", (1920, 1080), (8, 16, 28))
@@ -126,7 +166,7 @@ class VideoFormatTests(unittest.TestCase):
                 self.assertGreater(counts.get(subscribe, 0), 30_000)
                 self.assertGreater(counts.get(like, 0), 15_000)
 
-    def test_unknown_future_template_uses_native_three_beat_fallback(self) -> None:
+    def test_unknown_future_template_uses_native_single_hero_fallback(self) -> None:
         source = self.sample_frame()
         shorts = format_exact_visual_frame(
             source,

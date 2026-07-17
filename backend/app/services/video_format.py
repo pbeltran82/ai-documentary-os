@@ -10,6 +10,7 @@ from .native_shorts import compose_native_shorts
 YOUTUBE_FORMAT = "youtube"
 SHORTS_FORMAT = "shorts"
 DEFAULT_VIDEO_FORMAT = YOUTUBE_FORMAT
+SHORTS_HERO_SOURCE_PROGRESS = 0.82
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,24 @@ def video_format_catalog() -> list[dict[str, Any]]:
     ]
 
 
+def exact_visual_source_time(
+    video_format: Any,
+    duration_seconds: float,
+    time_seconds: float,
+) -> float:
+    """Resolve the source renderer time for an exact-visual output frame.
+
+    Landscape preserves the renderer's original animation clock. Shorts holds
+    one mature hero state for the whole scene so the vertical composition does
+    not cycle through several disconnected source layouts beneath the camera.
+    """
+    duration = max(0.0, float(duration_seconds))
+    requested = max(0.0, min(float(time_seconds), duration))
+    if project_video_format(video_format) != SHORTS_FORMAT or duration <= 0:
+        return requested
+    return min(max(0.0, duration - 0.03), duration * SHORTS_HERO_SOURCE_PROGRESS)
+
+
 def format_exact_visual_frame(
     frame: Image.Image,
     video_format: Any,
@@ -87,12 +106,11 @@ def format_exact_visual_frame(
 ) -> Image.Image:
     """Adapt a house-format exact visual to the selected delivery canvas.
 
-    Landscape remains pixel-identical. Shorts gets a native mobile story:
-    the title is redrawn at a readable size and semantic regions advance as
-    full-size beats instead of shrinking the original 16:9 composition.
+    Landscape remains pixel-identical. Shorts gets a native mobile story with
+    one persistent semantic hero, clean background, and mobile-scale type.
     """
     profile = video_format_profile(video_format)
-    source = frame.convert("RGB")
+    source = frame if frame.mode == "RGB" else frame.convert("RGB")
     if profile.format_id == YOUTUBE_FORMAT:
         if source.size == (profile.width, profile.height):
             return source

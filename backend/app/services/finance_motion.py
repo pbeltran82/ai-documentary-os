@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from ..models import Scene
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
 from .video_format import (
+    exact_visual_source_time,
     format_exact_visual_frame,
     project_video_format,
     video_format_profile,
@@ -335,14 +336,19 @@ def _encode_frames(
         stderr=subprocess.PIPE,
     )
     frame_count = max(1, math.ceil(duration_seconds * OUTPUT_FPS))
+    shorts_source = None
+    if profile.format_id == "shorts":
+        shorts_source = render_frame(
+            template.template_id,
+            duration_seconds,
+            exact_visual_source_time(video_format, duration_seconds, 0.0),
+        )
     try:
         assert process.stdin is not None
         for index in range(frame_count):
             time_value = min(duration_seconds, index / OUTPUT_FPS)
-            frame = render_frame(
-                template.template_id,
-                duration_seconds,
-                time_value,
+            frame = shorts_source or render_frame(
+                template.template_id, duration_seconds, time_value
             )
             process.stdin.write(
                 format_exact_visual_frame(
@@ -404,8 +410,9 @@ def render_finance_motion(scene: Scene, template_id: str | None = None) -> Gener
     try:
         _encode_frames(ffmpeg, template, duration, temporary_media, video_format)
         poster_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
+        source_time = exact_visual_source_time(video_format, duration, poster_time)
         format_exact_visual_frame(
-            render_frame(template.template_id, duration, poster_time),
+            render_frame(template.template_id, duration, source_time),
             video_format,
             "finance_motion",
             template.template_id,
