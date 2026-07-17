@@ -9,6 +9,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Project, Scene
+from ..services.documentary_script_generation import (
+    ScriptGenerationError,
+    generate_openai_script,
+    update_script_draft,
+)
 from ..services.narration_synthesis import NarrationSynthesisError, synthesize_narration
 from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.script_approval import approve_script, list_script_revisions
@@ -23,14 +28,24 @@ router = APIRouter(prefix="/projects/{project_id}/production", tags=["script-aud
 
 
 class ScriptGenerateRequest(BaseModel):
-    provider: Literal["local-outline"] = "local-outline"
+    provider: Literal["local-outline", "openai"] = "local-outline"
     angle: str = Field(default="", max_length=3000)
+    research_notes: str = Field(default="", max_length=100_000)
     target_scene_seconds: float = Field(default=8.0, ge=4.0, le=30.0)
+    replace_scenes: bool = False
+
+
+class ScriptUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=300)
+    thesis: str | None = Field(default=None, max_length=5000)
+    segments: list[dict[str, Any]] | None = None
+    editor_notes: str = Field(default="", max_length=5000)
     replace_scenes: bool = False
 
 
 class ScriptApproveRequest(BaseModel):
     notes: str = Field(default="", max_length=5000)
+    replace_scenes: bool = True
 
 
 class NarrationPlanRequest(BaseModel):
@@ -99,11 +114,59 @@ def generate_script(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
-    script = build_local_script_draft(
-        project,
-        angle=payload.angle,
-        target_scene_seconds=payload.target_scene_seconds,
-    )
+    current = load_script(project_id)
+    try:
+        if payload.provider == "openai":
+            script = generate_openai_script(
+                project,
+                angle=payload.angle,
+                research_notes=payload.research_notes,
+                target_scene_seconds=payload.target_scene_seconds,
+                previous_revision=int(current.get("revision", 0)) if current else 0,
+            )
+        else:
+            script = build_local_script_draft(
+                project,
+                angle=payload.angle,
+                target_scene_seconds=payload.target_scene_seconds,
+            )
+            script["research_notes"] = payload.research_notes.strip()
+    except ScriptGenerationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    project.status = "script"
+    db.commit()
+    if payload.replace_scenes:
+        _apply_script_to_scenes(project, script, db)
+        script["scenes_applied"] = True
+    else:
+        script["scenes_applied"] = False
+    return script
+
+
+@router.put("/script")
+def update_script(
+    project_id: int,
+    payload: ScriptUpdateRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    project = _project_or_404(project_id, db)
+    current = load_script(project_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="No generated script exists for this project")
+    try:
+        script = update_script_draft(
+            project,
+            current,
+            title=payload.title,
+            thesis=payload.thesis,
+            segments=payload.segments,
+            editor_notes=payload.editor_notes,
+        )
+    except ScriptGenerationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    project.status = "script"
+    db.commit()
     if payload.replace_scenes:
         _apply_script_to_scenes(project, script, db)
         script["scenes_applied"] = True
@@ -125,6 +188,13 @@ def approve_project_script(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     project.status = "script_approved"
     db.commit()
+    if payload.replace_scenes:
+        _apply_script_to_scenes(project, script, db)
+        project.status = "script_approved"
+        db.commit()
+        script["scenes_applied"] = True
+    else:
+        script["scenes_applied"] = False
     return script
 
 
@@ -152,6 +222,11 @@ def plan_narration(
         raise HTTPException(
             status_code=409,
             detail="Generate a project script before planning narration audio",
+        )
+    if script.get("status") != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail="Approve the project script before planning narration audio",
         )
     return build_narration_plan(
         project,
