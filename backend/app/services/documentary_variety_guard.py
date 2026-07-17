@@ -97,3 +97,6 @@ route._decisive_match = _expanded_decisive_match
 route._score_templates_with_prior = _guarded_score_templates_with_prior
 route.suggest_template = _guarded_suggest_template
 route.base.suggest_template = _guarded_suggest_template
+
+# Install only after the routing and renderer registries are fully initialized.
+from . import documentary_cross_format_polish as _documentary_cross_format_polish  # noqa: E402,F401
