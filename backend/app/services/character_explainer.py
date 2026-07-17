@@ -527,16 +527,15 @@ def _paycheck_arrival(
     progress: float,
     palette: dict[str, tuple[int, int, int]],
 ) -> None:
-    character_arrive = _phase(progress, 0.02, 0.15)
     paycheck_arrive = _phase(progress, 0.04, 0.30)
     split = _phase(progress, 0.32, 0.55)
     transfer = _phase(progress, 0.46, 0.76)
     result = _phase(progress, 0.75, 0.92)
 
     _panel(draw, (105, 350, 760, 900), palette, outline=palette["accent"])
-    # Finish screen travel inside the directed walk beat. Continuing to move
-    # the root after the pose settled into receive was the remaining glide.
-    person_x = round(engine._lerp(265, 410, character_arrive))
+    # The step-in rig owns the small grounded entrance. The layout anchor stays
+    # fixed so screen translation cannot drift out of sync with planted feet.
+    person_x = 410
     pose = "receive" if transfer < 0.72 else "point"
     _person(draw, (person_x, 835), palette, scale=1.18, pose=pose, mood="happy" if result > 0.5 else "neutral")
     engine._text(draw, (155, 390), "PAYDAY", 28, palette["accent"], bold=True)
