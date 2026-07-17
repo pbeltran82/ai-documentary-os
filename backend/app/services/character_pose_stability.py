@@ -53,7 +53,7 @@ def _sequence_state(
     local = position - index
     current = mapper(values[index])
     following = mapper(values[min(len(values) - 1, index + 1)])
-    blend = _smooth((local - 0.80) / 0.20) if current != following else 0.0
+    blend = _smooth((local - 0.92) / 0.08) if current != following else 0.0
     return current, following, blend
 
 
@@ -83,8 +83,9 @@ def _render_person_layer(
 
 def _stable_planned_person(*args, pose: str = "idle", mood: str = "neutral", **kwargs):
     """Consume saved direction with supported poses and short eased transitions."""
+    performance_role = str(kwargs.pop("performance_role", "directed"))
     plan = runtime._ACTIVE_PLAN
-    if not plan:
+    if not plan or performance_role == "authored":
         return runtime._ORIGINAL_PERSON(*args, pose=pose, mood=mood, **kwargs)
 
     progress = character._CURRENT_TIME / max(0.01, character._CURRENT_DURATION)
@@ -106,6 +107,10 @@ def _stable_planned_person(*args, pose: str = "idle", mood: str = "neutral", **k
         beats=plan.get("animation_beats"),
     )
     blend = max(pose_blend, mood_blend)
+    if current_pose != next_pose and {current_pose, next_pose} & {"walk", "run"}:
+        # Blending two full rigs across locomotion poses creates doubled feet.
+        # A clean planted cut is less visible and preserves the ground contact.
+        blend = 0.0
 
     # Ordinary unit tests and non-Pillow callers do not expose a backing image.
     # They still receive the stabilized current state without crossfade work.
