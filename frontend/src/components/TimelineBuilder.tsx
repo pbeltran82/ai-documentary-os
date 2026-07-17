@@ -638,6 +638,11 @@ export function TimelineBuilder({
             <span>{formatBytes(plan.output_size_bytes)}</span>
             <span>{formatTime(plan.runtime_seconds)}</span>
             <span>{plan.voiceover ? "AAC narration" : "No audio"}</span>
+            {plan.captions?.exists && (
+              <a href={plan.captions.public_url} target="_blank" rel="noreferrer">
+                Download captions ({plan.captions.cue_count})
+              </a>
+            )}
             <span>{transitionLabels[plan.settings.transition_style]}</span>
             <span>{motionLabels[plan.settings.photo_motion]}</span>
             <span>{plan.settings.format_label} · {plan.settings.aspect_ratio}</span>

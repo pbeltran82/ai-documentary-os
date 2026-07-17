@@ -128,9 +128,12 @@ class TimelineBuilderTests(unittest.TestCase):
         timeline_dir = self.media_root / "project-0001" / "timeline"
         self.assertTrue((timeline_dir / "render-plan.json").is_file())
         self.assertTrue((timeline_dir / "render.sh").is_file())
+        self.assertTrue((timeline_dir / "captions.srt").is_file())
         saved = json.loads((timeline_dir / "render-plan.json").read_text())
         self.assertIn("native motion", saved["clips"][0]["assembly_action"])
         self.assertEqual(saved["settings"]["transition_style"], "crossfade")
+        self.assertTrue(saved["captions"]["exists"])
+        self.assertGreater(saved["captions"]["cue_count"], 0)
 
     def test_photo_plan_uses_gentle_zoom(self) -> None:
         project = self.make_project("photo")
@@ -220,6 +223,70 @@ class TimelineBuilderTests(unittest.TestCase):
         self.assertEqual(clip["duration_extension_seconds"], 2.25)
         self.assertEqual(clip["exact_visual_template_id"], "subscribe_cta")
         self.assertEqual(plan["command"][plan["command"].index("-t") + 1], "4.000")
+
+    def test_generated_tech_cta_gets_a_readable_four_second_close(self) -> None:
+        project = self.make_project("video")
+        scene = project.scenes[0]
+        scene.duration_seconds = 2.0
+        scene.end_seconds = 2.0
+        scene.selected_asset.provider = "generated"
+        scene.selected_asset.provider_asset_id = (
+            "tech-machine_choice_cta-premium_motion-scene-10"
+        )
+        scene.selected_asset.source_url = (
+            "local://exact-visual/tech_behavior_motion/machine_choice_cta/premium_motion"
+        )
+        scene.selected_asset.duration_seconds = 2.0
+
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(project)
+
+        clip = plan["clips"][0]
+        self.assertEqual(plan["runtime_seconds"], 4.0)
+        self.assertEqual(clip["duration_seconds"], 4.0)
+        self.assertEqual(clip["duration_extension_seconds"], 2.0)
+        self.assertEqual(clip["exact_visual_template_id"], "machine_choice_cta")
+
+    def test_exact_visual_boundaries_use_short_text_safe_dips(self) -> None:
+        project = self.make_project("video")
+        project.scenes.append(
+            self.make_scene(
+                project,
+                scene_id=11,
+                scene_number=2,
+                start=5,
+                duration=5,
+                media_type="video",
+            )
+        )
+        identities = (
+            "algorithm_chose_you",
+            "behavior_prediction_engine",
+        )
+        for scene, template_id in zip(project.scenes, identities, strict=True):
+            scene.selected_asset.provider = "generated"
+            scene.selected_asset.provider_asset_id = f"tech-{template_id}-scene"
+            scene.selected_asset.source_url = (
+                f"local://exact-visual/tech_behavior_motion/{template_id}/premium_motion"
+            )
+
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(
+                project,
+                TimelineStyleUpdate(
+                    transition_style="crossfade",
+                    transition_duration_seconds=0.35,
+                ),
+            )
+
+        first = plan["clips"][0]
+        self.assertEqual(first["transition_out"], "fade_black")
+        self.assertEqual(first["transition_duration_seconds"], 0.24)
+        filter_graph = plan["command"][plan["command"].index("-filter_complex") + 1]
+        self.assertIn(
+            "xfade=transition=fadeblack:duration=0.240:offset=5.000",
+            filter_graph,
+        )
 
     def test_fade_black_and_clean_cut_generate_distinct_graphs(self) -> None:
         project = self.make_project("video")

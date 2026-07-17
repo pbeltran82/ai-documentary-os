@@ -14,6 +14,7 @@ from fastapi import HTTPException
 
 from ..models import Project, Scene
 from ..schemas import TimelineStyleUpdate
+from .caption_builder import write_caption_track
 from .exact_visual_timing import effective_scene_duration, exact_visual_identity
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, resolve_media_path
 from .video_format import SHORTS_FORMAT, video_format_profile
@@ -29,6 +30,7 @@ AUDIO_BITRATE = os.getenv("TIMELINE_AUDIO_BITRATE", "192k")
 ALIGNMENT_TOLERANCE_SECONDS = float(
     os.getenv("NARRATION_ALIGNMENT_TOLERANCE_SECONDS", "0.25")
 )
+EXACT_VISUAL_TEXT_TRANSITION_MAX_SECONDS = 0.24
 
 DEFAULT_STYLE = {
     "transition_style": "crossfade",
@@ -153,6 +155,16 @@ def transition_duration_for_boundary(
         0.75,
     )
     return round(max(0.0, min(requested_seconds, safe_limit)), 3)
+
+
+def is_exact_visual_boundary(
+    previous_clip: dict[str, Any],
+    next_clip: dict[str, Any],
+) -> bool:
+    return bool(
+        previous_clip.get("exact_visual_family_id")
+        and next_clip.get("exact_visual_family_id")
+    )
 
 
 READABILITY_WORDS = {
@@ -322,13 +334,28 @@ def apply_edit_decisions(
         transition_seconds = 0.0
         transition_out = "cut"
         if index < len(clips) - 1 and transition_style != "cut":
+            next_clip = clips[index + 1]
+            boundary_style = transition_style
+            boundary_request = requested
+            if (
+                transition_style == "crossfade"
+                and is_exact_visual_boundary(clip, next_clip)
+            ):
+                # Text-heavy exact visuals should never dissolve two titles and
+                # two panel systems over each other. A short dip preserves the
+                # transition rhythm while keeping every frame readable.
+                boundary_style = "fade_black"
+                boundary_request = min(
+                    requested,
+                    EXACT_VISUAL_TEXT_TRANSITION_MAX_SECONDS,
+                )
             transition_seconds = transition_duration_for_boundary(
                 clip,
-                clips[index + 1],
-                requested,
+                next_clip,
+                boundary_request,
             )
             if transition_seconds > 0:
-                transition_out = transition_style
+                transition_out = boundary_style
 
         clip["transition_out"] = transition_out
         clip["transition_duration_seconds"] = transition_seconds
@@ -512,11 +539,20 @@ def build_filter_graph(
     else:
         previous_label = "v0"
         timeline_offset = 0.0
-        transition_filter = TRANSITION_FILTERS[str(style["transition_style"])]
         for index in range(1, len(clips)):
             timeline_offset += float(clips[index - 1]["duration_seconds"])
             transition_seconds = float(
                 clips[index - 1]["transition_duration_seconds"]
+            )
+            boundary_style = str(
+                clips[index - 1].get(
+                    "transition_out",
+                    style["transition_style"],
+                )
+            )
+            transition_filter = TRANSITION_FILTERS.get(
+                boundary_style,
+                TRANSITION_FILTERS[str(style["transition_style"])],
             )
             output_label = "outv" if index == len(clips) - 1 else f"x{index}"
             filters.append(
@@ -659,6 +695,8 @@ def build_timeline_plan(
 
     timeline_dir = timeline_directory(project.id)
     output_path = timeline_dir / "first-cut.mp4"
+    caption_path = timeline_dir / "captions.srt"
+    caption_cue_count = write_caption_track(project.scenes, caption_path)
     executable = ffmpeg_executable()
     source_runtime = max(
         (float(scene.end_seconds) for scene in project.scenes),
@@ -687,6 +725,7 @@ def build_timeline_plan(
         else []
     )
     output_relative_path = relative_media_path(output_path)
+    caption_relative_path = relative_media_path(caption_path)
 
     return {
         "schema_version": "0.5",
@@ -714,6 +753,13 @@ def build_timeline_plan(
             **normalized_style,
         },
         "voiceover": voiceover,
+        "captions": {
+            "format": "SubRip",
+            "cue_count": caption_cue_count,
+            "relative_path": caption_relative_path,
+            "public_url": public_media_url(caption_relative_path),
+            "exists": caption_cue_count > 0 and caption_path.is_file(),
+        },
         "alignment_status": alignment_status,
         "duration_delta_seconds": duration_delta,
         "alignment_message": alignment_message,

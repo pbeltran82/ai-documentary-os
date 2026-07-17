@@ -638,6 +638,44 @@ def render_frame(
     return _original_render_frame(template_id, duration_seconds, time_seconds, style_id)
 
 
+def draw_expressive_person(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    palette: dict[str, tuple[int, int, int]],
+    *,
+    progress: float = 0.5,
+    scale: float = 1.0,
+    pose: str = "idle",
+    mood: str = "neutral",
+    facing: int = 1,
+    alternate: bool = False,
+    hair_style: str | None = None,
+    hair_color: tuple[int, int, int] | None = None,
+) -> None:
+    """Render the finished shared character rig inside another visual family."""
+    global _CURRENT_TIME, _CURRENT_DURATION
+    previous_time = _CURRENT_TIME
+    previous_duration = _CURRENT_DURATION
+    _CURRENT_DURATION = 1.0
+    _CURRENT_TIME = _clamp(progress)
+    try:
+        _expressive_person(
+            draw,
+            center,
+            palette,
+            scale=scale,
+            pose=pose,
+            mood=mood,
+            facing=facing,
+            alternate=alternate,
+            hair_style=hair_style,
+            hair_color=hair_color,
+        )
+    finally:
+        _CURRENT_TIME = previous_time
+        _CURRENT_DURATION = previous_duration
+
+
 # All existing templates resolve the person primitive dynamically. Replacing the
 # primitive upgrades the entire Character Explainer family while retaining the
 # proven face-safe staging and scene layouts.

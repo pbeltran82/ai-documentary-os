@@ -70,6 +70,45 @@ class VideoFormatTests(unittest.TestCase):
         command = ffmpeg_encoder_command("ffmpeg", Path("short.mp4"), 1080, 1920)
         self.assertEqual(command[command.index("-s") + 1], "1080x1920")
 
+    def test_three_column_tech_story_becomes_three_intact_shorts_panels(self) -> None:
+        source = Image.new("RGB", (1920, 1080), (8, 16, 28))
+        draw = ImageDraw.Draw(source)
+        draw.rectangle((65, 340, 640, 999), fill=(220, 45, 55))
+        draw.rectangle((662, 340, 1238, 999), fill=(35, 205, 105))
+        draw.rectangle((1277, 340, 1853, 999), fill=(45, 105, 230))
+
+        shorts = format_exact_visual_frame(
+            source,
+            SHORTS_FORMAT,
+            "tech_behavior_motion",
+            "algorithm_chose_you",
+        )
+
+        self.assertEqual(shorts.getpixel((540, 560)), (220, 45, 55))
+        self.assertEqual(shorts.getpixel((540, 1080)), (35, 205, 105))
+        self.assertEqual(shorts.getpixel((540, 1600)), (45, 105, 230))
+
+    def test_tech_terminal_cta_keeps_subscribe_and_like_together(self) -> None:
+        source = Image.new("RGB", (1920, 1080), (8, 16, 28))
+        draw = ImageDraw.Draw(source)
+        subscribe = (246, 42, 63)
+        like = (45, 139, 224)
+        draw.rectangle((620, 865, 980, 965), fill=subscribe)
+        draw.rectangle((1080, 865, 1350, 965), fill=like)
+
+        shorts = format_exact_visual_frame(
+            source,
+            SHORTS_FORMAT,
+            "tech_behavior_motion",
+            "machine_choice_cta",
+        )
+
+        bottom = shorts.crop((34, 1372, 1046, 1874))
+        colors = bottom.getcolors(maxcolors=bottom.width * bottom.height) or []
+        counts = {color: count for count, color in colors}
+        self.assertGreater(counts.get(subscribe, 0), 20_000)
+        self.assertGreater(counts.get(like, 0), 15_000)
+
     def test_project_format_update_persists_and_invalidates_old_render(self) -> None:
         engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)

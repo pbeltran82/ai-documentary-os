@@ -277,6 +277,14 @@ class VoiceoverRead(BaseModel):
     uploaded_at: str
 
 
+class CaptionTrackRead(BaseModel):
+    format: str
+    cue_count: int
+    relative_path: str
+    public_url: str
+    exists: bool
+
+
 class TimelinePlanResponse(BaseModel):
     schema_version: str
     generated_at: str
@@ -289,6 +297,7 @@ class TimelinePlanResponse(BaseModel):
     missing_scenes: list[TimelineMissingScene] = Field(default_factory=list)
     settings: dict[str, Any]
     voiceover: VoiceoverRead | None = None
+    captions: CaptionTrackRead
     alignment_status: str
     duration_delta_seconds: float | None = None
     alignment_message: str

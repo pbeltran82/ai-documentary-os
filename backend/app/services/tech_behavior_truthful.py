@@ -5,6 +5,7 @@ import math
 from PIL import ImageDraw
 
 from ..models import Scene
+from . import character_expressive as characters
 from . import finance_motion as engine
 from . import finance_motion_art as art
 from . import tech_behavior_motion as base
@@ -51,6 +52,12 @@ TEMPLATE_PHRASE_WEIGHTS: dict[str, dict[str, int]] = {
         "navigate us": 12,
         "anticipate what you might do next": 12,
     },
+    "machine_choice_explainer": {
+        "ranked the opportunity": 13,
+        "hidden ranking": 12,
+        "visible action": 10,
+        "machine choice": 12,
+    },
     "machine_choice_cta": {
         "help us navigate the world": 11,
         "did you choose": 13,
@@ -61,6 +68,24 @@ TEMPLATE_PHRASE_WEIGHTS: dict[str, dict[str, int]] = {
 }
 
 _ORIGINAL_COMMON = base._common
+
+
+def tech_character_palette(
+    palette: dict[str, tuple[int, int, int]],
+) -> dict[str, tuple[int, int, int]]:
+    """Adapt the house palette to the shared finished-character vocabulary."""
+    return {
+        "person": (78, 143, 212),
+        "person_alt": palette["accent"],
+        "skin": (238, 187, 145),
+        "denim": (45, 78, 122),
+        "denim_alt": (37, 70, 116),
+        "shoe": (25, 34, 49),
+        "hair": (48, 34, 28),
+        "hair_alt": (28, 24, 23),
+        "ink": palette["ink"],
+        "accent": palette["accent"],
+    }
 
 
 def _context(scene: Scene) -> str:
@@ -263,13 +288,34 @@ def _truthful_behavioral_twin(
 ) -> None:
     transfer = base._phase(progress, 0.12, 0.68)
     anticipate = base._phase(progress, 0.62, 0.90)
-    base._panel(draw, (100, 360, 700, 920), palette, outline=palette["white"])
-    base._person_wireframe(draw, (400, 645), palette)
-    engine._text(draw, (400, 865), "YOU", 26, palette["white"], bold=True, anchor="mm")
+    character_palette = tech_character_palette(palette)
+    base._panel(draw, (100, 365, 700, 930), palette, outline=palette["white"])
+    characters.draw_expressive_person(
+        draw,
+        (400, 850),
+        character_palette,
+        progress=progress,
+        scale=1.22,
+        pose="relaxed",
+        mood="neutral",
+        facing=1,
+    )
+    engine._text(draw, (400, 892), "YOU", 26, palette["white"], bold=True, anchor="mm")
 
-    base._panel(draw, (1220, 360, 1820, 920), palette, outline=palette["accent"])
-    base._person_wireframe(draw, (1520, 645), palette, digital=True)
-    engine._text(draw, (1520, 865), "BEHAVIORAL TWIN", 26, palette["accent"], bold=True, anchor="mm")
+    base._panel(draw, (1220, 365, 1820, 930), palette, outline=palette["accent"])
+    characters.draw_expressive_person(
+        draw,
+        (1520, 850),
+        character_palette,
+        progress=progress,
+        scale=1.22,
+        pose="relaxed",
+        mood="confident",
+        facing=-1,
+        alternate=True,
+        hair_style="curly_crop",
+    )
+    engine._text(draw, (1520, 892), "BEHAVIORAL TWIN", 26, palette["accent"], bold=True, anchor="mm")
 
     for index, label in enumerate(("SEARCH", "PAUSE", "PURCHASE", "DRAFT")):
         y = 450 + index * 115
@@ -282,7 +328,7 @@ def _truthful_behavioral_twin(
         state = "LIKELY" if anticipate >= 0.72 else "ESTIMATING"
         base._pill(
             draw,
-            (960, 810),
+            (960, 875),
             f"NEXT ACTION · {state}",
             palette,
             fill=palette["good"],
@@ -291,9 +337,9 @@ def _truthful_behavioral_twin(
         )
     engine._text(
         draw,
-        (960, 405),
+        (960, 335),
         "SIGNALS BECOME A PREDICTIVE COUNTERPART",
-        22,
+        24,
         palette["muted"],
         bold=True,
         anchor="mm",

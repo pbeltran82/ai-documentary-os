@@ -5,7 +5,13 @@ from typing import Any
 
 FINANCE_FAMILY_ID = "finance_motion"
 SUBSCRIBE_CTA_TEMPLATE_ID = "subscribe_cta"
+TECH_FAMILY_ID = "tech_behavior_motion"
+TECH_CTA_TEMPLATE_ID = "machine_choice_cta"
 SUBSCRIBE_CTA_MINIMUM_DURATION_SECONDS = 4.0
+ENGAGEMENT_CTA_IDENTITIES = {
+    (FINANCE_FAMILY_ID, SUBSCRIBE_CTA_TEMPLATE_ID),
+    (TECH_FAMILY_ID, TECH_CTA_TEMPLATE_ID),
+}
 
 
 def effective_exact_visual_duration(
@@ -15,10 +21,7 @@ def effective_exact_visual_duration(
 ) -> float:
     """Return the editorially safe duration for a generated exact visual."""
     duration = max(1.0, float(requested_duration_seconds))
-    if (
-        family_id == FINANCE_FAMILY_ID
-        and template_id == SUBSCRIBE_CTA_TEMPLATE_ID
-    ):
+    if (family_id, template_id) in ENGAGEMENT_CTA_IDENTITIES:
         return max(duration, SUBSCRIBE_CTA_MINIMUM_DURATION_SECONDS)
     return duration
 
@@ -38,6 +41,8 @@ def exact_visual_identity(asset: Any) -> tuple[str | None, str | None]:
     provider_asset_id = str(getattr(asset, "provider_asset_id", ""))
     if "subscribe_cta" in provider_asset_id:
         return FINANCE_FAMILY_ID, SUBSCRIBE_CTA_TEMPLATE_ID
+    if "machine_choice_cta" in provider_asset_id:
+        return TECH_FAMILY_ID, TECH_CTA_TEMPLATE_ID
     return None, None
 
 
@@ -51,8 +56,8 @@ def effective_scene_duration(scene: Any) -> float:
 
 
 def is_subscribe_cta_clip(clip: dict[str, Any]) -> bool:
-    return (
-        str(clip.get("exact_visual_family_id", "")) == FINANCE_FAMILY_ID
-        and str(clip.get("exact_visual_template_id", ""))
-        == SUBSCRIBE_CTA_TEMPLATE_ID
+    identity = (
+        str(clip.get("exact_visual_family_id", "")),
+        str(clip.get("exact_visual_template_id", "")),
     )
+    return identity in ENGAGEMENT_CTA_IDENTITIES

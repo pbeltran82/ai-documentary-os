@@ -257,6 +257,14 @@ export interface Voiceover {
   uploaded_at: string;
 }
 
+export interface CaptionTrack {
+  format: string;
+  cue_count: number;
+  relative_path: string;
+  public_url: string;
+  exists: boolean;
+}
+
 export interface TimelinePlan {
   schema_version: string;
   generated_at: string;
@@ -286,6 +294,7 @@ export interface TimelinePlan {
     edge_fade_seconds: number;
   };
   voiceover: Voiceover | null;
+  captions: CaptionTrack;
   alignment_status: NarrationAlignmentStatus;
   duration_delta_seconds: number | null;
   alignment_message: string;

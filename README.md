@@ -227,4 +227,4 @@ Read these before major development work:
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md)
 - [`docs/PAIN_LOG.md`](docs/PAIN_LOG.md)
 
-The next milestone is **caption timing and final export controls**, followed by music and publishing assistance.
+Timeline planning now emits an upload-ready timed SubRip caption track from the approved narration scenes. The next milestone is **final export controls**, followed by music and publishing assistance.

@@ -41,6 +41,48 @@ VIDEO_FORMATS = {
 }
 
 
+TECH_SHORTS_STORY_BOXES: dict[
+    str,
+    tuple[tuple[float, float, float, float], ...],
+] = {
+    # Tech templates use deliberate two- and three-column compositions. Their
+    # meaningful units must be separated before stacking; a generic 50/50 crop
+    # cuts labels, diagrams, and engagement controls in half.
+    "algorithm_chose_you": (
+        (0.035, 0.315, 0.335, 0.925),
+        (0.345, 0.315, 0.645, 0.925),
+        (0.665, 0.315, 0.965, 0.925),
+    ),
+    "behavior_prediction_engine": (
+        (0.040, 0.335, 0.385, 0.835),
+        (0.380, 0.335, 0.640, 0.835),
+        (0.660, 0.335, 0.955, 0.835),
+    ),
+    "life_event_timeline": (
+        (0.035, 0.320, 0.500, 0.700),
+        (0.500, 0.320, 0.965, 0.700),
+    ),
+    "digital_footprint_collector": (
+        (0.040, 0.320, 0.390, 0.920),
+        (0.500, 0.320, 0.960, 0.920),
+    ),
+    "behavioral_twin": (
+        (0.035, 0.350, 0.320, 0.930),
+        (0.325, 0.350, 0.675, 0.930),
+        (0.680, 0.350, 0.965, 0.930),
+    ),
+    "machine_choice_explainer": (
+        (0.035, 0.320, 0.400, 0.850),
+        (0.425, 0.300, 0.960, 0.850),
+    ),
+    "machine_choice_cta": (
+        (0.040, 0.320, 0.480, 0.755),
+        (0.520, 0.320, 0.960, 0.755),
+        (0.270, 0.735, 0.730, 0.965),
+    ),
+}
+
+
 def normalize_video_format(value: Any) -> str:
     candidate = str(value or DEFAULT_VIDEO_FORMAT).strip().lower()
     return candidate if candidate in VIDEO_FORMATS else DEFAULT_VIDEO_FORMAT
@@ -166,6 +208,42 @@ def _story_regions(
     return crop(left_box), crop(right_box)
 
 
+def _crop_relative(
+    source: Image.Image,
+    box: tuple[float, float, float, float],
+) -> Image.Image:
+    width, height = source.size
+    return source.crop(
+        tuple(
+            round(value * (width if index % 2 == 0 else height))
+            for index, value in enumerate(box)
+        )
+    )
+
+
+def _tech_story_regions(
+    source: Image.Image,
+    template_id: str | None,
+) -> tuple[Image.Image, ...] | None:
+    boxes = TECH_SHORTS_STORY_BOXES.get(template_id or "")
+    if boxes is None:
+        return None
+    return tuple(_crop_relative(source, box) for box in boxes)
+
+
+def _story_panel_boxes(count: int) -> tuple[tuple[int, int, int, int], ...]:
+    if count == 3:
+        return (
+            (34, 320, 1046, 812),
+            (34, 846, 1046, 1338),
+            (34, 1372, 1046, 1874),
+        )
+    return (
+        (34, 320, 1046, 1080),
+        (34, 1114, 1046, 1874),
+    )
+
+
 def format_exact_visual_frame(
     frame: Image.Image,
     video_format: Any,
@@ -196,10 +274,15 @@ def format_exact_visual_frame(
             round(height * 0.275),
         )
     )
-    left_story, right_story = _story_regions(source, family_id, template_id)
+    tech_regions = (
+        _tech_story_regions(source, template_id)
+        if family_id == "tech_behavior_motion"
+        else None
+    )
+    story_regions = tech_regions or _story_regions(source, family_id, template_id)
 
     _paste_panel(canvas, header, (34, 48, 1046, 286))
-    _paste_panel(canvas, left_story, (34, 320, 1046, 1080))
-    _paste_panel(canvas, right_story, (34, 1114, 1046, 1874))
+    for region, box in zip(story_regions, _story_panel_boxes(len(story_regions))):
+        _paste_panel(canvas, region, box)
 
     return canvas
