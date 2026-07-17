@@ -78,6 +78,23 @@ function App() {
     void refreshProjects();
   }, []);
 
+  useEffect(() => {
+    const openTimeline = (event: Event) => {
+      const projectId = Number((event as CustomEvent<{ projectId?: number }>).detail?.projectId);
+      if (!projectId) return;
+      setProjectLoading(true);
+      setError("");
+      void api.getProject(projectId).then((project) => {
+        setSelectedProject(project);
+        setWorkspaceMode("timeline");
+      }).catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Unable to open Timeline Builder");
+      }).finally(() => setProjectLoading(false));
+    };
+    window.addEventListener("atlas:open-timeline", openTimeline);
+    return () => window.removeEventListener("atlas:open-timeline", openTimeline);
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
