@@ -7,6 +7,7 @@ from . import tech_behavior_route_patch as route
 
 _ORIGINAL_DECISIVE_MATCH = route._decisive_match
 _ORIGINAL_SCORE_WITH_PRIOR = route._score_templates_with_prior
+_ORIGINAL_SUGGEST_TEMPLATE = route.suggest_template
 
 _NEW_DECISIVE_ROUTES = (
     (
@@ -73,5 +74,26 @@ def _guarded_score_templates_with_prior(scene: object, prior: list[str]):
     return guarded
 
 
+def _guarded_suggest_template(scene: object):
+    template, confidence, reason = _ORIGINAL_SUGGEST_TEMPLATE(scene)
+    decisive = _expanded_decisive_match(scene)
+    decisive_id = decisive[0] if decisive is not None else None
+    if template.template_id != route.CTA_TEMPLATE_ID or decisive_id == route.CTA_TEMPLATE_ID:
+        return template, confidence, reason
+
+    selected_score, selected = _guarded_score_templates_with_prior(
+        scene,
+        route.prior_template_ids(scene),
+    )[0]
+    resolved_confidence = min(0.92, max(0.58, 0.58 + max(0, selected_score) * 0.025))
+    return (
+        selected,
+        round(resolved_confidence, 2),
+        "Selected a non-terminal composition; engagement CTA is reserved for explicit closing narration.",
+    )
+
+
 route._decisive_match = _expanded_decisive_match
 route._score_templates_with_prior = _guarded_score_templates_with_prior
+route.suggest_template = _guarded_suggest_template
+route.base.suggest_template = _guarded_suggest_template
