@@ -67,7 +67,7 @@ def update_animation_plan(
     missing = sorted(required - payload.keys())
     if missing:
         raise HTTPException(status_code=422, detail=f"Missing animation plan fields: {', '.join(missing)}")
-    payload["version"] = "1.9.4"
+    payload["version"] = "1.9.5"
     scene.animation_plan = payload
     db.commit()
     return scene.animation_plan
