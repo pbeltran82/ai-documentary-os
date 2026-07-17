@@ -3,3 +3,4 @@
 # Register the expanded Tech & Behavior template family before suggestion,
 # preview, batch rendering, or timeline assembly asks for a composition.
 from . import documentary_variety_expansion as _documentary_variety_expansion  # noqa: F401,E402
+from . import documentary_variety_guard as _documentary_variety_guard  # noqa: F401,E402
