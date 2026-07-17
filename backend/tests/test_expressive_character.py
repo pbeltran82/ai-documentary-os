@@ -195,6 +195,39 @@ class ExpressiveCharacterTests(unittest.TestCase):
         )
         self.assertGreater(skin_below_head, 500)
 
+    def test_shirt_tapers_from_shoulders_to_waist(self) -> None:
+        from PIL import Image
+
+        canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (67, 185, 166),
+            "person_alt": (224, 174, 83),
+            "skin": (238, 187, 145),
+            "denim": (47, 84, 129),
+            "shoe": (29, 37, 49),
+            "accent": (174, 235, 222),
+        }
+        expressive._CURRENT_TIME = 0.4
+        expressive._CURRENT_DURATION = 4.0
+        expressive._expressive_person(
+            ImageDraw.Draw(canvas),
+            (350, 620),
+            palette,
+            scale=1.2,
+            pose="idle",
+        )
+
+        def shirt_span(y: int) -> int:
+            shirt_pixels = [
+                x
+                for x in range(250, 450)
+                if canvas.getpixel((x, y)) == palette["person"]
+            ]
+            return max(shirt_pixels) - min(shirt_pixels)
+
+        self.assertGreater(shirt_span(420) - shirt_span(500), 10)
+
     def test_celebration_keeps_open_hands_out_of_stick_up_zone(self) -> None:
         from PIL import Image
 
