@@ -63,7 +63,7 @@ BEATS_BY_TEMPLATE: dict[str, tuple[StoryBeat, StoryBeat, StoryBeat]] = {
     "subscribe_cta": (
         StoryBeat("BLUEPRINT", "Reveal the three-part money system.", 0.16),
         StoryBeat("NEXT STEP", "Focus attention on the channel action.", 0.52),
-        StoryBeat("SUBSCRIBE", "Land on a clean, confident final call to action.", 0.84),
+        StoryBeat("LIKE + SUBSCRIBE", "Land on two clean, recognizable channel actions.", 0.84),
     ),
 }
 
