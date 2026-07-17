@@ -143,9 +143,12 @@ def _polished_hand(
     scale: float,
     *,
     open_hand: bool = False,
+    hand_shape: str | None = None,
+    facing: int = 1,
 ) -> None:
-    """Draw a consistent graphic hand with four fingers plus a thumb."""
+    """Draw a restrained hand shape with only one readable intention."""
     x, y = center
+    shape = hand_shape or ("wave" if open_hand else "relaxed")
     outline = (3, 7, 12)
     palm_x = max(9, round(13 * scale))
     palm_y = max(9, round(15 * scale))
@@ -156,37 +159,63 @@ def _polished_hand(
     draw.ellipse((x - palm_x, y - palm_y, x + palm_x, y + palm_y), fill=color)
     stroke = max(2, round(3 * scale))
 
-    if open_hand:
-        # Four fingers fan upward; the fifth digit is a clear side thumb.
-        for offset, angle in ((-8, -116), (-3, -101), (3, -84), (8, -69)):
+    if shape == "wave":
+        # Only an intentional wave receives separated fingers, kept short so
+        # the silhouette does not resemble signing at documentary scale.
+        for offset, angle in ((-6, -104), (0, -90), (6, -76)):
             start = (x + round(offset * scale), y - round(7 * scale))
-            length = round(18 * scale)
+            length = round(12 * scale)
             radians = math.radians(angle)
             end = (
                 round(start[0] + math.cos(radians) * length),
                 round(start[1] + math.sin(radians) * length),
             )
             draw.line((start, end), fill=color, width=stroke)
-        thumb_start = (x + round(9 * scale), y + round(1 * scale))
-        thumb_end = (x + round(25 * scale), y + round(7 * scale))
+        thumb_start = (x + facing * round(8 * scale), y + round(1 * scale))
+        thumb_end = (x + facing * round(19 * scale), y + round(5 * scale))
         draw.line((thumb_start, thumb_end), fill=color, width=stroke + 1)
-    else:
-        # Closed and relaxed poses retain a readable hand instead of a blank blob.
-        for offset in (-7, -2, 3, 8):
+    elif shape == "point":
+        draw.line(
+            (x + facing * round(7 * scale), y - round(3 * scale), x + facing * round(27 * scale), y - round(6 * scale)),
+            fill=color,
+            width=stroke + 1,
+        )
+        draw.line(
+            (x - facing * round(7 * scale), y + round(3 * scale), x + facing * round(6 * scale), y + round(3 * scale)),
+            fill=_mix(color, outline, 0.30),
+            width=max(1, stroke - 1),
+        )
+    elif shape == "cup":
+        draw.arc(
+            (x - round(8 * scale), y - round(7 * scale), x + round(10 * scale), y + round(9 * scale)),
+            15 if facing > 0 else 165,
+            165 if facing > 0 else 345,
+            fill=_mix(color, outline, 0.34),
+            width=max(1, stroke - 1),
+        )
+    elif shape == "fist":
+        for offset in (-5, 2):
             draw.line(
                 (
-                    x + round(offset * scale),
-                    y - round(8 * scale),
-                    x + round(offset * scale),
-                    y - round(3 * scale),
+                    x - round(7 * scale),
+                    y + round(offset * scale),
+                    x + round(7 * scale),
+                    y + round(offset * scale),
                 ),
                 fill=_mix(color, outline, 0.28),
                 width=max(1, stroke - 1),
             )
+    else:
+        # Relaxed hands use one crease and one short thumb—no finger fan.
         draw.line(
-            (x + round(8 * scale), y, x + round(20 * scale), y + round(6 * scale)),
+            (x - round(6 * scale), y - round(2 * scale), x + round(6 * scale), y - round(2 * scale)),
+            fill=_mix(color, outline, 0.28),
+            width=max(1, stroke - 1),
+        )
+        draw.line(
+            (x + facing * round(7 * scale), y, x + facing * round(17 * scale), y + round(5 * scale)),
             fill=color,
-            width=stroke,
+            width=max(2, stroke),
         )
 
 
