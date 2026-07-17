@@ -5,6 +5,7 @@ from typing import Any
 
 from PIL import Image
 
+from . import documentary_final_pass as _documentary_final_pass
 from .documentary_visual_polish import (
     compose_documentary_shorts,
     install_landscape_character_patch,
