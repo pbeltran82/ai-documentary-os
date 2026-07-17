@@ -14,7 +14,7 @@ from app.routers.projects import update_project
 from app.schemas import ProjectCreate, ProjectUpdate
 from app.services import exact_visuals
 from app.services.finance_motion import ffmpeg_encoder_command
-from app.services.native_shorts import COMPOSITIONS
+from app.services.native_shorts import COMPOSITIONS, RENDERERS
 from app.services.video_format import (
     SHORTS_FORMAT,
     YOUTUBE_FORMAT,
@@ -144,6 +144,55 @@ class VideoFormatTests(unittest.TestCase):
         )
         exact_grid_pixels = sum(1 for color in shorts.getdata() if color == grid)
         self.assertLess(exact_grid_pixels, 120)
+
+    def test_known_shorts_templates_do_not_copy_any_landscape_source_pixels(self) -> None:
+        first = Image.new("RGB", (1920, 1080), (255, 0, 255))
+        second = Image.new("RGB", (1920, 1080), (0, 255, 0))
+        for family_id, template_id in COMPOSITIONS:
+            with self.subTest(family=family_id, template=template_id):
+                arguments = {
+                    "family_id": family_id,
+                    "template_id": template_id,
+                    "progress": 0.63,
+                    "title": "NATIVE TYPE STAYS SHARP",
+                    "subtitle": "The vertical renderer owns every pixel.",
+                }
+                first_render = format_exact_visual_frame(first, SHORTS_FORMAT, **arguments)
+                second_render = format_exact_visual_frame(second, SHORTS_FORMAT, **arguments)
+                self.assertEqual(first_render.tobytes(), second_render.tobytes())
+
+    def test_every_known_template_has_an_explicit_native_renderer(self) -> None:
+        self.assertEqual(set(COMPOSITIONS), set(RENDERERS))
+
+    def test_native_micro_actions_change_without_changing_the_scene_layout(self) -> None:
+        source = self.sample_frame()
+        for template_id in (
+            "behavior_prediction_engine",
+            "life_event_timeline",
+            "digital_footprint_collector",
+        ):
+            with self.subTest(template=template_id):
+                frames = [
+                    format_exact_visual_frame(
+                        source,
+                        SHORTS_FORMAT,
+                        "tech_behavior_motion",
+                        template_id,
+                        progress=progress,
+                        title="ONE CONNECTED SCENE",
+                        subtitle="Actions build inside one stable composition.",
+                    )
+                    for progress in (0.15, 0.50, 0.85)
+                ]
+                self.assertNotEqual(frames[0].tobytes(), frames[1].tobytes())
+                self.assertNotEqual(frames[1].tobytes(), frames[2].tobytes())
+                # The hero card itself remains fixed throughout the scene.
+                anchors = [(90, 700), (990, 700), (540, 350)]
+                for anchor in anchors:
+                    self.assertEqual(
+                        [frame.getpixel(anchor) for frame in frames],
+                        [frames[0].getpixel(anchor)] * len(frames),
+                    )
 
     def test_tech_terminal_cta_keeps_subscribe_and_like_together(self) -> None:
         source = Image.new("RGB", (1920, 1080), (8, 16, 28))

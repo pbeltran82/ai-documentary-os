@@ -160,10 +160,18 @@ class TimelineBuilderTests(unittest.TestCase):
         self.assertEqual(plan["settings"]["aspect_ratio"], "9:16")
         self.assertEqual(plan["settings"]["width"], 1080)
         self.assertEqual(plan["settings"]["height"], 1920)
+        self.assertEqual(plan["command"][plan["command"].index("-crf") + 1], "16")
         filter_graph = plan["command"][plan["command"].index("-filter_complex") + 1]
         self.assertIn("scale=1080:1920:force_original_aspect_ratio=increase", filter_graph)
         self.assertIn("crop=1080:1920", filter_graph)
         self.assertIn("fit 9:16", plan["clips"][0]["assembly_action"])
+
+    def test_youtube_keeps_the_established_export_quality(self) -> None:
+        project = self.make_project("video")
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(project)
+
+        self.assertEqual(plan["command"][plan["command"].index("-crf") + 1], "18")
 
     def test_crossfade_preserves_exact_timeline_runtime(self) -> None:
         project = self.make_project("video")
