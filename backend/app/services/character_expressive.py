@@ -363,20 +363,29 @@ def _expressive_person(
     elif pose == "shake_head":
         head = (head[0] + round(10 * math.sin(motion_phase * 0.7) * scale), head[1])
 
-    torso_width = round(54 * scale)
     shoulder_width = round(47 * scale)
+    shoulder_cap_width = round(31 * scale)
+    waist_width = round(34 * scale)
+    torso_top = shoulder[1] - round(8 * scale)
+    torso_bottom = hip[1] + round(2 * scale)
     torso_box = (
         shoulder[0] - shoulder_width,
-        shoulder[1] - round(8 * scale),
-        hip[0] + torso_width,
-        hip[1] + round(2 * scale),
+        torso_top,
+        shoulder[0] + shoulder_width,
+        torso_bottom,
     )
-    torso_radius = max(12, round(23 * scale))
-    draw.rounded_rectangle(
-        (torso_box[0] + 7, torso_box[1] + 9, torso_box[2] + 7, torso_box[3] + 9),
-        radius=torso_radius,
-        fill=outline,
+    shoulder_curve = round(14 * scale)
+    shirt_points = (
+        (shoulder[0] - shoulder_cap_width, torso_top),
+        (shoulder[0] - round(41 * scale), torso_top + round(4 * scale)),
+        (shoulder[0] - shoulder_width, torso_top + shoulder_curve),
+        (hip[0] - waist_width, torso_bottom),
+        (hip[0] + waist_width, torso_bottom),
+        (shoulder[0] + shoulder_width, torso_top + shoulder_curve),
+        (shoulder[0] + round(41 * scale), torso_top + round(4 * scale)),
+        (shoulder[0] + shoulder_cap_width, torso_top),
     )
+    draw.polygon(tuple((px + 5, py + 6) for px, py in shirt_points), fill=outline)
 
     head_radius_x = round(39 * scale)
     head_radius_y = round(44 * scale)
@@ -400,9 +409,9 @@ def _expressive_person(
     )
     draw.rounded_rectangle(neck_box, radius=max(4, round(8 * scale)), fill=skin)
 
-    # A shirt with a defined shoulder and hem reads as clothing rather than a
-    # single body-colored bean. The restrained details survive at thumbnail size.
-    draw.rounded_rectangle(torso_box, radius=torso_radius, fill=body)
+    # Broad shoulders taper into a narrower waist, giving the character a shirt
+    # silhouette instead of the old full-width rounded rectangle.
+    draw.polygon(shirt_points, fill=body)
     shirt_detail = _blend(body, outline, 0.30)
     collar_y = torso_box[1] + round(8 * scale)
     collar_center_x = shoulder[0] + round(2 * facing * scale)
@@ -436,9 +445,9 @@ def _expressive_person(
     # The waistband bridges the rig's hips and carries the jeans color into
     # both leg chains without turning the lower torso into a shorts silhouette.
     waist_box = (
-        hip[0] - round(43 * scale),
+        hip[0] - waist_width,
         hip[1] - round(14 * scale),
-        hip[0] + round(43 * scale),
+        hip[0] + waist_width,
         hip[1] + round(19 * scale),
     )
     draw.rounded_rectangle(
@@ -603,8 +612,8 @@ def _expressive_person(
             right_foot = (x + round(38 * scale), ground_y)
         left_knee = (x - round((23 - 13 * step) * scale), knee_y - round(left_lift * 15 * scale))
         right_knee = (x + round((23 + 13 * step) * scale), knee_y - round(right_lift * 15 * scale))
-    hip_left = (hip[0] - round(18 * scale), hip[1])
-    hip_right = (hip[0] + round(18 * scale), hip[1])
+    hip_left = (hip[0] - round(14 * scale), hip[1])
+    hip_right = (hip[0] + round(14 * scale), hip[1])
     leg_width = max(9, round(16 * scale))
     _limb(draw, (hip_left, left_knee, left_foot), denim, leg_width)
     _limb(draw, (hip_right, right_knee, right_foot), denim, leg_width)
