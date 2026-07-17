@@ -57,12 +57,12 @@ def build_animation_plan(scene: Scene) -> dict[str, Any]:
         props = ["paycheck", "10 percent token", "future account"]
         camera = "Medium entrance, track the transfer, settle on the funded future account."
         camera_motion = {"mode": "track", "intensity": 0.42, "focus": [0.54, 0.52]}
-        poses = ["walk", "receive", "point", "celebrate"]
+        poses = ["step_in", "receive", "point", "celebrate"]
     else:
         return plan_from_preset(suggest_preset(context).preset_id)
 
     return {
-        "version": "1.9.5",
+        "version": "1.9.6",
         "visual_strategy": "character_performance",
         "preset_id": None,
         "character_action": action,
