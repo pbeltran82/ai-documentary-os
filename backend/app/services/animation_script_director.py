@@ -62,7 +62,7 @@ def build_animation_plan(scene: Scene) -> dict[str, Any]:
         return plan_from_preset(suggest_preset(context).preset_id)
 
     return {
-        "version": "1.9.4",
+        "version": "1.9.5",
         "visual_strategy": "character_performance",
         "preset_id": None,
         "character_action": action,

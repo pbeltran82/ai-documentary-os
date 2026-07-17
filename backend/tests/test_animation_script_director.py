@@ -83,7 +83,7 @@ class AnimationScriptDirectorTests(unittest.TestCase):
 
     def test_generated_plans_use_current_character_studio_version(self) -> None:
         plan = director.build_animation_plan(self.scene("A person considers a difficult choice."))
-        self.assertEqual(plan["version"], "1.9.4")
+        self.assertEqual(plan["version"], "1.9.5")
 
     def test_reusable_performance_library_exposes_directing_patterns(self) -> None:
         catalog = library.preset_catalog()
@@ -139,6 +139,57 @@ class AnimationScriptDirectorTests(unittest.TestCase):
         self.assertEqual(person.call_args.kwargs["pose"], "slump")
         self.assertEqual(person.call_args.kwargs["mood"], "surprised")
         runtime._ACTIVE_PLAN = None
+
+    def test_authored_actor_keeps_its_role_specific_pose(self) -> None:
+        runtime._ACTIVE_PLAN = {
+            "pose_sequence": ["celebrate"],
+            "expression_sequence": ["happy"],
+        }
+        try:
+            with patch.object(runtime, "_ORIGINAL_PERSON") as person:
+                runtime._planned_person(
+                    MagicMock(),
+                    (100, 100),
+                    {},
+                    pose="slump",
+                    mood="sad",
+                    performance_role="authored",
+                )
+            self.assertEqual(person.call_args.kwargs["pose"], "slump")
+            self.assertEqual(person.call_args.kwargs["mood"], "sad")
+            self.assertNotIn("performance_role", person.call_args.kwargs)
+        finally:
+            runtime._ACTIVE_PLAN = None
+
+    def test_locomotion_transition_does_not_crossfade_two_rigs(self) -> None:
+        from PIL import ImageDraw
+
+        runtime._ACTIVE_PLAN = {
+            "pose_sequence": ["walk", "receive", "point", "celebrate"],
+            "expression_sequence": ["neutral", "focused", "confident", "happy"],
+            "animation_beats": {
+                "anticipation": 0.15,
+                "action": 0.35,
+                "overshoot": 0.15,
+                "recovery": 0.35,
+            },
+        }
+        runtime.character._CURRENT_TIME = 1.44
+        runtime.character._CURRENT_DURATION = 10.0
+        canvas = Image.new("RGBA", (320, 240), (0, 0, 0, 0))
+        try:
+            with patch.object(runtime, "_ORIGINAL_PERSON") as person:
+                runtime._planned_person(
+                    ImageDraw.Draw(canvas),
+                    (120, 200),
+                    {},
+                    pose="idle",
+                    mood="neutral",
+                )
+            self.assertEqual(person.call_count, 1)
+            self.assertEqual(person.call_args.kwargs["pose"], "walk")
+        finally:
+            runtime._ACTIVE_PLAN = None
 
     def test_runtime_uses_editable_performance_timing(self) -> None:
         runtime._ACTIVE_PLAN = {

@@ -121,7 +121,7 @@ def preset_catalog() -> list[dict[str, Any]]:
 def plan_from_preset(preset_id: str) -> dict[str, Any]:
     preset = PRESET_BY_ID[preset_id]
     return {
-        "version": "1.9.4",
+        "version": "1.9.5",
         "visual_strategy": "character_performance",
         "preset_id": preset.preset_id,
         "character_action": preset.character_action,

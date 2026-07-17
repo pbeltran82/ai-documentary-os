@@ -54,7 +54,9 @@ def apply_camera_direction(
         zoom = 1 + intensity * (1 - eased)
     elif mode == "track":
         zoom = 1 + intensity * 0.55
-        focus_x = _clamp(focus_x - 0.22 + 0.44 * eased)
+        # Track the idea, not the character's feet. The former wide pan made a
+        # planted figure appear to slide across its stage.
+        focus_x = _clamp(focus_x - 0.08 + 0.16 * eased)
     elif mode == "drift":
         zoom = 1 + intensity * 0.45
         focus_x = _clamp(focus_x + (eased - 0.5) * 0.24)

@@ -396,6 +396,7 @@ def _person(
     mood: str = "neutral",
     facing: int = 1,
     alternate: bool = False,
+    performance_role: str = "directed",
 ) -> None:
     x, ground_y = center
     body_color = palette["person_alt"] if alternate else palette["person"]
@@ -526,20 +527,25 @@ def _paycheck_arrival(
     progress: float,
     palette: dict[str, tuple[int, int, int]],
 ) -> None:
-    arrive = _phase(progress, 0.04, 0.30)
+    character_arrive = _phase(progress, 0.02, 0.15)
+    paycheck_arrive = _phase(progress, 0.04, 0.30)
     split = _phase(progress, 0.32, 0.55)
     transfer = _phase(progress, 0.46, 0.76)
     result = _phase(progress, 0.75, 0.92)
 
     _panel(draw, (105, 350, 760, 900), palette, outline=palette["accent"])
-    person_x = round(engine._lerp(265, 410, arrive))
+    # Finish screen travel inside the directed walk beat. Continuing to move
+    # the root after the pose settled into receive was the remaining glide.
+    person_x = round(engine._lerp(265, 410, character_arrive))
     pose = "receive" if transfer < 0.72 else "point"
     _person(draw, (person_x, 835), palette, scale=1.18, pose=pose, mood="happy" if result > 0.5 else "neutral")
     engine._text(draw, (155, 390), "PAYDAY", 28, palette["accent"], bold=True)
-    paycheck_x = round(engine._lerp(70, 650, arrive))
-    draw.rounded_rectangle((paycheck_x - 115, 480, paycheck_x + 115, 600), radius=22, fill=palette["panel"], outline=palette["accent"], width=4)
-    engine._text(draw, (paycheck_x, 520), "PAYCHECK", 22, palette["muted"], bold=True, anchor="mm")
-    engine._text(draw, (paycheck_x, 565), "$5,000", 36, palette["white"], bold=True, anchor="mm")
+    # The paycheck drops into its own prop lane instead of travelling through
+    # the face-safe zone while the character enters from the left.
+    paycheck_x = 620
+    paycheck_y = round(engine._lerp(290, 540, paycheck_arrive))
+    composition._icon_paycheck(draw, (paycheck_x, paycheck_y), scale=1.0, accent=palette["accent"], received=paycheck_arrive > 0.92)
+    engine._text(draw, (paycheck_x + 30, paycheck_y + 28), "$5,000", 27, (29, 53, 54), bold=True, anchor="mm")
 
     _panel(draw, (930, 350, 1810, 585), palette, outline=palette["bad"])
     composition._icon_house(draw, (1050, 465), scale=0.58, accent=palette["bad"])
@@ -641,14 +647,31 @@ def _comparison(
     draw.line((960, 350, 960, 905), fill=palette["muted"], width=3)
 
     engine._text(draw, (498, 398), "SPEND FIRST", 31, palette["bad"], bold=True, anchor="mm")
-    _person(draw, (390, 815), palette, scale=1.02, pose="slump" if result > 0.35 else "receive", mood="sad" if result > 0.35 else "neutral")
+    _person(
+        draw,
+        (390, 815),
+        palette,
+        scale=1.02,
+        pose="slump" if result > 0.35 else "receive",
+        mood="sad" if result > 0.35 else "neutral",
+        performance_role="authored",
+    )
     composition._icon_wallet(draw, (690, 565), scale=0.70, accent=palette["bad"], empty=result > 0.35)
     composition._icon_house(draw, (650, 750), scale=0.38, accent=palette["bad"])
     composition._icon_bag(draw, (770, 750), scale=0.38, accent=palette["good"])
     engine._text(draw, (690, 850), "$0 LEFT", 38, palette["bad"], bold=True, anchor="mm")
 
     engine._text(draw, (1422, 398), "PAY SELF FIRST", 31, palette["good"], bold=True, anchor="mm")
-    _person(draw, (1240, 815), palette, scale=1.02, pose="celebrate" if result > 0.55 else "point", mood="happy", alternate=True)
+    _person(
+        draw,
+        (1240, 815),
+        palette,
+        scale=1.02,
+        pose="celebrate" if result > 0.55 else "point",
+        mood="happy",
+        alternate=True,
+        performance_role="authored",
+    )
     composition._icon_bank(draw, (1650, 590), scale=0.66, accent=palette["good"])
     if decision > 0:
         token = _route(draw, (1320, 600), (1450, 470), (1575, 600), decision, palette["good"])

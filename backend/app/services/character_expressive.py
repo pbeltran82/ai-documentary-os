@@ -165,10 +165,18 @@ def _expressive_person(
     outline = (3, 6, 14)
     pulse = _performance_pulse()
     motion_phase = _CURRENT_TIME * 6.2
+    gait = math.sin(motion_phase) if pose == "walk" else 0.0
+
+    # A readable walk needs vertical weight transfer as well as changing leg
+    # angles. Keeping both hips and feet on one flat rail produced the previous
+    # skating silhouette.
+    if pose == "walk":
+        x += round(3 * gait * scale)
+        ground_y -= round(4 * abs(gait) * scale)
 
     posture = {
         "slump": (18, 11, -7),
-        "celebrate": (-12, -8, 8),
+        "celebrate": (-3, -2, 4),
         "relaxed": (4, 2, 3),
         "tap": (-2, -3, 5),
         "receive": (-5, -2, 5),
@@ -222,17 +230,23 @@ def _expressive_person(
     shoulder_right = (shoulder[0] + round(37 * scale), shoulder[1] + round(8 * scale))
     limb_width = max(7, round(14 * scale))
 
-    if pose in {"receive", "point"}:
-        front_hand = (x + facing * round((105 + pulse * 12) * scale), shoulder[1] + round((18 - pulse * 8) * scale))
-        rear_hand = (x - facing * round(56 * scale), shoulder[1] + round(100 * scale))
+    if pose == "receive":
+        front_hand = (x + facing * round((78 + pulse * 8) * scale), shoulder[1] + round((54 - pulse * 5) * scale))
+        rear_hand = (x - facing * round(50 * scale), shoulder[1] + round(104 * scale))
+        open_front = True
+    elif pose == "point":
+        front_hand = (x + facing * round((102 + pulse * 8) * scale), shoulder[1] + round((31 - pulse * 5) * scale))
+        rear_hand = (x - facing * round(46 * scale), shoulder[1] + round(94 * scale))
         open_front = True
     elif pose in {"phone", "tap"}:
         front_hand = (x + facing * round(72 * scale), shoulder[1] + round(52 * scale))
         rear_hand = (x + facing * round(28 * scale), shoulder[1] + round(72 * scale))
         open_front = False
     elif pose == "celebrate":
-        front_hand = (x + round(98 * scale), shoulder[1] - round((92 + pulse * 16) * scale))
-        rear_hand = (x - round(98 * scale), shoulder[1] - round((92 + pulse * 16) * scale))
+        # One compact accent hand and one grounded hand read as confidence,
+        # without the symmetrical open-palm "stick-up" silhouette.
+        front_hand = (x + facing * round((84 + pulse * 8) * scale), shoulder[1] - round((10 + pulse * 8) * scale))
+        rear_hand = (x - facing * round(38 * scale), shoulder[1] + round(72 * scale))
         open_front = True
     elif pose == "slump":
         front_hand = (x + round(54 * scale), shoulder[1] + round(124 * scale))
@@ -257,6 +271,12 @@ def _expressive_person(
         front_hand = (x + facing * round((72 + 20 * travel) * scale), shoulder[1] + round(55 * scale))
         rear_hand = (x + facing * round((28 - 12 * travel) * scale), shoulder[1] + round(68 * scale))
         open_front = pose == "swipe"
+    elif pose == "walk":
+        # Arms counter-swing against the stepping leg and remain below the
+        # shoulders. This supplies the missing locomotion cue at small scale.
+        front_hand = (x + facing * round((48 - 18 * gait) * scale), shoulder[1] + round((96 + 16 * gait) * scale))
+        rear_hand = (x - facing * round((48 + 18 * gait) * scale), shoulder[1] + round((96 - 16 * gait) * scale))
+        open_front = False
     else:
         front_hand = (x + facing * round(74 * scale), shoulder[1] + round(102 * scale))
         rear_hand = (x - facing * round(72 * scale), shoulder[1] + round(102 * scale))
@@ -275,18 +295,21 @@ def _expressive_person(
     _limb(draw, (front_shoulder, front_elbow, front_hand), body, limb_width)
     _limb(draw, (rear_shoulder, rear_elbow, rear_hand), body, limb_width)
     _hand(draw, front_hand, body, scale, open_hand=open_front)
-    _hand(draw, rear_hand, body, scale, open_hand=pose in {"celebrate", "relaxed", "shrug", "confused"})
+    _hand(draw, rear_hand, body, scale, open_hand=pose in {"relaxed", "shrug", "confused"})
 
     locomotion_speed = 1.65 if pose == "run" else 1.0
     step = math.sin(motion_phase * locomotion_speed) if pose in {"walk", "run"} else 0.0
     knee_y = ground_y - round(38 * scale)
-    left_foot = (x - round((56 + 26 * step) * scale), ground_y)
-    right_foot = (x + round((56 - 26 * step) * scale), ground_y - round(max(0.0, step) * 10 * scale))
+    left_lift = max(0.0, -step) if pose in {"walk", "run"} else 0.0
+    right_lift = max(0.0, step) if pose in {"walk", "run"} else 0.0
+    lift_height = 18 if pose == "walk" else 25
+    left_foot = (x - round((56 + 26 * step) * scale), ground_y - round(left_lift * lift_height * scale))
+    right_foot = (x + round((56 - 26 * step) * scale), ground_y - round(right_lift * lift_height * scale))
     if pose == "slump":
         left_foot = (x - round(48 * scale), ground_y)
         right_foot = (x + round(38 * scale), ground_y)
-    left_knee = (x - round((23 - 13 * step) * scale), knee_y - round(max(0.0, -step) * 10 * scale))
-    right_knee = (x + round((23 + 13 * step) * scale), knee_y - round(max(0.0, step) * 10 * scale))
+    left_knee = (x - round((23 - 13 * step) * scale), knee_y - round(left_lift * 15 * scale))
+    right_knee = (x + round((23 + 13 * step) * scale), knee_y - round(right_lift * 15 * scale))
     hip_left = (hip[0] - round(18 * scale), hip[1])
     hip_right = (hip[0] + round(18 * scale), hip[1])
     _limb(draw, (hip_left, left_knee, left_foot), body, limb_width)
