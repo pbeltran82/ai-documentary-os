@@ -4,6 +4,7 @@ import App from "./App";
 import { AnimationScriptLauncher } from "./components/AnimationScriptLauncher";
 import { BatchExitGuard } from "./components/BatchExitGuard";
 import { FinanceMotionLauncher } from "./components/FinanceMotionLauncher";
+import { ProductionPipelineLauncher } from "./components/ProductionPipelineLauncher";
 import "./styles.css";
 import "./asset-planner.css";
 import "./provider-hub.css";
@@ -23,6 +24,7 @@ createRoot(document.getElementById("root")!).render(
     <App />
     <AnimationScriptLauncher />
     <FinanceMotionLauncher />
+    <ProductionPipelineLauncher />
     <BatchExitGuard />
   </StrictMode>,
 );

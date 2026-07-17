@@ -15,6 +15,7 @@ from .routers.animation_plans import router as animation_plans_router
 from .routers.assets import router as assets_router
 from .routers.finance_motion import router as finance_motion_router
 from .routers.projects import router as projects_router
+from .routers.production import router as production_router
 from .routers.scenes import router as scenes_router
 from .routers.timeline import router as timeline_router
 from .schemas import HealthResponse
@@ -63,6 +64,7 @@ app.add_middleware(
 
 app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 app.include_router(projects_router, prefix="/api")
+app.include_router(production_router, prefix="/api")
 app.include_router(scenes_router, prefix="/api")
 app.include_router(animation_plans_router, prefix="/api")
 app.include_router(assets_router, prefix="/api")
