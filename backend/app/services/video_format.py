@@ -5,7 +5,10 @@ from typing import Any
 
 from PIL import Image
 
-from .native_shorts import compose_native_shorts
+from .documentary_visual_polish import (
+    compose_documentary_shorts,
+    install_landscape_character_patch,
+)
 
 YOUTUBE_FORMAT = "youtube"
 SHORTS_FORMAT = "shorts"
@@ -106,9 +109,15 @@ def format_exact_visual_frame(
 ) -> Image.Image:
     """Adapt a house-format exact visual to the selected delivery canvas.
 
-    Landscape remains pixel-identical. Shorts gets a native mobile story with
-    one persistent semantic hero, clean background, and mobile-scale type.
+    Landscape remains dimensionally identical while receiving the shared,
+    finished character rig. Shorts gets a native mobile story with stronger
+    visual variety, a hard first-frame hook, and a thesis-led ending.
     """
+    # This is intentionally installed at render time. Tech Behavior imports this
+    # module before defining its legacy wireframe helper, so delaying the patch
+    # avoids a circular import and guarantees the finished rig wins.
+    install_landscape_character_patch()
+
     profile = video_format_profile(video_format)
     source = frame if frame.mode == "RGB" else frame.convert("RGB")
     if profile.format_id == YOUTUBE_FORMAT:
@@ -116,7 +125,7 @@ def format_exact_visual_frame(
             return source
         return source.resize((profile.width, profile.height), Image.Resampling.LANCZOS)
 
-    return compose_native_shorts(
+    return compose_documentary_shorts(
         source,
         family_id=family_id,
         template_id=template_id,
