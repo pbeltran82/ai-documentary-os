@@ -75,7 +75,7 @@ PRESETS = (
         ("hello", "welcome", "meet", "introduce"),
         "Enter naturally, greet the audience, introduce the subject, and settle into an attentive stance.",
         ("neutral", "happy", "confident", "neutral"),
-        ("walk", "wave", "point", "idle"),
+        ("step_in", "wave", "point", "idle"),
         ("subject title",),
         "Welcoming medium-wide entrance followed by a gentle push toward the introduction.",
         {"mode": "push_in", "intensity": 0.32, "focus": [0.46, 0.50]},
@@ -85,7 +85,7 @@ PRESETS = (
         (),
         "Enter, observe the key visual, gesture toward the main idea, and land on a clear reaction.",
         ("neutral", "curious", "focused", "confident"),
-        ("walk", "idle", "point", "relaxed"),
+        ("step_in", "idle", "point", "relaxed"),
         (),
         "Medium establishing shot with a restrained push-in on the final idea.",
         {"mode": "settle", "intensity": 0.28, "focus": [0.50, 0.50]},
@@ -121,7 +121,7 @@ def preset_catalog() -> list[dict[str, Any]]:
 def plan_from_preset(preset_id: str) -> dict[str, Any]:
     preset = PRESET_BY_ID[preset_id]
     return {
-        "version": "1.9.5",
+        "version": "1.9.6",
         "visual_strategy": "character_performance",
         "preset_id": preset.preset_id,
         "character_action": preset.character_action,

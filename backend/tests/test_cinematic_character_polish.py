@@ -26,15 +26,26 @@ class CinematicCharacterPolishTests(unittest.TestCase):
         self.assertLessEqual(max(abs(left[i] - center[i]) for i in range(3)), 3)
         self.assertLessEqual(max(abs(center[i] - right[i]) for i in range(3)), 3)
 
-    def test_open_hand_draws_four_fingers_and_one_thumb(self) -> None:
+    def test_wave_is_the_only_short_finger_fan(self) -> None:
         draw = MagicMock()
-        cinematic._polished_hand(draw, (100, 100), cinematic.TEAL, 1.0, open_hand=True)
-        self.assertEqual(draw.line.call_count, 5)
+        cinematic._polished_hand(draw, (100, 100), cinematic.TEAL, 1.0, hand_shape="wave")
+        self.assertEqual(draw.line.call_count, 4)
 
-    def test_closed_hand_keeps_visible_digit_definition(self) -> None:
+    def test_relaxed_hand_has_no_finger_fan(self) -> None:
         draw = MagicMock()
-        cinematic._polished_hand(draw, (100, 100), cinematic.TEAL, 1.0, open_hand=False)
-        self.assertEqual(draw.line.call_count, 5)
+        cinematic._polished_hand(draw, (100, 100), cinematic.TEAL, 1.0, hand_shape="relaxed")
+        self.assertEqual(draw.line.call_count, 2)
+
+    def test_point_hand_has_one_short_index_direction(self) -> None:
+        draw = MagicMock()
+        cinematic._polished_hand(draw, (100, 100), cinematic.TEAL, 1.0, hand_shape="point", facing=-1)
+        self.assertEqual(draw.line.call_count, 2)
+
+    def test_cupped_receiving_hand_has_no_separated_fingers(self) -> None:
+        draw = MagicMock()
+        cinematic._polished_hand(draw, (100, 100), cinematic.TEAL, 1.0, hand_shape="cup")
+        self.assertEqual(draw.line.call_count, 0)
+        self.assertEqual(draw.arc.call_count, 1)
 
     def test_performance_arc_is_restrained_and_settles(self) -> None:
         character._CURRENT_DURATION = 10.0

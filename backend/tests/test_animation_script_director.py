@@ -79,11 +79,52 @@ class AnimationScriptDirectorTests(unittest.TestCase):
         plan = director.build_animation_plan(
             self.scene("Welcome. Meet the scientist who changed the field.")
         )
-        self.assertEqual(plan["pose_sequence"], ["walk", "wave", "point", "idle"])
+        self.assertEqual(plan["pose_sequence"], ["step_in", "wave", "point", "idle"])
+
+    def test_paycheck_infographic_uses_grounded_step_in(self) -> None:
+        plan = director.build_animation_plan(
+            self.scene("A paycheck arrives and the first 10 percent goes to your future self.")
+        )
+        self.assertEqual(
+            plan["pose_sequence"],
+            ["step_in", "receive", "point", "relaxed"],
+        )
+        self.assertIn("point briefly", plan["character_action"])
+
+    def test_saved_generated_paycheck_plan_upgrades_to_the_released_hold(self) -> None:
+        scene = self.scene("A paycheck arrives and funds your future self.")
+        scene.animation_plan = {
+            "version": "1.9.6",
+            "character_action": (
+                "Receive the paycheck, anticipate the choice, separate ten percent, "
+                "and point to the future account."
+            ),
+            "pose_sequence": ["step_in", "receive", "point", "celebrate"],
+        }
+
+        plan = director.ensure_animation_plan(scene)
+
+        self.assertEqual(
+            plan["pose_sequence"],
+            ["step_in", "receive", "point", "relaxed"],
+        )
+        self.assertIs(scene.animation_plan, plan)
+
+    def test_hand_edited_paycheck_plan_is_not_rewritten(self) -> None:
+        scene = self.scene("A paycheck arrives and funds your future self.")
+        scene.animation_plan = {
+            "version": "manual",
+            "character_action": "Hold this custom performance.",
+            "pose_sequence": ["step_in", "receive", "point", "celebrate"],
+        }
+
+        plan = director.ensure_animation_plan(scene)
+
+        self.assertEqual(plan["pose_sequence"][-1], "celebrate")
 
     def test_generated_plans_use_current_character_studio_version(self) -> None:
         plan = director.build_animation_plan(self.scene("A person considers a difficult choice."))
-        self.assertEqual(plan["version"], "1.9.5")
+        self.assertEqual(plan["version"], "1.9.6")
 
     def test_reusable_performance_library_exposes_directing_patterns(self) -> None:
         catalog = library.preset_catalog()

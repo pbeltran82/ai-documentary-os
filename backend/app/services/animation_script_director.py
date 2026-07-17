@@ -7,6 +7,18 @@ from ..models import Scene
 from .character_performance_library import plan_from_preset, suggest_preset
 
 
+_LEGACY_PAYCHECK_ACTION = (
+    "Receive the paycheck, anticipate the choice, separate ten percent, and point "
+    "to the future account."
+)
+_LEGACY_PAYCHECK_POSES = ["step_in", "receive", "point", "celebrate"]
+_RELEASED_PAYCHECK_ACTION = (
+    "Receive the paycheck, separate ten percent, point briefly to the future "
+    "account, then release into a relaxed hold."
+)
+_RELEASED_PAYCHECK_POSES = ["step_in", "receive", "point", "relaxed"]
+
+
 def _context(scene: Scene) -> str:
     return " ".join([scene.narration, scene.visual_intent, *scene.search_keywords]).lower()
 
@@ -52,17 +64,17 @@ def build_animation_plan(scene: Scene) -> dict[str, Any]:
         camera_motion = {"mode": "pull_back", "intensity": 0.34, "focus": [0.56, 0.50]}
         poses = ["tap", "point", "relaxed", "celebrate"]
     elif _mentions(context, ("paycheck", "salary", "future self", "first 10")):
-        action = "Receive the paycheck, anticipate the choice, separate ten percent, and point to the future account."
+        action = _RELEASED_PAYCHECK_ACTION
         expressions = ["neutral", "focused", "confident", "happy"]
         props = ["paycheck", "10 percent token", "future account"]
         camera = "Medium entrance, track the transfer, settle on the funded future account."
         camera_motion = {"mode": "track", "intensity": 0.42, "focus": [0.54, 0.52]}
-        poses = ["walk", "receive", "point", "celebrate"]
+        poses = list(_RELEASED_PAYCHECK_POSES)
     else:
         return plan_from_preset(suggest_preset(context).preset_id)
 
     return {
-        "version": "1.9.5",
+        "version": "1.9.6",
         "visual_strategy": "character_performance",
         "preset_id": None,
         "character_action": action,
@@ -85,5 +97,18 @@ def ensure_animation_plan(scene: Scene) -> dict[str, Any]:
     plan = scene.animation_plan or {}
     if not plan:
         plan = build_animation_plan(scene)
+        scene.animation_plan = plan
+    elif (
+        plan.get("character_action") == _LEGACY_PAYCHECK_ACTION
+        and plan.get("pose_sequence") == _LEGACY_PAYCHECK_POSES
+    ):
+        # Upgrade only the exact prior auto-generated direction. Hand-edited
+        # animation plans retain their saved choices, even when they happen to
+        # use one of the same poses.
+        plan = {
+            **plan,
+            "character_action": _RELEASED_PAYCHECK_ACTION,
+            "pose_sequence": list(_RELEASED_PAYCHECK_POSES),
+        }
         scene.animation_plan = plan
     return plan

@@ -37,6 +37,22 @@ class PlaybackPolishTests(unittest.TestCase):
         clip = self.generated_clip(duration=2.0, processed=2.35)
         self.assertEqual(playback.generated_edge_trim_seconds(clip), 0.05)
 
+    def test_short_subscribe_cta_holds_last_clear_frame_without_looping(self) -> None:
+        clip = self.generated_clip(duration=4.0, processed=4.0)
+        clip.update(
+            {
+                "source_duration_seconds": 1.75,
+                "exact_visual_family_id": "finance_motion",
+                "exact_visual_template_id": "subscribe_cta",
+            }
+        )
+
+        chain = playback.normalized_video_filter(clip, 4.0)
+
+        self.assertIn("tpad=stop_mode=clone", chain)
+        self.assertIn("trim=duration=4.000", chain)
+        self.assertNotIn("setpts=(PTS-STARTPTS)*", chain)
+
     def test_remote_video_keeps_original_normalization_path(self) -> None:
         clip = self.generated_clip()
         clip["provider"] = "pixabay"

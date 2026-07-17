@@ -69,7 +69,7 @@ TEMPLATES = (
     MotionTemplate("index_growth", "Index Fund Growth", "Show regular contributions building long-term market exposure.", tuple("s&p index fund market investing investment".split()), "LOW-COST INDEX FUND", "Small automatic deposits. Long-term market growth."),
     MotionTemplate("compound_growth", "Compound Growth", "Show contributions accelerating through compounding.", tuple("compound interest wealth growth machine future".split()), "COMPOUNDING TAKES OVER", "Time turns consistency into acceleration"),
     MotionTemplate("pay_self_comparison", "Pay Yourself First", "Compare spending-first and investing-first money flows.", tuple("opposite pay yourself first spending wealthy".split()), "TWO DIFFERENT SYSTEMS", "Spend first vs. invest first"),
-    MotionTemplate("subscribe_cta", "Blueprint CTA", "End with an animated subscribe and blueprint call to action.", tuple("subscribe blueprint follow channel".split()), "BUILD YOUR BLUEPRINT", "Subscribe for the next step"),
+    MotionTemplate("subscribe_cta", "Blueprint CTA", "End with animated Like and Subscribe actions beside the completed blueprint.", tuple("subscribe like blueprint follow channel".split()), "BUILD YOUR BLUEPRINT", "Like and subscribe for the next step"),
 )
 TEMPLATE_BY_ID = {item.template_id: item for item in TEMPLATES}
 
