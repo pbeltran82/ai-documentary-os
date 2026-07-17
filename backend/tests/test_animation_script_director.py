@@ -79,11 +79,17 @@ class AnimationScriptDirectorTests(unittest.TestCase):
         plan = director.build_animation_plan(
             self.scene("Welcome. Meet the scientist who changed the field.")
         )
-        self.assertEqual(plan["pose_sequence"], ["walk", "wave", "point", "idle"])
+        self.assertEqual(plan["pose_sequence"], ["step_in", "wave", "point", "idle"])
+
+    def test_paycheck_infographic_uses_grounded_step_in(self) -> None:
+        plan = director.build_animation_plan(
+            self.scene("A paycheck arrives and the first 10 percent goes to your future self.")
+        )
+        self.assertEqual(plan["pose_sequence"][0], "step_in")
 
     def test_generated_plans_use_current_character_studio_version(self) -> None:
         plan = director.build_animation_plan(self.scene("A person considers a difficult choice."))
-        self.assertEqual(plan["version"], "1.9.5")
+        self.assertEqual(plan["version"], "1.9.6")
 
     def test_reusable_performance_library_exposes_directing_patterns(self) -> None:
         catalog = library.preset_catalog()
