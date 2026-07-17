@@ -4,6 +4,7 @@ import math
 
 from PIL import Image, ImageDraw
 
+from . import documentary_assets as assets
 from . import finance_motion as base
 from . import finance_motion_polish as polish
 
@@ -154,39 +155,7 @@ def _icon_wallet(
     accent: tuple[int, int, int] = CYAN,
     empty: bool = False,
 ) -> None:
-    x, y = center
-    width = round(190 * scale)
-    height = round(126 * scale)
-    radius = round(24 * scale)
-    draw.rounded_rectangle(
-        (x - width // 2 + 10, y - height // 2 + 12, x + width // 2 + 10, y + height // 2 + 12),
-        radius=radius,
-        fill=(4, 8, 17),
-    )
-    draw.rounded_rectangle(
-        (x - width // 2, y - height // 2, x + width // 2, y + height // 2),
-        radius=radius,
-        fill=(39, 50, 69),
-        outline=accent,
-        width=max(2, round(4 * scale)),
-    )
-    draw.rounded_rectangle(
-        (x + round(20 * scale), y - round(31 * scale), x + round(100 * scale), y + round(31 * scale)),
-        radius=round(14 * scale),
-        fill=(20, 27, 43),
-        outline=accent,
-        width=max(2, round(3 * scale)),
-    )
-    draw.ellipse(
-        (x + round(48 * scale), y - round(8 * scale), x + round(64 * scale), y + round(8 * scale)),
-        fill=accent,
-    )
-    if empty:
-        draw.line(
-            (x - round(52 * scale), y, x - round(2 * scale), y),
-            fill=CORAL,
-            width=max(2, round(6 * scale)),
-        )
+    assets.render_asset(draw, "wallet", center, scale=scale, accent=accent, state="empty" if empty else "default")
 
 
 def _icon_card(
@@ -197,41 +166,7 @@ def _icon_card(
     accent: tuple[int, int, int] = BLUE,
     declined: bool = False,
 ) -> None:
-    x, y = center
-    width = round(210 * scale)
-    height = round(128 * scale)
-    draw.rounded_rectangle(
-        (x - width // 2 + 10, y - height // 2 + 10, x + width // 2 + 10, y + height // 2 + 10),
-        radius=round(22 * scale),
-        fill=(4, 8, 17),
-    )
-    draw.rounded_rectangle(
-        (x - width // 2, y - height // 2, x + width // 2, y + height // 2),
-        radius=round(22 * scale),
-        fill=(24, 34, 52),
-        outline=accent,
-        width=max(2, round(4 * scale)),
-    )
-    draw.rectangle(
-        (x - width // 2, y - round(32 * scale), x + width // 2, y - round(8 * scale)),
-        fill=accent,
-    )
-    draw.rounded_rectangle(
-        (x - round(70 * scale), y + round(18 * scale), x - round(12 * scale), y + round(38 * scale)),
-        radius=round(5 * scale),
-        fill=(226, 232, 240),
-    )
-    if declined:
-        draw.line(
-            (x - round(82 * scale), y - round(50 * scale), x + round(82 * scale), y + round(50 * scale)),
-            fill=CORAL,
-            width=max(3, round(9 * scale)),
-        )
-        draw.line(
-            (x + round(82 * scale), y - round(50 * scale), x - round(82 * scale), y + round(50 * scale)),
-            fill=CORAL,
-            width=max(3, round(9 * scale)),
-        )
+    assets.render_asset(draw, "payment_card", center, scale=scale, accent=accent, state="declined" if declined else "default")
 
 
 def _icon_house(
@@ -241,24 +176,7 @@ def _icon_house(
     scale: float = 1.0,
     accent: tuple[int, int, int] = AMBER,
 ) -> None:
-    x, y = center
-    half = round(70 * scale)
-    draw.polygon(
-        ((x - half - 12, y - 8), (x, y - half), (x + half + 12, y - 8)),
-        fill=accent,
-    )
-    draw.rounded_rectangle(
-        (x - half, y - 10, x + half, y + half),
-        radius=round(12 * scale),
-        fill=(44, 35, 29),
-        outline=accent,
-        width=max(2, round(4 * scale)),
-    )
-    draw.rounded_rectangle(
-        (x - round(18 * scale), y + round(16 * scale), x + round(18 * scale), y + half),
-        radius=round(8 * scale),
-        fill=(20, 24, 35),
-    )
+    assets.render_asset(draw, "home", center, scale=scale, accent=accent)
 
 
 def _icon_bag(
@@ -268,24 +186,7 @@ def _icon_bag(
     scale: float = 1.0,
     accent: tuple[int, int, int] = GREEN,
 ) -> None:
-    x, y = center
-    width = round(130 * scale)
-    height = round(130 * scale)
-    draw.rounded_rectangle(
-        (x - width // 2, y - height // 3, x + width // 2, y + height // 2),
-        radius=round(16 * scale),
-        fill=(20, 54, 47),
-        outline=accent,
-        width=max(2, round(4 * scale)),
-    )
-    draw.arc(
-        (x - round(38 * scale), y - round(76 * scale), x + round(38 * scale), y + round(10 * scale)),
-        190,
-        350,
-        fill=accent,
-        width=max(2, round(8 * scale)),
-    )
-    draw.ellipse((x - 12, y - 4, x + 12, y + 20), fill=accent)
+    assets.render_asset(draw, "groceries", center, scale=scale, accent=accent)
 
 
 def _icon_calendar(
@@ -296,22 +197,8 @@ def _icon_calendar(
     accent: tuple[int, int, int] = BLUE,
     day: str = "15",
 ) -> None:
-    x, y = center
-    width = round(190 * scale)
-    height = round(174 * scale)
-    draw.rounded_rectangle(
-        (x - width // 2, y - height // 2, x + width // 2, y + height // 2),
-        radius=round(24 * scale),
-        fill=(22, 31, 48),
-        outline=accent,
-        width=max(2, round(4 * scale)),
-    )
-    draw.rounded_rectangle(
-        (x - width // 2, y - height // 2, x + width // 2, y - round(36 * scale)),
-        radius=round(22 * scale),
-        fill=accent,
-    )
-    _value(draw, (x, y + round(22 * scale)), day, size=round(64 * scale), anchor="mm")
+    assets.render_asset(draw, "calendar", center, scale=scale, accent=accent)
+    _value(draw, (center[0], center[1] + round(20 * scale)), day, size=round(36 * scale), anchor="mm")
 
 
 def _icon_bank(
@@ -321,23 +208,18 @@ def _icon_bank(
     scale: float = 1.0,
     accent: tuple[int, int, int] = PURPLE,
 ) -> None:
-    x, y = center
-    width = round(210 * scale)
-    roof_y = y - round(76 * scale)
-    draw.polygon(
-        ((x - width // 2, y - round(26 * scale)), (x, roof_y), (x + width // 2, y - round(26 * scale))),
-        fill=accent,
-    )
-    for offset in (-72, -24, 24, 72):
-        draw.rounded_rectangle(
-            (x + round(offset * scale) - round(12 * scale), y - round(18 * scale), x + round(offset * scale) + round(12 * scale), y + round(62 * scale)),
-            radius=round(5 * scale),
-            fill=(52, 61, 82),
-        )
-    draw.rectangle(
-        (x - width // 2, y + round(62 * scale), x + width // 2, y + round(82 * scale)),
-        fill=accent,
-    )
+    assets.render_asset(draw, "bank", center, scale=scale, accent=accent)
+
+
+def _icon_paycheck(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    *,
+    scale: float = 1.0,
+    accent: tuple[int, int, int] = GREEN,
+    received: bool = False,
+) -> None:
+    assets.render_asset(draw, "paycheck", center, scale=scale, accent=accent, state="received" if received else "default")
 
 
 def _coin(
