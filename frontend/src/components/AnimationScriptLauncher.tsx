@@ -3,7 +3,7 @@ import "../animation-script.css";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
-type ProjectSummary = { id: number; title: string };
+type ProjectSummary = { id: number; title: string; video_format: "youtube" | "shorts" };
 type SceneSummary = { id: number; scene_number: number; narration: string; visual_intent: string };
 type ProjectDetail = ProjectSummary & { scenes: SceneSummary[] };
 type AnimationPlan = {
@@ -197,7 +197,7 @@ export function AnimationScriptLauncher() {
               {PERFORMANCE_METHODS.map((method) => <button key={method} type="button" onClick={() => addPerformanceMethod(method)}>+ {performanceLabel(method)}</button>)}
             </div>
           </div>
-          <figure className="animation-script-preview wide">
+          <figure className={`animation-script-preview wide ${project?.video_format ?? "youtube"}`}>
             <div><span>DIRECTED FRAME PREVIEW</span><small>Uses the saved poses, expressions, cinematic style, and scene timing.</small></div>
             <img key={previewUrl} src={previewUrl} alt="Directed Character Studio scene preview" />
           </figure>

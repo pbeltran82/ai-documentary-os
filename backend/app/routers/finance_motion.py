@@ -29,6 +29,11 @@ from ..services.exact_visuals import (
 from ..services.exact_visual_timing import effective_exact_visual_duration
 from ..services.manifest_events import defer_manifest_refresh, refresh_project_manifests
 from ..services.media_library import resolve_media_path
+from ..services.video_format import (
+    format_exact_visual_frame,
+    project_video_format,
+    video_format_profile,
+)
 from .assets import update_project_asset_status
 
 router = APIRouter(tags=["exact-visuals"])
@@ -79,6 +84,8 @@ def exact_visual_suggestion(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     scene = get_scene_or_404(scene_id, db)
+    video_format = project_video_format(scene)
+    format_profile = video_format_profile(video_format)
     family_id, family_confidence, family_reason = recommend_family(scene)
     family_items = family_catalog()
     family_by_id = {str(item["family_id"]): item for item in family_items}
@@ -109,6 +116,9 @@ def exact_visual_suggestion(
         "templates_by_family": templates_by_family,
         "styles": style_catalog(),
         "default_style_id": DEFAULT_STYLE_ID,
+        "video_format": video_format,
+        "output_width": format_profile.width,
+        "output_height": format_profile.height,
     }
 
 
@@ -127,11 +137,16 @@ def exact_visual_storyboard(
         resolved_template,
         scene.duration_seconds,
     )
+    video_format = project_video_format(scene)
+    format_profile = video_format_profile(video_format)
     return {
         "family_id": resolved_family,
         "template_id": resolved_template,
         "duration_seconds": duration,
         "beats": storyboard_beats(resolved_family, resolved_template, duration),
+        "video_format": video_format,
+        "output_width": format_profile.width,
+        "output_height": format_profile.height,
     }
 
 
@@ -173,6 +188,12 @@ def exact_visual_preview(
             preview_time,
             style_id or DEFAULT_STYLE_ID,
         )
+    frame = format_exact_visual_frame(
+        frame,
+        project_video_format(scene),
+        resolved_family,
+        resolved_template,
+    )
     output = BytesIO()
     frame.save(output, format="PNG", optimize=True)
     return Response(
@@ -215,26 +236,28 @@ def generate_exact_visual(
         "provider": "generated",
         "provider_asset_id": (
             f"{family_slug}-{generated.template.template_id}-"
-            f"{generated.style.style_id}-scene-{scene.id}"
+            f"{generated.style.style_id}-{generated.video_format}-scene-{scene.id}"
         ),
         "media_type": "video",
         "source_url": (
             f"local://exact-visual/{resolved_family}/"
-            f"{generated.template.template_id}/{generated.style.style_id}"
+            f"{generated.template.template_id}/{generated.style.style_id}/"
+            f"{generated.video_format}"
         ),
         "preview_url": generated.preview_url,
         "download_url": generated.media_url,
         "remote_download_url": "",
         "creator": "AI Documentary OS",
         "creator_url": "",
-        "width": 1920,
-        "height": 1080,
+        "width": generated.width,
+        "height": generated.height,
         "duration_seconds": generated.duration_seconds,
         "license_name": "Project-owned generated media",
         "license_url": "",
         "attribution": (
             "Generated locally by AI Documentary OS Exact Visual Studio v1.8.0 · "
-            f"{family_label} · {generated.style.label}"
+            f"{family_label} · {generated.style.label} · "
+            f"{video_format_profile(generated.video_format).label}"
         ),
         "local_path": generated.media_relative_path,
         "local_preview_path": generated.preview_relative_path,

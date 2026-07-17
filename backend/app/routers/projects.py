@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Project, Scene
-from ..schemas import ProjectCreate, ProjectDetail, ProjectRead
+from ..schemas import ProjectCreate, ProjectDetail, ProjectRead, ProjectUpdate
 from ..services.media_library import remove_project_directory
+from ..services.render_invalidation import invalidate_render_artifacts
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -24,6 +25,24 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> Pro
     db.add(project)
     db.commit()
     db.refresh(project)
+    return project
+
+
+@router.patch("/{project_id}", response_model=ProjectRead)
+def update_project(
+    project_id: int,
+    payload: ProjectUpdate,
+    db: Session = Depends(get_db),
+) -> Project:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.video_format != payload.video_format:
+        project.video_format = payload.video_format
+        db.commit()
+        db.refresh(project)
+        invalidate_render_artifacts(project_id)
     return project
 
 

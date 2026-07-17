@@ -6,6 +6,7 @@ import type {
   TimelinePlan,
   TimelineStyle,
   TransitionStyle,
+  VideoFormat,
 } from "../types";
 
 interface TimelineBuilderProps {
@@ -15,6 +16,7 @@ interface TimelineBuilderProps {
   onBack: () => void;
   onOpenAssets: () => void;
   onOpenScenes: () => void;
+  onProjectChanged: () => Promise<void> | void;
 }
 
 const defaultTimelineStyle: TimelineStyle = {
@@ -91,6 +93,7 @@ export function TimelineBuilder({
   onBack,
   onOpenAssets,
   onOpenScenes,
+  onProjectChanged,
 }: TimelineBuilderProps) {
   const [plan, setPlan] = useState<TimelinePlan | null>(null);
   const [style, setStyle] = useState<TimelineStyle>(defaultTimelineStyle);
@@ -99,6 +102,7 @@ export function TimelineBuilder({
   const [rendering, setRendering] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [removingAudio, setRemovingAudio] = useState(false);
+  const [switchingFormat, setSwitchingFormat] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [localError, setLocalError] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -188,6 +192,20 @@ export function TimelineBuilder({
 
   async function applyMotionPlan() {
     await buildPlan(style);
+  }
+
+  async function switchVideoFormat(nextFormat: VideoFormat) {
+    if (nextFormat === project.video_format) return;
+    setSwitchingFormat(true);
+    setLocalError("");
+    try {
+      await api.updateProject(project.id, { video_format: nextFormat });
+      await onProjectChanged();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Unable to switch video format");
+    } finally {
+      setSwitchingFormat(false);
+    }
   }
 
   async function renderFirstCut() {
@@ -294,6 +312,46 @@ export function TimelineBuilder({
         </article>
       </section>
 
+      <section className="panel format-control-panel">
+        <div className="format-control-copy">
+          <p className="eyebrow">DELIVERY FORMAT</p>
+          <h3>Choose the canvas before the final render</h3>
+          <p>
+            This setting controls exact visuals, still-photo treatment, stock-footage framing,
+            preview shape, and final FFmpeg output for the whole project.
+          </p>
+        </div>
+        <div className="format-switch" role="group" aria-label="Video format">
+          <button
+            className={project.video_format === "youtube" ? "active" : ""}
+            aria-pressed={project.video_format === "youtube"}
+            disabled={switchingFormat || rendering}
+            onClick={() => void switchVideoFormat("youtube")}
+          >
+            <span className="format-glyph landscape" aria-hidden="true" />
+            <strong>YouTube</strong>
+            <small>16:9 · 1920×1080</small>
+          </button>
+          <button
+            className={project.video_format === "shorts" ? "active" : ""}
+            aria-pressed={project.video_format === "shorts"}
+            disabled={switchingFormat || rendering}
+            onClick={() => void switchVideoFormat("shorts")}
+          >
+            <span className="format-glyph portrait" aria-hidden="true" />
+            <strong>Shorts</strong>
+            <small>9:16 · 1080×1920</small>
+          </button>
+        </div>
+        <p className="format-control-note">
+          {switchingFormat
+            ? "Switching canvas and rebuilding the render plan…"
+            : project.video_format === "shorts"
+              ? "Vertical-safe reflow is active. Regenerate exact visuals for the strongest native Shorts composition."
+              : "Landscape production is active. Existing projects remain on this format by default."}
+        </p>
+      </section>
+
       <section className="panel motion-control-panel">
         <div className="section-heading">
           <div>
@@ -372,7 +430,7 @@ export function TimelineBuilder({
         <div className="motion-control-footer">
           <p>
             Crossfade handles overlap outside the scene slots, so the narration and final runtime stay exact.
-            Editorial mode chooses a restrained push, pull, pan, or steady hold per scene. Still photos use a soft 16:9 background; stock videos keep native motion.
+            Editorial mode chooses a restrained push, pull, pan, or steady hold per scene. Still photos use a soft {project.video_format === "shorts" ? "9:16" : "16:9"} background; stock videos keep native motion.
           </p>
           <button
             className="secondary-button"
@@ -399,7 +457,7 @@ export function TimelineBuilder({
           <div className="timeline-readiness">
             <strong>{readyAssets} of {project.scenes.length} scenes ready</strong>
             <p>
-              Clips are normalized to 1080p, timed exactly, given the saved motion treatment, and assembled in narration order.
+              Clips are normalized to {project.video_format === "shorts" ? "1080×1920 Shorts" : "1920×1080 YouTube"}, timed exactly, given the saved motion treatment, and assembled in narration order.
             </p>
             <p className="motion-summary">
               {transitionLabels[style.transition_style]} · {motionLabels[style.photo_motion]} · {style.edge_fade_seconds}s edge fade
@@ -569,13 +627,20 @@ export function TimelineBuilder({
                   : "Motion preview"}
             </span>
           </div>
-          <video key={previewUrl} className="timeline-video" controls playsInline src={previewUrl} />
+          <video
+            key={previewUrl}
+            className={`timeline-video ${plan.settings.video_format}`}
+            controls
+            playsInline
+            src={previewUrl}
+          />
           <div className="render-meta">
             <span>{formatBytes(plan.output_size_bytes)}</span>
             <span>{formatTime(plan.runtime_seconds)}</span>
             <span>{plan.voiceover ? "AAC narration" : "No audio"}</span>
             <span>{transitionLabels[plan.settings.transition_style]}</span>
             <span>{motionLabels[plan.settings.photo_motion]}</span>
+            <span>{plan.settings.format_label} · {plan.settings.aspect_ratio}</span>
             {isTrimmedExcerpt && narrationCoverage && (
               <span>{formatSeconds(narrationCoverage.uncoveredSeconds)} narration not yet covered</span>
             )}

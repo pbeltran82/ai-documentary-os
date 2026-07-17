@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+VideoFormat = Literal["youtube", "shorts"]
+
 
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
@@ -15,6 +17,11 @@ class ProjectCreate(BaseModel):
     visual_style: str = Field(
         default="Cinematic documentary", min_length=2, max_length=200
     )
+    video_format: VideoFormat = "youtube"
+
+
+class ProjectUpdate(BaseModel):
+    video_format: VideoFormat
 
 
 class ProjectRead(ProjectCreate):

@@ -22,6 +22,7 @@ class Project(Base):
     audience: Mapped[str] = mapped_column(String(200), default="General audience", nullable=False)
     tone: Mapped[str] = mapped_column(String(120), default="Cinematic", nullable=False)
     visual_style: Mapped[str] = mapped_column(String(200), default="Cinematic documentary", nullable=False)
+    video_format: Mapped[str] = mapped_column(String(20), default="youtube", nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="planning", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

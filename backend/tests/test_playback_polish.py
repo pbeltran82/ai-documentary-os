@@ -60,6 +60,37 @@ class PlaybackPolishTests(unittest.TestCase):
         self.assertIn("trim=duration=4.350", chain)
         self.assertNotIn("trim=start=", chain)
 
+    def test_legacy_landscape_generated_visual_gets_ambient_shorts_frame(self) -> None:
+        clip = self.generated_clip()
+        clip.update(
+            {
+                "video_format": "shorts",
+                "output_width": 1080,
+                "output_height": 1920,
+                "source_width": 1920,
+                "source_height": 1080,
+            }
+        )
+        chain = playback.normalized_video_filter(clip, 4.35)
+        self.assertIn("split=2[generated_bg_0][generated_fg_0]", chain)
+        self.assertIn("gblur=sigma=32", chain)
+        self.assertIn("overlay=(W-w)/2:(H-h)/2", chain)
+
+    def test_vertical_generated_visual_stays_safe_when_switching_back_to_youtube(self) -> None:
+        clip = self.generated_clip()
+        clip.update(
+            {
+                "video_format": "youtube",
+                "output_width": 1920,
+                "output_height": 1080,
+                "source_width": 1080,
+                "source_height": 1920,
+            }
+        )
+        chain = playback.normalized_video_filter(clip, 4.35)
+        self.assertIn("split=2[generated_bg_0][generated_fg_0]", chain)
+        self.assertIn("scale=1920:1080:force_original_aspect_ratio=increase", chain)
+
     def test_narration_filter_targets_finished_web_loudness(self) -> None:
         graph = playback.build_filter_graph(
             [self.generated_clip(duration=4.0, processed=4.0)],

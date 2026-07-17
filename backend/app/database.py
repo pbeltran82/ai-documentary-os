@@ -64,6 +64,11 @@ def migrate_sqlite_schema() -> None:
     with engine.begin() as connection:
         _add_missing_columns(
             connection,
+            "projects",
+            {"video_format": "VARCHAR(20) NOT NULL DEFAULT 'youtube'"},
+        )
+        _add_missing_columns(
+            connection,
             "assets",
             {
                 "license_name": "VARCHAR(200) NOT NULL DEFAULT ''",

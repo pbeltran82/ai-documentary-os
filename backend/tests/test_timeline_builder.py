@@ -114,7 +114,7 @@ class TimelineBuilderTests(unittest.TestCase):
             plan = timeline_builder.write_timeline_plan(project)
 
         self.assertTrue(plan["ready"])
-        self.assertEqual(plan["schema_version"], "0.4")
+        self.assertEqual(plan["schema_version"], "0.5")
         self.assertEqual(plan["clip_count"], 1)
         self.assertEqual(plan["runtime_seconds"], 5)
         self.assertIn("-stream_loop", plan["command"])
@@ -145,6 +145,22 @@ class TimelineBuilderTests(unittest.TestCase):
         self.assertIn("overlay=(W-w)/2:(H-h)/2", filter_graph)
         self.assertEqual(plan["clips"][0]["motion_effect"], "static")
         self.assertIn("readability", plan["clips"][0]["motion_reason"].lower())
+
+    def test_shorts_plan_uses_vertical_output_and_fill_crop_for_stock_video(self) -> None:
+        project = self.make_project("video")
+        project.video_format = "shorts"
+        with patch.object(timeline_builder, "ffmpeg_executable", return_value="ffmpeg"):
+            plan = timeline_builder.build_timeline_plan(project)
+
+        self.assertEqual(plan["schema_version"], "0.5")
+        self.assertEqual(plan["settings"]["video_format"], "shorts")
+        self.assertEqual(plan["settings"]["aspect_ratio"], "9:16")
+        self.assertEqual(plan["settings"]["width"], 1080)
+        self.assertEqual(plan["settings"]["height"], 1920)
+        filter_graph = plan["command"][plan["command"].index("-filter_complex") + 1]
+        self.assertIn("scale=1080:1920:force_original_aspect_ratio=increase", filter_graph)
+        self.assertIn("crop=1080:1920", filter_graph)
+        self.assertIn("fit 9:16", plan["clips"][0]["assembly_action"])
 
     def test_crossfade_preserves_exact_timeline_runtime(self) -> None:
         project = self.make_project("video")

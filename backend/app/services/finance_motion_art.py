@@ -18,6 +18,11 @@ from .exact_visual_timing import (
     effective_exact_visual_duration,
 )
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
+from .video_format import (
+    format_exact_visual_frame,
+    project_video_format,
+    video_format_profile,
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +47,9 @@ class ArtDirectedMotion:
     size_bytes: int
     checksum_sha256: str
     duration_seconds: float
+    width: int
+    height: int
+    video_format: str
 
 
 STYLES = (
@@ -291,9 +299,11 @@ def _encode_frames(
     style: MotionStyle,
     duration_seconds: float,
     output_path: Path,
+    video_format: str = "youtube",
 ) -> None:
+    profile = video_format_profile(video_format)
     process = subprocess.Popen(
-        ffmpeg_encoder_command(ffmpeg, output_path),
+        ffmpeg_encoder_command(ffmpeg, output_path, profile.width, profile.height),
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -303,12 +313,18 @@ def _encode_frames(
     try:
         assert process.stdin is not None
         for index in range(frame_count):
+            frame = render_frame(
+                template.template_id,
+                duration_seconds,
+                min(duration_seconds, index / engine.OUTPUT_FPS),
+                style.style_id,
+            )
             process.stdin.write(
-                render_frame(
+                format_exact_visual_frame(
+                    frame,
+                    video_format,
+                    "finance_motion",
                     template.template_id,
-                    duration_seconds,
-                    min(duration_seconds, index / engine.OUTPUT_FPS),
-                    style.style_id,
                 ).tobytes()
             )
         process.stdin.close()
@@ -360,11 +376,14 @@ def render_finance_motion(
         ),
         3,
     )
+    video_format = project_video_format(scene)
+    profile = video_format_profile(video_format)
     asset_directory = project_directory(scene.project_id) / "assets"
     asset_directory.mkdir(parents=True, exist_ok=True)
     stem = asset_directory / (
         f"scene-{scene.scene_number:03d}-finance-"
-        f"{safe_component(template.template_id)}-{safe_component(style.style_id)}"
+        f"{safe_component(template.template_id)}-{safe_component(style.style_id)}-"
+        f"{video_format}"
     )
     media_path = stem.with_suffix(".mp4")
     preview_path = Path(f"{stem}-poster.jpg")
@@ -374,13 +393,18 @@ def render_finance_motion(
     temporary_preview.unlink(missing_ok=True)
 
     try:
-        _encode_frames(ffmpeg, template, style, duration, temporary_media)
+        _encode_frames(ffmpeg, template, style, duration, temporary_media, video_format)
         poster_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
-        render_frame(
+        format_exact_visual_frame(
+            render_frame(
+                template.template_id,
+                duration,
+                poster_time,
+                style.style_id,
+            ),
+            video_format,
+            "finance_motion",
             template.template_id,
-            duration,
-            poster_time,
-            style.style_id,
         ).save(temporary_preview, format="JPEG", quality=93, optimize=True)
         temporary_media.replace(media_path)
         temporary_preview.replace(preview_path)
@@ -411,4 +435,7 @@ def render_finance_motion(
         size_bytes=media_path.stat().st_size,
         checksum_sha256=engine._checksum(media_path),
         duration_seconds=duration,
+        width=profile.width,
+        height=profile.height,
+        video_format=video_format,
     )
