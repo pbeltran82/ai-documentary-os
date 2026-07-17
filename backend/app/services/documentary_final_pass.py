@@ -2,25 +2,21 @@ from __future__ import annotations
 
 """Final editorial pass for PR #40.
 
-This module intentionally changes only two things:
+This module changes only the review findings:
 
-1. project-level Tech & Behavior template variety, and
-2. the terminal Shorts thesis/CTA layout.
-
-Everything else in the approved visual-polish layer remains untouched.
+1. project-level Tech & Behavior template variety,
+2. the terminal Shorts thesis/CTA layout, and
+3. the regular 16:9 Tech & Behavior background/character finish.
 """
 
 from collections import Counter
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from . import documentary_visual_polish as polish
 from . import tech_behavior_route_patch as route
 
 
-# Strongly discourage the three concepts that were visibly repeating in the
-# reviewed Short. They remain available when narration makes them necessary,
-# but unused visual ideas win before a repeated one does.
 _REPEAT_SENSITIVE = {
     "digital_footprint_collector",
     "machine_choice_explainer",
@@ -91,8 +87,6 @@ def _score_templates_with_prior(
         elif template_id == route.CTA_TEMPLATE_ID and decisive_template_id != route.CTA_TEMPLATE_ID:
             value -= 12
 
-        # Stay semantically close when an unused option exists inside the same
-        # visual family, but do not force a repeat after that family is exhausted.
         if variant_group is not None and template_id not in variant_group and unused_group_templates:
             value -= 95
 
@@ -108,9 +102,6 @@ def _score_templates_with_prior(
         if prior and template_id == prior[-1]:
             value -= IMMEDIATE_REPEAT_PENALTY
 
-        # Ranking and behavioral-signal scenes can look repetitive even when
-        # their exact template IDs differ, so penalize recently used semantic
-        # siblings as well as exact duplicates.
         for members in route.SEMANTIC_VARIANT_GROUPS.values():
             if template_id in members and any(item in members for item in prior[-3:]):
                 value -= SEMANTIC_GROUP_REPEAT_PENALTY
@@ -139,8 +130,6 @@ def _clean_story_cta(canvas: Image.Image, progress: float) -> None:
     thesis_reveal = shorts._phase(progress, 0.02, 0.24)
     cta_reveal = shorts._phase(progress, 0.48, 0.74)
 
-    # Cover the lower ranking/funnel graphics so the conclusion never competes
-    # with a green score chip or other underlying renderer detail.
     panel = (48, 1080, 1032, 1665)
     draw.rounded_rectangle(
         panel,
@@ -163,32 +152,11 @@ def _clean_story_cta(canvas: Image.Image, progress: float) -> None:
         thesis_color,
         bold=True,
     )
-    shorts._text(
-        draw,
-        (shorts.SAFE_LEFT, 1260),
-        "THOSE PREDICTIONS SHAPE",
-        27,
-        support_color,
-        bold=True,
-    )
-    shorts._text(
-        draw,
-        (shorts.SAFE_LEFT, 1302),
-        "WHAT REACHES YOU NEXT.",
-        27,
-        support_color,
-        bold=True,
-    )
+    shorts._text(draw, (shorts.SAFE_LEFT, 1260), "THOSE PREDICTIONS SHAPE", 27, support_color, bold=True)
+    shorts._text(draw, (shorts.SAFE_LEFT, 1302), "WHAT REACHES YOU NEXT.", 27, support_color, bold=True)
 
     if cta_reveal <= 0.01:
-        shorts._text(
-            draw,
-            (shorts.SAFE_LEFT, 1515),
-            "AI DOCUMENTARY OS",
-            19,
-            (78, 91, 112),
-            bold=True,
-        )
+        shorts._text(draw, (shorts.SAFE_LEFT, 1515), "AI DOCUMENTARY OS", 19, (78, 91, 112), bold=True)
         return
 
     red = _blend((46, 31, 42), shorts.RED, cta_reveal)
@@ -212,15 +180,54 @@ def _clean_story_cta(canvas: Image.Image, progress: float) -> None:
     )
 
 
+def _clean_landscape_background(style_id: str, time_seconds: float) -> Image.Image:
+    """Replace the moving desktop grid with a quiet editorial gradient."""
+    base = route.base
+    palette = base._palette(style_id)
+    width, height = base.OUTPUT_WIDTH, base.OUTPUT_HEIGHT
+
+    gradient = Image.new("RGB", (1, height))
+    pixels = gradient.load()
+    top = palette["background"]
+    bottom = _blend(palette["background"], palette["panel"], 0.46)
+    for y in range(height):
+        amount = y / max(1, height - 1)
+        pixels[0, y] = _blend(top, bottom, amount)
+    image = gradient.resize((width, height))
+
+    # Large, blurred editorial glows add depth without visible guide lines.
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(glow)
+    drift = round(36 * __import__("math").sin(float(time_seconds) * 0.24))
+    draw.ellipse((-260 + drift, 130, 920 + drift, 1210), fill=(*palette["accent_alt"], 22))
+    draw.ellipse((1120 - drift, 180, 2200 - drift, 1050), fill=(*palette["accent"], 17))
+    glow = glow.filter(ImageFilter.GaussianBlur(190))
+    image = Image.alpha_composite(image.convert("RGBA"), glow).convert("RGB")
+
+    # A subtle floor vignette grounds figures without creating a grid.
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    ImageDraw.Draw(overlay).ellipse((180, 760, 1740, 1210), fill=(0, 0, 0, 38))
+    return Image.alpha_composite(image.convert("RGBA"), overlay.filter(ImageFilter.GaussianBlur(70))).convert("RGB")
+
+
 def install_final_pass() -> None:
-    """Install the narrowly scoped routing and CTA fixes."""
+    """Install routing, CTA, desktop background, and character fixes before render."""
     route.PROJECT_REUSE_LIMIT = PROJECT_REUSE_LIMIT
     route.PRIOR_USE_PENALTY = PRIOR_USE_PENALTY
     route.RECENT_USE_PENALTY = RECENT_USE_PENALTY
     route.IMMEDIATE_REPEAT_PENALTY = IMMEDIATE_REPEAT_PENALTY
     route.PROJECT_OVERUSE_PENALTY = PROJECT_OVERUSE_PENALTY
     route._score_templates_with_prior = _score_templates_with_prior
+
     polish._story_cta = _clean_story_cta
+    polish.install_landscape_character_patch()
+
+    # Patch the actual module globals used while 16:9 frames are created. This
+    # must happen before render_frame runs; installing it in video_format was too late.
+    route.base._base_frame = _clean_landscape_background
+    route.base._person_wireframe = polish._landscape_person
+    route.truthful.base._base_frame = _clean_landscape_background
+    route.truthful.base._person_wireframe = polish._landscape_person
 
 
 install_final_pass()
