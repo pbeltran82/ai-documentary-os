@@ -12,10 +12,69 @@ from app.services import exact_visuals
 class ExpressiveCharacterTests(unittest.TestCase):
     def test_character_studio_animation_vocabulary_is_supported(self) -> None:
         expected = {
-            "walk", "run", "look", "think", "celebrate", "point", "wave",
+            "step_in", "walk", "run", "look", "think", "celebrate", "point", "wave",
             "shrug", "confused", "nod", "shake_head", "type", "swipe", "tap", "idle",
         }
         self.assertTrue(expected.issubset(character_pose_stability.SUPPORTED_POSES))
+
+    def test_step_in_moves_once_and_settles_at_the_stage_anchor(self) -> None:
+        from PIL import Image
+
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (139, 92, 246),
+            "person_alt": (139, 92, 246),
+            "skin": (251, 191, 145),
+            "accent": (34, 211, 238),
+        }
+
+        def character_center(time_seconds: float) -> float:
+            canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+            expressive._CURRENT_TIME = time_seconds
+            expressive._CURRENT_DURATION = 6.0
+            expressive._expressive_person(
+                ImageDraw.Draw(canvas),
+                (350, 620),
+                palette,
+                scale=1.2,
+                pose="step_in",
+            )
+            body_x = [
+                x
+                for y in range(330, 650)
+                for x in range(180, 520)
+                if canvas.getpixel((x, y)) == palette["person"]
+            ]
+            return sum(body_x) / len(body_x)
+
+        self.assertGreater(character_center(0.90) - character_center(0.03), 24)
+        self.assertAlmostEqual(character_center(0.90), character_center(1.40), delta=1.5)
+
+    def test_primary_and_alternate_characters_have_distinct_hair(self) -> None:
+        from PIL import Image
+
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (34, 211, 238),
+            "person_alt": (34, 211, 238),
+            "skin": (251, 191, 145),
+            "accent": (34, 211, 238),
+        }
+        heads = []
+        for alternate in (False, True):
+            canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+            expressive._CURRENT_TIME = 0.3
+            expressive._CURRENT_DURATION = 4.0
+            expressive._expressive_person(
+                ImageDraw.Draw(canvas),
+                (350, 620),
+                palette,
+                scale=1.3,
+                pose="idle",
+                alternate=alternate,
+            )
+            heads.append(canvas.crop((275, 205, 430, 365)))
+        self.assertIsNotNone(ImageChops.difference(*heads).getbbox())
 
     def test_new_performance_methods_render_distinct_motion(self) -> None:
         from PIL import Image
