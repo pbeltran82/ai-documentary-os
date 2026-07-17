@@ -175,11 +175,11 @@ def synthesize_narration(
     if manifest is None:
         raise NarrationSynthesisError("Plan narration before synthesis")
 
-    attempted = completed = failed = skipped = 0
+    attempted = completed = failed = skipped = filtered_out = 0
     for segment in manifest.get("segments", []):
         scene_number = int(segment.get("scene_number", 0))
         if scene_numbers and scene_number not in scene_numbers:
-            skipped += 1
+            filtered_out += 1
             continue
         if segment.get("status") == "complete" and not force:
             skipped += 1
@@ -220,6 +220,7 @@ def synthesize_narration(
         "completed": completed,
         "failed": failed,
         "skipped": skipped,
+        "filtered_out": filtered_out,
     }
     _write_json(_manifest_path(project.id), manifest)
 
