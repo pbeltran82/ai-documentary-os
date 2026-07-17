@@ -28,7 +28,7 @@ type PerformancePreset = {
 };
 
 const PERFORMANCE_METHODS = [
-  "idle", "walk", "run", "look", "think", "point", "wave", "shrug",
+  "idle", "step_in", "walk", "run", "look", "think", "point", "wave", "shrug",
   "confused", "nod", "shake_head", "type", "swipe", "tap", "celebrate",
 ] as const;
 
