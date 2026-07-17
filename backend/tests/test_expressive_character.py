@@ -84,6 +84,7 @@ class ExpressiveCharacterTests(unittest.TestCase):
             "person": (139, 92, 246),
             "person_alt": (34, 211, 238),
             "skin": (251, 191, 145),
+            "denim": (48, 86, 132),
             "accent": (34, 211, 238),
         }
         for pose in ("run", "look", "think", "wave", "shrug", "confused", "nod", "shake_head", "type", "swipe"):
@@ -107,6 +108,7 @@ class ExpressiveCharacterTests(unittest.TestCase):
             "person": (139, 92, 246),
             "person_alt": (34, 211, 238),
             "skin": (251, 191, 145),
+            "denim": (48, 86, 132),
             "accent": (34, 211, 238),
         }
 
@@ -121,15 +123,77 @@ class ExpressiveCharacterTests(unittest.TestCase):
                 scale=1.2,
                 pose="walk",
             )
-            body = palette["person"]
-            left = [y for y in range(520, 680) for x in range(180, 350) if canvas.getpixel((x, y)) == body]
-            right = [y for y in range(520, 680) for x in range(350, 530) if canvas.getpixel((x, y)) == body]
+            pants = palette["denim"]
+            left = [y for y in range(520, 680) for x in range(180, 350) if canvas.getpixel((x, y)) == pants]
+            right = [y for y in range(520, 680) for x in range(350, 530) if canvas.getpixel((x, y)) == pants]
             return max(left), max(right)
 
         left_planted = foot_bottoms(0.25)
         right_planted = foot_bottoms(0.75)
         self.assertGreater(left_planted[0], left_planted[1])
         self.assertGreater(right_planted[1], right_planted[0])
+
+    def test_head_has_one_ink_contour_without_a_shirt_colored_halo(self) -> None:
+        from PIL import Image
+
+        canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (67, 185, 166),
+            "person_alt": (224, 174, 83),
+            "skin": (238, 187, 145),
+            "accent": (174, 235, 222),
+            "hair": (35, 31, 29),
+        }
+        expressive._CURRENT_TIME = 0.4
+        expressive._CURRENT_DURATION = 4.0
+        expressive._expressive_person(
+            ImageDraw.Draw(canvas),
+            (350, 620),
+            palette,
+            scale=1.2,
+            pose="idle",
+        )
+        head_crop = canvas.crop((295, 260, 415, 390))
+        self.assertEqual(
+            sum(1 for pixel in head_crop.getdata() if pixel == palette["person"]),
+            0,
+        )
+
+    def test_outfit_separates_shirt_jeans_shoes_and_skin(self) -> None:
+        from PIL import Image
+
+        canvas = Image.new("RGB", (700, 700), (255, 255, 255))
+        palette = {
+            "ink": (9, 14, 27),
+            "person": (67, 185, 166),
+            "person_alt": (224, 174, 83),
+            "skin": (238, 187, 145),
+            "denim": (47, 84, 129),
+            "denim_alt": (40, 72, 110),
+            "shoe": (29, 37, 49),
+            "accent": (174, 235, 222),
+        }
+        expressive._CURRENT_TIME = 0.4
+        expressive._CURRENT_DURATION = 4.0
+        expressive._expressive_person(
+            ImageDraw.Draw(canvas),
+            (350, 620),
+            palette,
+            scale=1.2,
+            pose="idle",
+        )
+        pixels = list(canvas.getdata())
+        self.assertGreater(pixels.count(palette["person"]), 3000)
+        self.assertGreater(pixels.count(palette["denim"]), 1000)
+        self.assertGreater(pixels.count(palette["shoe"]), 500)
+        skin_below_head = sum(
+            1
+            for y in range(385, 650)
+            for x in range(180, 520)
+            if canvas.getpixel((x, y)) == palette["skin"]
+        )
+        self.assertGreater(skin_below_head, 500)
 
     def test_celebration_keeps_open_hands_out_of_stick_up_zone(self) -> None:
         from PIL import Image
