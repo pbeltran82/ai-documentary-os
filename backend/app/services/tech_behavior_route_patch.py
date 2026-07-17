@@ -283,3 +283,8 @@ storyboard_beats = truthful.storyboard_beats
 prediction_confidence_state = truthful.prediction_confidence_state
 render_frame = truthful.render_frame
 render_tech_motion = truthful.render_tech_motion
+
+# Install the final review pass only after every Tech & Behavior renderer symbol is
+# fully initialized. This ensures the desktop background and character patches
+# apply before render_frame draws its first pixel.
+from . import documentary_final_pass as _documentary_final_pass  # noqa: E402,F401
