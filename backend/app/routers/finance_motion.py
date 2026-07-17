@@ -25,11 +25,13 @@ from ..services.exact_visuals import (
     style_catalog,
     suggest_template,
     template_catalog,
+    template_definition,
 )
 from ..services.exact_visual_timing import effective_exact_visual_duration
 from ..services.manifest_events import defer_manifest_refresh, refresh_project_manifests
 from ..services.media_library import resolve_media_path
 from ..services.video_format import (
+    exact_visual_source_time,
     format_exact_visual_frame,
     project_video_format,
     video_format_profile,
@@ -172,12 +174,14 @@ def exact_visual_preview(
         if time_seconds is not None
         else min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
     )
+    video_format = project_video_format(scene)
+    source_time = exact_visual_source_time(video_format, duration, preview_time)
     if resolved_family == CHARACTER_FAMILY_ID:
         frame = animation_script_runtime.render_planned_frame(
             scene,
             resolved_template,
             duration,
-            preview_time,
+            source_time,
             style_id or DEFAULT_STYLE_ID,
         )
     else:
@@ -185,14 +189,18 @@ def exact_visual_preview(
             resolved_family,
             resolved_template,
             duration,
-            preview_time,
+            source_time,
             style_id or DEFAULT_STYLE_ID,
         )
+    template = template_definition(resolved_family, resolved_template)
     frame = format_exact_visual_frame(
         frame,
-        project_video_format(scene),
+        video_format,
         resolved_family,
         resolved_template,
+        progress=preview_time / max(0.001, duration),
+        title=template.title,
+        subtitle=template.subtitle,
     )
     output = BytesIO()
     frame.save(output, format="PNG", optimize=True)

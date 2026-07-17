@@ -19,6 +19,7 @@ from .exact_visual_timing import (
 )
 from .media_library import MEDIA_ROOT, project_directory, public_media_url, safe_component
 from .video_format import (
+    exact_visual_source_time,
     format_exact_visual_frame,
     project_video_format,
     video_format_profile,
@@ -309,14 +310,23 @@ def _encode_frames(
         stderr=subprocess.PIPE,
     )
     frame_count = max(1, math.ceil(duration_seconds * engine.OUTPUT_FPS))
+    shorts_source = None
+    if profile.format_id == "shorts":
+        shorts_source = render_frame(
+            template.template_id,
+            duration_seconds,
+            exact_visual_source_time(video_format, duration_seconds, 0.0),
+            style.style_id,
+        )
     code = -1
     try:
         assert process.stdin is not None
         for index in range(frame_count):
-            frame = render_frame(
+            time_value = min(duration_seconds, index / engine.OUTPUT_FPS)
+            frame = shorts_source or render_frame(
                 template.template_id,
                 duration_seconds,
-                min(duration_seconds, index / engine.OUTPUT_FPS),
+                time_value,
                 style.style_id,
             )
             process.stdin.write(
@@ -325,6 +335,9 @@ def _encode_frames(
                     video_format,
                     "finance_motion",
                     template.template_id,
+                    progress=time_value / max(0.001, duration_seconds),
+                    title=template.title,
+                    subtitle=template.subtitle,
                 ).tobytes()
             )
         process.stdin.close()
@@ -395,16 +408,20 @@ def render_finance_motion(
     try:
         _encode_frames(ffmpeg, template, style, duration, temporary_media, video_format)
         poster_time = min(max(0.8, duration * 0.55), max(0.0, duration - 0.03))
+        source_time = exact_visual_source_time(video_format, duration, poster_time)
         format_exact_visual_frame(
             render_frame(
                 template.template_id,
                 duration,
-                poster_time,
+                source_time,
                 style.style_id,
             ),
             video_format,
             "finance_motion",
             template.template_id,
+            progress=poster_time / max(0.001, duration),
+            title=template.title,
+            subtitle=template.subtitle,
         ).save(temporary_preview, format="JPEG", quality=93, optimize=True)
         temporary_media.replace(media_path)
         temporary_preview.replace(preview_path)

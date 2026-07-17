@@ -589,7 +589,16 @@ def build_ffmpeg_command(
     runtime = runtime_seconds if runtime_seconds is not None else sum(
         float(clip["duration_seconds"]) for clip in clips
     )
+    requested_video_format = (
+        str(style.get("video_format", ""))
+        if isinstance(style, dict)
+        else str(getattr(style, "video_format", ""))
+    )
     normalized_style = normalize_timeline_style(style)
+    # Vertical typography and thin vector strokes show compression artifacts
+    # sooner than landscape footage. Give Shorts two extra CRF quality steps
+    # while leaving the established YouTube encode path unchanged.
+    video_crf = "16" if requested_video_format == SHORTS_FORMAT else "18"
     command: list[str] = [binary, "-y", "-hide_banner"]
 
     for clip in clips:
@@ -646,7 +655,7 @@ def build_ffmpeg_command(
             "-preset",
             "medium",
             "-crf",
-            "18",
+            video_crf,
             "-pix_fmt",
             "yuv420p",
             "-t",

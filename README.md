@@ -29,6 +29,8 @@ The working application now includes:
 - one globally ranked visual feed across every configured provider,
 - scene-by-scene FFmpeg assembly planning,
 - scene-aware still-image pushes, pulls, pans, steady holds, and soft 16:9 backgrounds,
+- selectable 16:9 YouTube and native 9:16 Shorts delivery, with semantic
+  full-size mobile beats for every generated exact-visual family,
 - playable local 1080p first-cut previews,
 - local narration upload and FFprobe duration analysis,
 - explicit narration-versus-timeline mismatch warnings,

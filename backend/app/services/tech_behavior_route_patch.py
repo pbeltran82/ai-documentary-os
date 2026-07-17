@@ -75,6 +75,8 @@ DECISIVE_BOOST = 48
 PRIOR_USE_PENALTY = 10
 RECENT_USE_PENALTY = 85
 IMMEDIATE_REPEAT_PENALTY = 90
+PROJECT_REUSE_LIMIT = 2
+PROJECT_OVERUSE_PENALTY = 240
 EARLY_CTA_FALLBACK_TEMPLATE_ID = "machine_choice_explainer"
 EARLY_CTA_FALLBACK_BOOST = 36
 SEMANTIC_VARIANT_GROUPS = {
@@ -85,7 +87,7 @@ SEMANTIC_VARIANT_GROUPS = {
         "behavioral_twin",
     },
 }
-OUTSIDE_VARIANT_GROUP_PENALTY = 80
+OUTSIDE_VARIANT_GROUP_PENALTY = 160
 
 
 def _context(scene: Scene) -> str:
@@ -190,6 +192,15 @@ def _score_templates_with_prior(
     )
     counts = Counter(prior)
     recent = set(prior[-3:])
+    diversity_pool = variant_group or {
+        template.template_id
+        for _score, template in scored
+        if template.template_id != CTA_TEMPLATE_ID
+    }
+    underused_variant_available = any(
+        counts[template_id] < PROJECT_REUSE_LIMIT
+        for template_id in diversity_pool
+    )
     adjusted: list[tuple[int, base.TechTemplate]] = []
     for score, template in scored:
         template_id = template.template_id
@@ -209,6 +220,12 @@ def _score_templates_with_prior(
         if variant_group is not None and template_id not in variant_group:
             value -= OUTSIDE_VARIANT_GROUP_PENALTY
         value -= counts[template_id] * PRIOR_USE_PENALTY
+        if (
+            template_id in diversity_pool
+            and counts[template_id] >= PROJECT_REUSE_LIMIT
+            and underused_variant_available
+        ):
+            value -= PROJECT_OVERUSE_PENALTY
         if template_id in recent:
             value -= RECENT_USE_PENALTY
         if prior and template_id == prior[-1]:
@@ -230,7 +247,8 @@ def suggest_template(scene: Scene) -> tuple[base.TechTemplate, float, str]:
         return (
             selected,
             0.82,
-            f"Selected {selected.label} to avoid repeating {base.TEMPLATE_BY_ID[raw_template_id].label} in the recent project sequence.",
+            f"Selected {selected.label} to avoid repeating "
+            f"{base.TEMPLATE_BY_ID[raw_template_id].label} in the recent project sequence.",
         )
     if decisive is not None and (
         decisive[0] != CTA_TEMPLATE_ID or is_terminal_scene(scene)

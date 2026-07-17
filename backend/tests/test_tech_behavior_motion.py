@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -185,6 +186,28 @@ class TechBehaviorMotionTests(unittest.TestCase):
                 self.assertNotIn(template_id, selected[max(0, index - 3):index])
         self.assertNotIn("machine_choice_cta", selected[:-1])
         self.assertEqual(selected[-1], "machine_choice_cta")
+
+    def test_project_sequence_exhausts_semantic_variants_before_a_third_use(self) -> None:
+        scenes = self.project_scenes(
+            [
+                "Those signals create a behavioral twin that predicts you next."
+                for _index in range(6)
+            ]
+        )
+
+        selected = [tech.suggest_template(scene)[0].template_id for scene in scenes]
+        counts = Counter(selected)
+
+        self.assertLessEqual(max(counts.values()), 2)
+        self.assertTrue(
+            set(selected).issubset(
+                {
+                    "behavior_prediction_engine",
+                    "digital_footprint_collector",
+                    "behavioral_twin",
+                }
+            )
+        )
 
     def test_behavioral_twin_uses_finished_clothed_characters(self) -> None:
         palette = tech._palette(tech.DEFAULT_STYLE_ID)
