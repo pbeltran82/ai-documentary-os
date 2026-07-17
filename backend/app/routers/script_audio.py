@@ -41,6 +41,7 @@ class ScriptUpdateRequest(BaseModel):
     segments: list[dict[str, Any]] | None = None
     editor_notes: str = Field(default="", max_length=5000)
     replace_scenes: bool = False
+    apply_to_scenes: bool = False
 
 
 class ScriptApproveRequest(BaseModel):
@@ -89,6 +90,27 @@ def _apply_script_to_scenes(project: Project, script: dict[str, Any], db: Sessio
     invalidate_render_artifacts(project.id)
 
 
+def _same_editorial_content(current: dict[str, Any], payload: ScriptUpdateRequest) -> bool:
+    if payload.title is not None and payload.title.strip() != str(current.get("title", "")).strip():
+        return False
+    if payload.thesis is not None and payload.thesis.strip() != str(current.get("thesis", "")).strip():
+        return False
+    if payload.editor_notes.strip() != str(current.get("editor_notes", "")).strip():
+        return False
+    if payload.segments is None:
+        return True
+    current_segments = current.get("segments", [])
+    if len(payload.segments) != len(current_segments):
+        return False
+    for incoming, existing in zip(payload.segments, current_segments, strict=True):
+        for field in ("act", "narration", "visual_intent"):
+            if str(incoming.get(field, "")).strip() != str(existing.get(field, "")).strip():
+                return False
+        if list(incoming.get("search_keywords", [])) != list(existing.get("search_keywords", [])):
+            return False
+    return True
+
+
 @router.get("/script")
 def get_script(project_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     _project_or_404(project_id, db)
@@ -99,20 +121,13 @@ def get_script(project_id: int, db: Session = Depends(get_db)) -> dict[str, Any]
 
 
 @router.get("/script/revisions")
-def get_script_revisions(
-    project_id: int,
-    db: Session = Depends(get_db),
-) -> list[dict[str, Any]]:
+def get_script_revisions(project_id: int, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     _project_or_404(project_id, db)
     return list_script_revisions(project_id)
 
 
 @router.post("/script/generate")
-def generate_script(
-    project_id: int,
-    payload: ScriptGenerateRequest,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
+def generate_script(project_id: int, payload: ScriptGenerateRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
     current = load_script(project_id)
     try:
@@ -125,11 +140,7 @@ def generate_script(
                 previous_revision=int(current.get("revision", 0)) if current else 0,
             )
         else:
-            script = build_local_script_draft(
-                project,
-                angle=payload.angle,
-                target_scene_seconds=payload.target_scene_seconds,
-            )
+            script = build_local_script_draft(project, angle=payload.angle, target_scene_seconds=payload.target_scene_seconds)
             script["research_notes"] = payload.research_notes.strip()
     except ScriptGenerationError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -145,15 +156,20 @@ def generate_script(
 
 
 @router.put("/script")
-def update_script(
-    project_id: int,
-    payload: ScriptUpdateRequest,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
+def update_script(project_id: int, payload: ScriptUpdateRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
     current = load_script(project_id)
     if current is None:
         raise HTTPException(status_code=404, detail="No generated script exists for this project")
+
+    apply_scenes = payload.replace_scenes or payload.apply_to_scenes
+    if current.get("status") == "approved" and apply_scenes and _same_editorial_content(current, payload):
+        _apply_script_to_scenes(project, current, db)
+        project.status = "script_approved"
+        db.commit()
+        current["scenes_applied"] = True
+        return current
+
     try:
         script = update_script_draft(
             project,
@@ -167,7 +183,7 @@ def update_script(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     project.status = "script"
     db.commit()
-    if payload.replace_scenes:
+    if apply_scenes:
         _apply_script_to_scenes(project, script, db)
         script["scenes_applied"] = True
     else:
@@ -176,11 +192,7 @@ def update_script(
 
 
 @router.post("/script/approve")
-def approve_project_script(
-    project_id: int,
-    payload: ScriptApproveRequest,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
+def approve_project_script(project_id: int, payload: ScriptApproveRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
     try:
         script = approve_script(project_id, notes=payload.notes)
@@ -199,10 +211,7 @@ def approve_project_script(
 
 
 @router.get("/narration")
-def get_narration_plan(
-    project_id: int,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
+def get_narration_plan(project_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     _project_or_404(project_id, db)
     plan = load_narration_plan(project_id)
     if plan is None:
@@ -211,45 +220,22 @@ def get_narration_plan(
 
 
 @router.post("/narration/plan")
-def plan_narration(
-    project_id: int,
-    payload: NarrationPlanRequest,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
+def plan_narration(project_id: int, payload: NarrationPlanRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
     script = load_script(project_id)
     if script is None:
-        raise HTTPException(
-            status_code=409,
-            detail="Generate a project script before planning narration audio",
-        )
+        raise HTTPException(status_code=409, detail="Generate a project script before planning narration audio")
     if script.get("status") != "approved":
-        raise HTTPException(
-            status_code=409,
-            detail="Approve the project script before planning narration audio",
-        )
-    return build_narration_plan(
-        project,
-        script,
-        provider=payload.provider,
-        voice_id=payload.voice_id,
-        speaking_rate=payload.speaking_rate,
-    )
+        raise HTTPException(status_code=409, detail="Approve the project script before planning narration audio")
+    return build_narration_plan(project, script, provider=payload.provider, voice_id=payload.voice_id, speaking_rate=payload.speaking_rate)
 
 
 @router.post("/narration/synthesize")
-def synthesize_project_narration(
-    project_id: int,
-    payload: NarrationSynthesizeRequest,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
+def synthesize_project_narration(project_id: int, payload: NarrationSynthesizeRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
     script = load_script(project_id)
     if script is None or script.get("status") != "approved":
-        raise HTTPException(
-            status_code=409,
-            detail="Approve the project script before synthesizing narration",
-        )
+        raise HTTPException(status_code=409, detail="Approve the project script before synthesizing narration")
     selected = {int(number) for number in payload.scene_numbers if int(number) > 0}
     try:
         return synthesize_narration(
