@@ -48,6 +48,18 @@ def _point(origin: tuple[float, float], angle: float, length: float) -> tuple[in
     )
 
 
+def _blend(
+    first: tuple[int, int, int],
+    second: tuple[int, int, int],
+    amount: float,
+) -> tuple[int, int, int]:
+    amount = _clamp(amount)
+    return tuple(
+        round(first[index] + (second[index] - first[index]) * amount)
+        for index in range(3)
+    )
+
+
 def _limb(
     draw: ImageDraw.ImageDraw,
     points: Iterable[tuple[int, int]],
@@ -62,6 +74,61 @@ def _limb(
     radius = max(3, width // 2)
     for x, y in sequence[1:-1]:
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
+
+
+def _clothed_arm(
+    draw: ImageDraw.ImageDraw,
+    shoulder: tuple[int, int],
+    elbow: tuple[int, int],
+    hand: tuple[int, int],
+    shirt: tuple[int, int, int],
+    skin: tuple[int, int, int],
+    width: int,
+    scale: float,
+) -> None:
+    """Draw a short sleeve and a readable skin-tone forearm on one rig chain."""
+    outline = (3, 6, 14)
+    sleeve_end = (
+        round(shoulder[0] + (elbow[0] - shoulder[0]) * 0.56),
+        round(shoulder[1] + (elbow[1] - shoulder[1]) * 0.56),
+    )
+    skin_start = (
+        round(shoulder[0] + (elbow[0] - shoulder[0]) * 0.49),
+        round(shoulder[1] + (elbow[1] - shoulder[1]) * 0.49),
+    )
+    outline_width = width + max(3, width // 3)
+    draw.line((shoulder, elbow, hand), fill=outline, width=outline_width, joint="curve")
+    draw.line((shoulder, sleeve_end), fill=shirt, width=width + max(1, round(2 * scale)))
+    draw.line((skin_start, elbow, hand), fill=skin, width=max(6, width - round(2 * scale)), joint="curve")
+
+    elbow_radius = max(3, (width - round(2 * scale)) // 2)
+    draw.ellipse(
+        (
+            elbow[0] - elbow_radius,
+            elbow[1] - elbow_radius,
+            elbow[0] + elbow_radius,
+            elbow[1] + elbow_radius,
+        ),
+        fill=skin,
+    )
+    # A short perpendicular seam reads as a sleeve cuff without introducing a
+    # circular "robot joint" at the color transition.
+    cuff = _blend(shirt, outline, 0.32)
+    dx = elbow[0] - shoulder[0]
+    dy = elbow[1] - shoulder[1]
+    distance = max(1.0, math.hypot(dx, dy))
+    cuff_half = width * 0.46
+    perpendicular = (-dy / distance * cuff_half, dx / distance * cuff_half)
+    draw.line(
+        (
+            round(sleeve_end[0] - perpendicular[0]),
+            round(sleeve_end[1] - perpendicular[1]),
+            round(sleeve_end[0] + perpendicular[0]),
+            round(sleeve_end[1] + perpendicular[1]),
+        ),
+        fill=cuff,
+        width=max(1, round(2 * scale)),
+    )
 
 
 def _hand(
@@ -118,28 +185,30 @@ def _hair(
 ) -> None:
     x, y = center
     if style == "curly_crop":
-        radius = max(7, round(11 * scale))
-        for offset, drop in ((-28, 7), (-14, 1), (0, -2), (14, 1), (28, 7)):
+        radius = max(6, round(8 * scale))
+        for offset, drop in ((-23, 12), (-12, 3), (0, 0), (12, 3), (23, 12)):
             cx = x + round(offset * scale)
             cy = y - round((38 - drop) * scale)
             draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=color)
         return
 
-    # A low side part leaves the brows and eyes fully readable.
+    # Keep the side part inside the skull contour; the final head outline is
+    # drawn over it so no shirt-colored "helmet" ring can leak around the hair.
     points = (
-        (x - round(37 * scale), y - round(8 * scale)),
-        (x - round(33 * scale), y - round(27 * scale)),
-        (x - round(18 * scale), y - round(40 * scale)),
-        (x + round(8 * scale), y - round(44 * scale)),
-        (x + round(34 * scale), y - round(25 * scale)),
-        (x + round(37 * scale), y - round(10 * scale)),
-        (x + facing * round(12 * scale), y - round(25 * scale)),
-        (x - facing * round(8 * scale), y - round(29 * scale)),
+        (x - round(35 * scale), y - round(9 * scale)),
+        (x - round(32 * scale), y - round(25 * scale)),
+        (x - round(18 * scale), y - round(38 * scale)),
+        (x + round(6 * scale), y - round(42 * scale)),
+        (x + round(25 * scale), y - round(34 * scale)),
+        (x + round(34 * scale), y - round(18 * scale)),
+        (x + round(35 * scale), y - round(9 * scale)),
+        (x + facing * round(10 * scale), y - round(25 * scale)),
+        (x - facing * round(9 * scale), y - round(28 * scale)),
     )
     draw.polygon(points, fill=color)
     draw.line(
-        (x + facing * round(9 * scale), y - round(42 * scale), x - facing * round(3 * scale), y - round(28 * scale)),
-        fill=(91, 68, 57),
+        (x + facing * round(6 * scale), y - round(40 * scale), x - facing * round(5 * scale), y - round(28 * scale)),
+        fill=_blend(color, (238, 187, 145), 0.35),
         width=max(1, round(2 * scale)),
     )
 
@@ -236,6 +305,11 @@ def _expressive_person(
     body = palette["person_alt"] if alternate else palette["person"]
     skin = palette["skin"]
     outline = (3, 6, 14)
+    denim = palette.get(
+        "denim_alt" if alternate else "denim",
+        (43, 74, 112) if alternate else (48, 86, 132),
+    )
+    shoe = palette.get("shoe", (29, 37, 49))
     pulse = _performance_pulse()
     motion_phase = _CURRENT_TIME * 6.2
     gait = math.sin(motion_phase) if pose == "walk" else 0.0
@@ -283,7 +357,7 @@ def _expressive_person(
     hip = (x, ground_y - round(78 * scale))
     shoulder = (x + round(lean * scale), ground_y - round((178 - shoulder_drop) * scale))
     neck = (shoulder[0] + round(2 * facing * scale), shoulder[1] - round(22 * scale))
-    head = (neck[0] + round((5 + pulse * 4) * facing * scale), neck[1] - round((54 - head_drop) * scale))
+    head = (neck[0] + round((5 + pulse * 4) * facing * scale), neck[1] - round((46 - head_drop) * scale))
     if pose == "look":
         head = (head[0] + round(8 * math.sin(motion_phase * 0.35) * scale), head[1])
     elif pose == "shake_head":
@@ -295,22 +369,128 @@ def _expressive_person(
         shoulder[0] - shoulder_width,
         shoulder[1] - round(8 * scale),
         hip[0] + torso_width,
-        hip[1] + round(18 * scale),
+        hip[1] + round(2 * scale),
     )
+    torso_radius = max(12, round(23 * scale))
     draw.rounded_rectangle(
         (torso_box[0] + 7, torso_box[1] + 9, torso_box[2] + 7, torso_box[3] + 9),
-        radius=round(34 * scale),
+        radius=torso_radius,
         fill=outline,
     )
-    draw.rounded_rectangle(torso_box, radius=round(34 * scale), fill=body)
 
     head_radius_x = round(39 * scale)
     head_radius_y = round(44 * scale)
-    draw.ellipse((head[0] - head_radius_x + 7, head[1] - head_radius_y + 9, head[0] + head_radius_x + 7, head[1] + head_radius_y + 9), fill=outline)
-    draw.ellipse((head[0] - head_radius_x, head[1] - head_radius_y, head[0] + head_radius_x, head[1] + head_radius_y), fill=skin, outline=body, width=max(3, round(5 * scale)))
+    head_box = (
+        head[0] - head_radius_x,
+        head[1] - head_radius_y,
+        head[0] + head_radius_x,
+        head[1] + head_radius_y,
+    )
+
+    # The neck removes the floating-head gap. Draw it behind the shirt and head
+    # so those contours stay clean during leans and nods.
+    neck_width = round(14 * scale)
+    neck_top = head[1] + head_radius_y - round(8 * scale)
+    neck_bottom = shoulder[1] + round(7 * scale)
+    neck_box = (neck[0] - neck_width, neck_top, neck[0] + neck_width, neck_bottom)
+    draw.rounded_rectangle(
+        (neck_box[0] + 3, neck_box[1] + 4, neck_box[2] + 3, neck_box[3] + 4),
+        radius=max(4, round(8 * scale)),
+        fill=outline,
+    )
+    draw.rounded_rectangle(neck_box, radius=max(4, round(8 * scale)), fill=skin)
+
+    # A shirt with a defined shoulder and hem reads as clothing rather than a
+    # single body-colored bean. The restrained details survive at thumbnail size.
+    draw.rounded_rectangle(torso_box, radius=torso_radius, fill=body)
+    shirt_detail = _blend(body, outline, 0.30)
+    collar_y = torso_box[1] + round(8 * scale)
+    collar_center_x = shoulder[0] + round(2 * facing * scale)
+    draw.line(
+        (
+            collar_center_x - round(13 * scale),
+            collar_y,
+            collar_center_x,
+            collar_y + round(14 * scale),
+            collar_center_x + round(13 * scale),
+            collar_y,
+        ),
+        fill=shirt_detail,
+        width=max(2, round(3 * scale)),
+        joint="curve",
+    )
+    pocket_x = shoulder[0] + facing * round(22 * scale)
+    pocket_y = shoulder[1] + round(34 * scale)
+    draw.rounded_rectangle(
+        (
+            pocket_x - round(9 * scale),
+            pocket_y - round(7 * scale),
+            pocket_x + round(9 * scale),
+            pocket_y + round(10 * scale),
+        ),
+        radius=max(2, round(3 * scale)),
+        outline=shirt_detail,
+        width=max(1, round(2 * scale)),
+    )
+
+    # The waistband bridges the rig's hips and carries the jeans color into
+    # both leg chains without turning the lower torso into a shorts silhouette.
+    waist_box = (
+        hip[0] - round(43 * scale),
+        hip[1] - round(14 * scale),
+        hip[0] + round(43 * scale),
+        hip[1] + round(19 * scale),
+    )
+    draw.rounded_rectangle(
+        waist_box,
+        radius=max(4, round(6 * scale)),
+        fill=denim,
+        outline=outline,
+        width=max(2, round(3 * scale)),
+    )
+    denim_detail = _blend(denim, (205, 224, 237), 0.30)
+    draw.line(
+        (
+            waist_box[0] + round(9 * scale),
+            waist_box[1] + round(5 * scale),
+            waist_box[2] - round(9 * scale),
+            waist_box[1] + round(5 * scale),
+        ),
+        fill=denim_detail,
+        width=max(1, round(2 * scale)),
+    )
+    draw.line(
+        (
+            hip[0],
+            waist_box[1] + round(5 * scale),
+            hip[0],
+            waist_box[3] - round(4 * scale),
+        ),
+        fill=_blend(denim, outline, 0.28),
+        width=max(1, round(2 * scale)),
+    )
+
+    # Paint hair between the face fill and one final ink contour. This removes
+    # the old teal outline that made the primary character look helmeted.
+    shadow_offset_x = round(5 * scale)
+    shadow_offset_y = round(7 * scale)
+    draw.ellipse(
+        (
+            head_box[0] + shadow_offset_x,
+            head_box[1] + shadow_offset_y,
+            head_box[2] + shadow_offset_x,
+            head_box[3] + shadow_offset_y,
+        ),
+        fill=outline,
+    )
+    draw.ellipse(head_box, fill=skin)
     resolved_hair_style = hair_style or ("curly_crop" if alternate else "side_part")
-    resolved_hair_color = hair_color or ((46, 32, 25) if alternate else (35, 31, 29))
+    resolved_hair_color = hair_color or palette.get(
+        "hair_alt" if alternate else "hair",
+        (64, 40, 24) if alternate else (35, 31, 29),
+    )
     _hair(draw, head, scale, style=resolved_hair_style, color=resolved_hair_color, facing=facing)
+    draw.ellipse(head_box, outline=outline, width=max(3, round(4 * scale)))
     _expression(draw, head, palette, scale, mood, facing)
 
     shoulder_left = (shoulder[0] - round(37 * scale), shoulder[1] + round(8 * scale))
@@ -350,7 +530,11 @@ def _expressive_person(
         rear_hand = (x - facing * round(54 * scale), shoulder[1] + round(102 * scale))
         front_shape = "cup"
     elif pose == "think":
-        front_hand = (head[0] + facing * round(35 * scale), head[1] + round(25 * scale))
+        think_breath = math.sin(motion_phase * 0.42)
+        front_hand = (
+            head[0] + facing * round((35 + 3 * think_breath) * scale),
+            head[1] + round((25 + 2 * think_breath) * scale),
+        )
         rear_hand = (x - facing * round(62 * scale), shoulder[1] + round(105 * scale))
     elif pose in {"type", "swipe"}:
         travel = math.sin(motion_phase) if pose == "type" else math.sin(motion_phase * 0.45)
@@ -379,10 +563,10 @@ def _expressive_person(
         round((rear_shoulder[0] + rear_hand[0]) / 2 - facing * 15 * scale),
         round((rear_shoulder[1] + rear_hand[1]) / 2 + 8 * scale),
     )
-    _limb(draw, (front_shoulder, front_elbow, front_hand), body, limb_width)
-    _limb(draw, (rear_shoulder, rear_elbow, rear_hand), body, limb_width)
-    _hand(draw, front_hand, body, scale, hand_shape=front_shape, facing=facing)
-    _hand(draw, rear_hand, body, scale, hand_shape=rear_shape, facing=-facing)
+    _clothed_arm(draw, front_shoulder, front_elbow, front_hand, body, skin, limb_width, scale)
+    _clothed_arm(draw, rear_shoulder, rear_elbow, rear_hand, body, skin, limb_width, scale)
+    _hand(draw, front_hand, skin, scale, hand_shape=front_shape, facing=facing)
+    _hand(draw, rear_hand, skin, scale, hand_shape=rear_shape, facing=-facing)
 
     knee_y = ground_y - round(38 * scale)
     if pose == "step_in":
@@ -421,10 +605,11 @@ def _expressive_person(
         right_knee = (x + round((23 + 13 * step) * scale), knee_y - round(right_lift * 15 * scale))
     hip_left = (hip[0] - round(18 * scale), hip[1])
     hip_right = (hip[0] + round(18 * scale), hip[1])
-    _limb(draw, (hip_left, left_knee, left_foot), body, limb_width)
-    _limb(draw, (hip_right, right_knee, right_foot), body, limb_width)
-    _shoe(draw, left_foot, -1, body, scale)
-    _shoe(draw, right_foot, 1, body, scale)
+    leg_width = max(9, round(16 * scale))
+    _limb(draw, (hip_left, left_knee, left_foot), denim, leg_width)
+    _limb(draw, (hip_right, right_knee, right_foot), denim, leg_width)
+    _shoe(draw, left_foot, -1, shoe, scale)
+    _shoe(draw, right_foot, 1, shoe, scale)
 
     if pose in {"phone", "tap", "type", "swipe"}:
         phone_x = x + facing * round(76 * scale)
