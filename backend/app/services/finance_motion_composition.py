@@ -42,6 +42,10 @@ GOLD = (245, 190, 73)
 SLATE = (71, 85, 105)
 INK = (9, 14, 27)
 DEEP = (13, 20, 36)
+SUBSCRIBE_RED = (220, 53, 69)
+SUBSCRIBE_RED_DARK = (151, 30, 43)
+LIKE_BLUE = (48, 126, 218)
+LIKE_BLUE_LIGHT = (160, 211, 255)
 
 SEMANTIC_ACCENT = {
     "paycheck_split": CYAN,
@@ -145,6 +149,45 @@ def _arrow(
         ),
         fill=fill,
     )
+
+
+def _icon_like(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    *,
+    scale: float = 1.0,
+    fill: tuple[int, int, int] = WHITE,
+) -> None:
+    """Draw a compact original thumbs-up mark for the end-card Like action."""
+    x, y = center
+    outline = INK
+    cuff = (
+        x - round(35 * scale),
+        y - round(12 * scale),
+        x - round(17 * scale),
+        y + round(27 * scale),
+    )
+    draw.rounded_rectangle(
+        (cuff[0] + 3, cuff[1] + 4, cuff[2] + 3, cuff[3] + 4),
+        radius=max(3, round(5 * scale)),
+        fill=outline,
+    )
+    draw.rounded_rectangle(cuff, radius=max(3, round(5 * scale)), fill=fill)
+    hand = (
+        (x - round(12 * scale), y + round(24 * scale)),
+        (x + round(20 * scale), y + round(24 * scale)),
+        (x + round(29 * scale), y + round(15 * scale)),
+        (x + round(31 * scale), y - round(5 * scale)),
+        (x + round(25 * scale), y - round(12 * scale)),
+        (x + round(8 * scale), y - round(12 * scale)),
+        (x + round(14 * scale), y - round(30 * scale)),
+        (x + round(10 * scale), y - round(39 * scale)),
+        (x + round(2 * scale), y - round(40 * scale)),
+        (x - round(8 * scale), y - round(19 * scale)),
+        (x - round(14 * scale), y - round(10 * scale)),
+    )
+    draw.polygon(tuple((px + 3, py + 4) for px, py in hand), fill=outline)
+    draw.polygon(hand, fill=fill)
 
 
 def _icon_wallet(
@@ -441,8 +484,10 @@ def _comparison_composed(draw: ImageDraw.ImageDraw, t: float) -> None:
 
 
 def _cta_composed(draw: ImageDraw.ImageDraw, t: float) -> None:
-    reveal = base._progress(t, 0.24, 0.88)
-    pulse = 1 + 0.02 * math.sin(t * 4.2)
+    blueprint_reveal = base._progress(t, 0.24, 0.88)
+    subscribe_reveal = base._progress(t, 0.52, 0.56)
+    like_reveal = base._progress(t, 0.96, 0.48)
+    pulse = (math.sin(t * 3.6) + 1) / 2
     _shadowed_round_rect(draw, (210, 340, 1040, 870), fill=(22, 28, 45), outline=GOLD)
     _label(draw, (280, 390), "YOUR WEALTH BLUEPRINT", fill=(253, 230, 138), size=30)
     for index, (label, accent) in enumerate((("PAY YOURSELF FIRST", CYAN), ("AUTOMATE 10%", GREEN), ("LET TIME COMPOUND", PURPLE_LIGHT))):
@@ -452,16 +497,86 @@ def _cta_composed(draw: ImageDraw.ImageDraw, t: float) -> None:
         _label(draw, (380, y - 8), label, fill=WHITE, size=28)
         draw.line((380, y + 34, 920, y + 34), fill=(69, 79, 99), width=2)
 
-    width, height = round(600 * pulse), round(250 * pulse)
-    left = 1325 - width // 2
-    top = 535 - height // 2
-    for ring in range(3):
-        amount = round((50 + ring * 42) * reveal)
-        draw.rounded_rectangle((left - amount, top - amount // 2, left + width + amount, top + height + amount // 2), radius=56, outline=(94 + ring * 24, 68, 176), width=4)
-    draw.rounded_rectangle((left, top, left + width, top + height), radius=50, fill=PURPLE)
-    _value(draw, (1325, top + 88), "SUBSCRIBE", size=68, anchor="mm")
-    _label(draw, (1325, top + 174), "BUILD THE NEXT STEP", fill=(237, 233, 254), size=28, anchor="mm")
-    _pill(draw, (1325, 780), "BLUEPRINT READY", fill=(51, 42, 87), text_fill=GOLD, width=300)
+    cta_x = 1400
+    _label(draw, (cta_x, 405), "SUPPORT THE NEXT STORY", fill=MUTED, size=25, anchor="mm")
+
+    if subscribe_reveal > 0.14:
+        width = round(520 * (0.88 + 0.12 * subscribe_reveal))
+        height = round(108 * (0.90 + 0.10 * subscribe_reveal))
+        left = cta_x - width // 2
+        top = round(520 - height // 2 + (1 - subscribe_reveal) * 24)
+        right = left + width
+        bottom = top + height
+
+        # One restrained red pulse replaces the previous oversized purple rings.
+        halo = round((8 + 8 * pulse) * subscribe_reveal)
+        draw.rounded_rectangle(
+            (left - halo, top - halo // 2, right + halo, bottom + halo // 2),
+            radius=32,
+            outline=SUBSCRIBE_RED_DARK,
+            width=3,
+        )
+        draw.rounded_rectangle(
+            (left + 8, top + 10, right + 8, bottom + 10),
+            radius=28,
+            fill=(3, 6, 14),
+        )
+        draw.rounded_rectangle(
+            (left, top, right, bottom),
+            radius=28,
+            fill=SUBSCRIBE_RED,
+            outline=RED_LIGHT,
+            width=2,
+        )
+
+        play_x = left + round(62 * (0.86 + 0.14 * subscribe_reveal))
+        play_half = round(20 * (0.76 + 0.24 * subscribe_reveal))
+        draw.polygon(
+            (
+                (play_x - play_half // 2, 520 - play_half),
+                (play_x - play_half // 2, 520 + play_half),
+                (play_x + play_half, 520),
+            ),
+            fill=WHITE,
+        )
+        _value(draw, (left + round(width * 0.60), 520), "SUBSCRIBE", size=47, anchor="mm")
+
+    if like_reveal > 0.16:
+        like_width = round(270 * (0.72 + 0.28 * like_reveal))
+        like_height = 78
+        like_y = round(680 + (1 - like_reveal) * 24)
+        like_left = cta_x - like_width // 2
+        like_right = cta_x + like_width // 2
+        draw.rounded_rectangle(
+            (like_left + 6, like_y - like_height // 2 + 7, like_right + 6, like_y + like_height // 2 + 7),
+            radius=like_height // 2,
+            fill=(3, 6, 14),
+        )
+        draw.rounded_rectangle(
+            (like_left, like_y - like_height // 2, like_right, like_y + like_height // 2),
+            radius=like_height // 2,
+            fill=LIKE_BLUE,
+            outline=LIKE_BLUE_LIGHT,
+            width=2,
+        )
+        _icon_like(
+            draw,
+            (like_left + 61, like_y + 1),
+            scale=0.63 * (0.82 + 0.18 * like_reveal),
+            fill=WHITE,
+        )
+        _value(draw, (like_left + round(like_width * 0.67), like_y), "LIKE", size=35, anchor="mm")
+
+    ready_width = round(300 * blueprint_reveal)
+    if ready_width > 20:
+        _pill(
+            draw,
+            (cta_x, 795),
+            "BLUEPRINT READY",
+            fill=(37, 52, 68),
+            text_fill=GOLD,
+            width=ready_width,
+        )
 
 
 COMPOSITION_RENDERERS = {
