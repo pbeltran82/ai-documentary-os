@@ -11,7 +11,9 @@ from types import SimpleNamespace
 
 from . import cartoon_documentary as cartoon
 from . import exact_visuals as exact
+from . import native_shorts
 
+_ORIGINAL_RECOMMEND_FAMILY = exact.recommend_family
 _ORIGINAL_TEMPLATE_CATALOG = exact.template_catalog
 _ORIGINAL_TEMPLATE_DEFINITION = exact.template_definition
 _ORIGINAL_SUGGEST_TEMPLATE = exact.suggest_template
@@ -28,8 +30,10 @@ GENERAL_DOCUMENTARY_SIGNALS = (
     "government", "court", "public", "environment", "planet", "journey",
 )
 ALGORITHM_SPECIFIC_SIGNALS = (
-    "algorithm", "digital footprint", "behavioral twin", "recommendation system",
-    "ranking", "prediction model", "profile", "scroll", "click", "highest bidder",
+    "algorithm", "artificial intelligence", "digital footprint", "behavioral twin",
+    "recommendation system", "ranking", "prediction model", "predicting human behavior",
+    "profile", "every scroll", "every pause", "deleted draft", "machine choose",
+    "systems that learn how to navigate us", "scroll", "click", "highest bidder",
 )
 
 
@@ -37,12 +41,17 @@ def _context(scene) -> str:
     return " ".join([scene.narration, scene.visual_intent, *scene.search_keywords]).lower()
 
 
+def _algorithm_signal(scene) -> str | None:
+    context = _context(scene)
+    return next((signal for signal in ALGORITHM_SPECIFIC_SIGNALS if signal in context), None)
+
+
 def _use_cartoon(scene) -> bool:
     context = _context(scene)
     plan = dict(getattr(scene, "animation_plan", None) or {})
     has_visual_beats = bool(plan.get("visual_beats"))
     general = any(signal in context for signal in GENERAL_DOCUMENTARY_SIGNALS)
-    algorithmic = any(signal in context for signal in ALGORITHM_SPECIFIC_SIGNALS)
+    algorithmic = _algorithm_signal(scene) is not None
     return general or (has_visual_beats and not algorithmic)
 
 
@@ -57,6 +66,14 @@ def _preview_frame(template_id: str, duration_seconds: float, time_seconds: floa
         duration_seconds=duration_seconds,
     )
     return cartoon.render_planned_frame(scene, template_id, duration_seconds, time_seconds, style_id)
+
+
+def recommend_family(scene):
+    family_id, confidence, reason = _ORIGINAL_RECOMMEND_FAMILY(scene)
+    signal = _algorithm_signal(scene)
+    if family_id == exact.TECH_FAMILY_ID and signal:
+        return family_id, confidence, f"The scene centers on algorithmic behavior: {signal}."
+    return family_id, confidence, reason
 
 
 def template_catalog(family_id: str):
@@ -96,7 +113,14 @@ def render_exact_visual(scene, family_id: str, template_id: str | None = None, s
     return _ORIGINAL_RENDER_EXACT_VISUAL(scene, family_id, template_id, style_id)
 
 
+for template in cartoon.TEMPLATES:
+    native_shorts.COMPOSITIONS.setdefault(
+        (exact.TECH_FAMILY_ID, template.template_id),
+        native_shorts.ShortsComposition(template.title),
+    )
+
 cartoon.render_frame = _preview_frame
+exact.recommend_family = recommend_family
 exact.template_catalog = template_catalog
 exact.template_definition = template_definition
 exact.suggest_template = suggest_template
