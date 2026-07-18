@@ -6,6 +6,7 @@ from app.models import Scene
 from app.services import cartoon_documentary as cartoon
 from app.services import cartoon_documentary_patch as patch
 from app.services import exact_visuals
+from app.services.video_format import format_exact_visual_frame
 
 
 class CartoonDocumentaryTests(unittest.TestCase):
@@ -82,6 +83,38 @@ class CartoonDocumentaryTests(unittest.TestCase):
             2.5,
         )
         self.assertEqual(frame.size, (1920, 1080))
+
+    def test_every_cartoon_template_supports_youtube_and_shorts(self) -> None:
+        for template in cartoon.TEMPLATES:
+            with self.subTest(template=template.template_id, format="youtube"):
+                source = patch.render_frame(
+                    exact_visuals.TECH_FAMILY_ID,
+                    template.template_id,
+                    5,
+                    2.5,
+                )
+                youtube = format_exact_visual_frame(
+                    source,
+                    "youtube",
+                    exact_visuals.TECH_FAMILY_ID,
+                    template.template_id,
+                    progress=0.5,
+                    title=template.title,
+                    subtitle=template.subtitle,
+                )
+                self.assertEqual(youtube.size, (1920, 1080))
+
+            with self.subTest(template=template.template_id, format="shorts"):
+                shorts = format_exact_visual_frame(
+                    source,
+                    "shorts",
+                    exact_visuals.TECH_FAMILY_ID,
+                    template.template_id,
+                    progress=0.5,
+                    title=template.title,
+                    subtitle=template.subtitle,
+                )
+                self.assertEqual(shorts.size, (1080, 1920))
 
 
 if __name__ == "__main__":
