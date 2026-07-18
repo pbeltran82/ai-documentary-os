@@ -153,8 +153,9 @@ def _draw_route_map(draw: ImageDraw.ImageDraw, width: int, height: int, progress
         sy = 24 + (index * 83) % round(height * 0.32)
         r = 2 + index % 3
         draw.ellipse((sx - r, sy - r, sx + r, sy + r), fill=cartoon.MUTED)
-    v6._planet(draw, (round(width * 0.22), round(height * 0.58)), round(height * 0.22), cartoon.BLUE, progress)
-    v6._planet(draw, (round(width * 0.80), round(height * 0.58)), round(height * 0.19), cartoon.MARS, 1 - progress)
+    # Use the shared planet primitive installed by the active polish stack.
+    cartoon._planet(draw, (round(width * 0.22), round(height * 0.58)), round(height * 0.22), cartoon.BLUE, progress)
+    cartoon._planet(draw, (round(width * 0.80), round(height * 0.58)), round(height * 0.19), cartoon.MARS, 1 - progress)
 
     box = (round(width * 0.31), round(height * 0.20), round(width * 0.73), round(height * 0.71))
     for start in range(205, 336, 18):
