@@ -30,10 +30,11 @@ GENERAL_DOCUMENTARY_SIGNALS = (
     "government", "court", "public", "environment", "planet", "journey",
 )
 ALGORITHM_SPECIFIC_SIGNALS = (
-    "algorithm", "artificial intelligence", "digital footprint", "behavioral twin",
-    "recommendation system", "ranking", "prediction model", "predicting human behavior",
-    "profile", "every scroll", "every pause", "deleted draft", "machine choose",
-    "systems that learn how to navigate us", "scroll", "click", "highest bidder",
+    "algorithm", "artificial intelligence", "digital footprint", "digital twin",
+    "behavioral twin", "recommendation system", "ranking", "prediction model",
+    "predicting human behavior", "profile", "every scroll", "every pause",
+    "deleted draft", "machine choose", "systems that learn how to navigate us",
+    "scroll", "click", "highest bidder",
 )
 
 
@@ -113,11 +114,16 @@ def render_exact_visual(scene, family_id: str, template_id: str | None = None, s
     return _ORIGINAL_RENDER_EXACT_VISUAL(scene, family_id, template_id, style_id)
 
 
+# Every exposed cartoon template has a native semantic Shorts composition and an
+# explicit native renderer. The current v1 uses the established single-hero
+# documentary renderer in 9:16 rather than cropping or reusing landscape pixels.
 for template in cartoon.TEMPLATES:
+    key = (exact.TECH_FAMILY_ID, template.template_id)
     native_shorts.COMPOSITIONS.setdefault(
-        (exact.TECH_FAMILY_ID, template.template_id),
+        key,
         native_shorts.ShortsComposition(template.title),
     )
+    native_shorts.RENDERERS.setdefault(key, native_shorts._generic)
 
 cartoon.render_frame = _preview_frame
 exact.recommend_family = recommend_family
