@@ -5,6 +5,7 @@ import unittest
 from app.models import Scene
 from app.services import cartoon_documentary as cartoon
 from app.services import cartoon_documentary_patch as patch
+from app.services import cartoon_documentary_polish as polish
 from app.services import exact_visuals
 from app.services.video_format import format_exact_visual_frame
 
@@ -35,6 +36,17 @@ class CartoonDocumentaryTests(unittest.TestCase):
             exact_visuals.TECH_FAMILY_ID,
         )
         self.assertIn(template.template_id, cartoon.TEMPLATE_BY_ID)
+
+    def test_mars_evacuation_prefers_transport_composition(self) -> None:
+        scene = self.scene(
+            narration="Families evacuate Earth and board robotic transports.",
+            visual_intent="People boarding spacecraft during an urgent relocation.",
+        )
+        template, _confidence, _reason = cartoon.suggest_template(
+            scene,
+            "Crowds board transport before launch",
+        )
+        self.assertEqual(template.template_id, "transport_scene")
 
     def test_algorithm_story_keeps_existing_tech_templates(self) -> None:
         scene = self.scene(
@@ -74,6 +86,16 @@ class CartoonDocumentaryTests(unittest.TestCase):
         second_template = cartoon.suggest_template(scene, second["visual_intent"])[0]
         self.assertEqual(first_template.template_id, "route_map")
         self.assertEqual(second_template.template_id, "habitat_build")
+
+    def test_long_visual_copy_wraps_to_two_safe_lines(self) -> None:
+        lines = polish._wrap_text(
+            "A very long documentary visual direction describing families boarding robotic transports while Earth disappears behind them",
+            600,
+            size=30,
+            max_lines=2,
+        )
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[-1].endswith("…"))
 
     def test_preview_frame_is_full_hd(self) -> None:
         frame = patch.render_frame(
