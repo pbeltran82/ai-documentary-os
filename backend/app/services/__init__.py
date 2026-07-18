@@ -13,3 +13,4 @@ from . import character_stance_patch as _character_stance_patch  # noqa: F401,E4
 # Broad documentary scenes use the beat-aware cartoon illustration engine while
 # algorithm-specific scenes retain the existing Tech & Behavior compositions.
 from . import cartoon_documentary_patch as _cartoon_documentary_patch  # noqa: F401,E402
+from . import cartoon_documentary_polish as _cartoon_documentary_polish  # noqa: F401,E402
