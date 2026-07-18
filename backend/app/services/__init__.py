@@ -38,3 +38,12 @@ from . import cartoon_art_polish_v19 as _cartoon_art_polish_v19  # noqa: F401,E4
 from . import cartoon_art_polish_v19_guard as _cartoon_art_polish_v19_guard  # noqa: F401,E402
 from . import cartoon_art_polish_v20 as _cartoon_art_polish_v20  # noqa: F401,E402
 from . import cartoon_art_polish_v21 as _cartoon_art_polish_v21  # noqa: F401,E402
+from . import cartoon_art_polish_v22 as _cartoon_art_polish_v22  # noqa: F401,E402
+from . import cartoon_art_polish_v23 as _cartoon_art_polish_v23  # noqa: F401,E402
+from . import cartoon_art_polish_v24 as _cartoon_art_polish_v24  # noqa: F401,E402
+from . import cartoon_art_polish_v25 as _cartoon_art_polish_v25  # noqa: F401,E402
+from . import cartoon_art_polish_v26 as _cartoon_art_polish_v26  # noqa: F401,E402
+from . import cartoon_art_polish_v27 as _cartoon_art_polish_v27  # noqa: F401,E402
+from . import cartoon_art_polish_v28 as _cartoon_art_polish_v28  # noqa: F401,E402
+from . import cartoon_art_polish_v29 as _cartoon_art_polish_v29  # noqa: F401,E402
+from . import cartoon_art_polish_v30 as _cartoon_art_polish_v30  # noqa: F401,E402
