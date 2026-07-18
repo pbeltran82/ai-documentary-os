@@ -7,6 +7,8 @@ beat-aware cartoon compositions. Existing algorithm-specific Tech templates stil
 render through the established Tech & Behavior engine.
 """
 
+from types import SimpleNamespace
+
 from . import cartoon_documentary as cartoon
 from . import exact_visuals as exact
 
@@ -44,6 +46,19 @@ def _use_cartoon(scene) -> bool:
     return general or (has_visual_beats and not algorithmic)
 
 
+def _preview_frame(template_id: str, duration_seconds: float, time_seconds: float, style_id: str | None = None):
+    template = cartoon.TEMPLATE_BY_ID[template_id]
+    scene = SimpleNamespace(
+        narration=template.description,
+        visual_intent=template.description,
+        search_keywords=list(template.keywords),
+        scene_number=1,
+        animation_plan={},
+        duration_seconds=duration_seconds,
+    )
+    return cartoon.render_planned_frame(scene, template_id, duration_seconds, time_seconds, style_id)
+
+
 def template_catalog(family_id: str):
     items = _ORIGINAL_TEMPLATE_CATALOG(family_id)
     if family_id == exact.TECH_FAMILY_ID:
@@ -71,7 +86,7 @@ def storyboard_beats(family_id: str, template_id: str, duration_seconds: float):
 
 def render_frame(family_id: str, template_id: str, duration_seconds: float, time_seconds: float, style_id: str | None = None):
     if template_id in CARTOON_TEMPLATE_IDS:
-        return cartoon.render_frame(template_id, duration_seconds, time_seconds, style_id)
+        return _preview_frame(template_id, duration_seconds, time_seconds, style_id)
     return _ORIGINAL_RENDER_FRAME(family_id, template_id, duration_seconds, time_seconds, style_id)
 
 
@@ -81,6 +96,7 @@ def render_exact_visual(scene, family_id: str, template_id: str | None = None, s
     return _ORIGINAL_RENDER_EXACT_VISUAL(scene, family_id, template_id, style_id)
 
 
+cartoon.render_frame = _preview_frame
 exact.template_catalog = template_catalog
 exact.template_definition = template_definition
 exact.suggest_template = suggest_template
