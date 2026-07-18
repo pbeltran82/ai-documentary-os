@@ -28,3 +28,5 @@ from . import cartoon_art_polish_v11 as _cartoon_art_polish_v11  # noqa: F401,E4
 from . import cartoon_art_polish_v12 as _cartoon_art_polish_v12  # noqa: F401,E402
 from . import cartoon_art_polish_v13 as _cartoon_art_polish_v13  # noqa: F401,E402
 from . import cartoon_art_polish_v14 as _cartoon_art_polish_v14  # noqa: F401,E402
+from . import cartoon_art_polish_v15 as _cartoon_art_polish_v15  # noqa: F401,E402
+from . import cartoon_art_polish_v15_compat as _cartoon_art_polish_v15_compat  # noqa: F401,E402
