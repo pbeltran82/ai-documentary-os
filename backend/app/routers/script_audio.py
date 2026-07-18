@@ -23,6 +23,7 @@ from ..services.script_audio_pipeline import (
     load_narration_plan,
     load_script,
 )
+from ..services.visual_beat_planning import plan_visual_beats
 
 router = APIRouter(prefix="/projects/{project_id}/production", tags=["script-audio"])
 
@@ -59,6 +60,10 @@ class NarrationSynthesizeRequest(BaseModel):
     scene_numbers: list[int] = Field(default_factory=list, max_length=500)
     force: bool = False
     retime_scenes: bool = True
+
+
+class VisualBeatPlanRequest(BaseModel):
+    target_seconds: float = Field(default=5.0, ge=3.0, le=15.0)
 
 
 def _project_or_404(project_id: int, db: Session) -> Project:
@@ -247,3 +252,16 @@ def synthesize_project_narration(project_id: int, payload: NarrationSynthesizeRe
         )
     except NarrationSynthesisError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/visual-beats/plan")
+def plan_project_visual_beats(
+    project_id: int,
+    payload: VisualBeatPlanRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    project = _project_or_404(project_id, db)
+    narration = load_narration_plan(project_id)
+    if narration is None or narration.get("status") != "complete":
+        raise HTTPException(status_code=409, detail="Complete narration before planning visual beats")
+    return plan_visual_beats(project, db, target_seconds=payload.target_seconds)
