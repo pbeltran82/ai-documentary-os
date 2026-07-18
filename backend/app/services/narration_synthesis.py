@@ -36,13 +36,7 @@ def _absolute(relative_path: str) -> Path:
 
 
 def _wav_data_bytes(path: Path) -> int:
-    """Return the real PCM payload size, including streamed WAV sentinel headers.
-
-    Some speech APIs emit a WAV header with a data length of 0xFFFFFFFF because
-    the response is streamed before its final length is known. Python's wave
-    reader exposes that sentinel as 4,294,967,295 frames. In that case the real
-    payload is the bytes remaining after the data chunk header.
-    """
+    """Return the real PCM payload size, including streamed WAV sentinel headers."""
     content = path.read_bytes()
     if len(content) < 12 or content[:4] not in {b"RIFF", b"RF64"} or content[8:12] != b"WAVE":
         raise NarrationSynthesisError(f"Invalid WAV container for {path.name}")
@@ -76,8 +70,6 @@ def _wav_duration(path: Path) -> float:
     if rate <= 0 or channels <= 0 or sample_width <= 0:
         raise NarrationSynthesisError(f"Invalid WAV format for {path.name}")
 
-    # Prefer the container's actual data payload. This handles ordinary WAVs
-    # and streamed WAVs whose frame/data sizes use the 0xFFFFFFFF sentinel.
     try:
         payload_bytes = _wav_data_bytes(path)
         duration = payload_bytes / (rate * channels * sample_width)
@@ -223,6 +215,37 @@ def _retime_project_scenes(project: Project, manifest: dict[str, Any], db: Sessi
         project.status = "narrated"
         db.commit()
         invalidate_render_artifacts(project.id)
+
+
+def repair_existing_narration_timings(project: Project, db: Session) -> bool:
+    """Repair impossible persisted scene durations from completed local WAV files.
+
+    This is intentionally provider-free: it only re-measures files already on disk.
+    It allows a project poisoned by the streamed-WAV sentinel bug to load again.
+    """
+    manifest = load_narration_plan(project.id)
+    if manifest is None:
+        return False
+
+    repaired = False
+    for segment in manifest.get("segments", []):
+        if segment.get("status") != "complete":
+            continue
+        try:
+            repaired = _refresh_completed_segment(segment) or repaired
+        except NarrationSynthesisError:
+            continue
+
+    if not repaired:
+        return False
+
+    manifest["actual_runtime_seconds"] = round(
+        sum(float(item.get("actual_duration_seconds") or 0) for item in manifest.get("segments", [])),
+        3,
+    )
+    _write_json(_manifest_path(project.id), manifest)
+    _retime_project_scenes(project, manifest, db)
+    return True
 
 
 def synthesize_narration(
