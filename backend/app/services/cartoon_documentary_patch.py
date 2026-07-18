@@ -69,6 +69,30 @@ def _preview_frame(template_id: str, duration_seconds: float, time_seconds: floa
     return cartoon.render_planned_frame(scene, template_id, duration_seconds, time_seconds, style_id)
 
 
+def _attach_style_metadata(generated, style_id: str | None):
+    """Keep generated-motion metadata compatible with the exact-visual router."""
+    if hasattr(generated, "style"):
+        return generated
+    resolved_style_id = style_id or exact.DEFAULT_STYLE_ID
+    styles = {
+        str(item["style_id"]): item
+        for item in exact.style_catalog()
+    }
+    style = styles.get(
+        resolved_style_id,
+        {"style_id": resolved_style_id, "label": resolved_style_id},
+    )
+    object.__setattr__(
+        generated,
+        "style",
+        SimpleNamespace(
+            style_id=str(style["style_id"]),
+            label=str(style["label"]),
+        ),
+    )
+    return generated
+
+
 def recommend_family(scene):
     family_id, confidence, reason = _ORIGINAL_RECOMMEND_FAMILY(scene)
     signal = _algorithm_signal(scene)
@@ -110,8 +134,10 @@ def render_frame(family_id: str, template_id: str, duration_seconds: float, time
 
 def render_exact_visual(scene, family_id: str, template_id: str | None = None, style_id: str | None = None):
     if family_id == exact.TECH_FAMILY_ID and (template_id in CARTOON_TEMPLATE_IDS or _use_cartoon(scene)):
-        return cartoon.render_cartoon_documentary(scene, template_id, style_id)
-    return _ORIGINAL_RENDER_EXACT_VISUAL(scene, family_id, template_id, style_id)
+        generated = cartoon.render_cartoon_documentary(scene, template_id, style_id)
+    else:
+        generated = _ORIGINAL_RENDER_EXACT_VISUAL(scene, family_id, template_id, style_id)
+    return _attach_style_metadata(generated, style_id)
 
 
 # Every exposed cartoon template has a native semantic Shorts composition and an
