@@ -67,3 +67,7 @@ from . import cartoon_art_polish_v47 as _cartoon_art_polish_v47  # noqa: F401,E4
 from . import cartoon_art_polish_v48 as _cartoon_art_polish_v48  # noqa: F401,E402
 from . import cartoon_art_polish_v49 as _cartoon_art_polish_v49  # noqa: F401,E402
 from . import cartoon_art_polish_v50 as _cartoon_art_polish_v50  # noqa: F401,E402
+
+# Final native 9:16 release polish installs after the general Shorts family so
+# immediate openings, tighter automation beats, and the dedicated CTA win.
+from . import native_shorts_final_polish as _native_shorts_final_polish  # noqa: F401,E402
