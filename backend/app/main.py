@@ -19,6 +19,7 @@ from .routers.production import router as production_router
 from .routers.scenes import router as scenes_router
 from .routers.script_audio import router as script_audio_router
 from .routers.timeline import router as timeline_router
+from .routers.voice_previews import router as voice_previews_router
 from .schemas import HealthResponse
 from .services import animation_script_runtime as _animation_script_runtime
 from .services import cinematic_character_polish as _cinematic_character_polish
@@ -67,6 +68,7 @@ app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 app.include_router(projects_router, prefix="/api")
 app.include_router(production_router, prefix="/api")
 app.include_router(script_audio_router, prefix="/api")
+app.include_router(voice_previews_router, prefix="/api")
 app.include_router(scenes_router, prefix="/api")
 app.include_router(animation_plans_router, prefix="/api")
 app.include_router(assets_router, prefix="/api")
