@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import struct
 import tempfile
 import unittest
+import wave
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -81,6 +83,30 @@ class NarrationSynthesisTests(unittest.TestCase):
         self.assertEqual(len(segment["checksum_sha256"]), 64)
         self.assertEqual(first["last_run"]["completed"], 1)
         self.assertEqual(second["last_run"]["skipped"], 1)
+
+    def test_streamed_wav_sentinel_uses_actual_payload_duration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "streamed.wav"
+            sample_rate = 48_000
+            seconds = 2
+            payload = b"\x00\x00" * sample_rate * seconds
+            fmt = struct.pack("<HHIIHH", 1, 1, sample_rate, sample_rate * 2, 2, 16)
+            content = (
+                b"RIFF"
+                + struct.pack("<I", 0xFFFFFFFF)
+                + b"WAVE"
+                + b"fmt "
+                + struct.pack("<I", len(fmt))
+                + fmt
+                + b"data"
+                + struct.pack("<I", 0xFFFFFFFF)
+                + payload
+            )
+            path.write_bytes(content)
+
+            duration = synthesis._wav_duration(path)
+
+        self.assertEqual(duration, 2.0)
 
 
 if __name__ == "__main__":
