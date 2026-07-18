@@ -35,13 +35,58 @@ def _absolute(relative_path: str) -> Path:
     return path
 
 
+def _wav_data_bytes(path: Path) -> int:
+    """Return the real PCM payload size, including streamed WAV sentinel headers.
+
+    Some speech APIs emit a WAV header with a data length of 0xFFFFFFFF because
+    the response is streamed before its final length is known. Python's wave
+    reader exposes that sentinel as 4,294,967,295 frames. In that case the real
+    payload is the bytes remaining after the data chunk header.
+    """
+    content = path.read_bytes()
+    if len(content) < 12 or content[:4] not in {b"RIFF", b"RF64"} or content[8:12] != b"WAVE":
+        raise NarrationSynthesisError(f"Invalid WAV container for {path.name}")
+
+    offset = 12
+    while offset + 8 <= len(content):
+        chunk_id = content[offset : offset + 4]
+        declared_size = struct.unpack_from("<I", content, offset + 4)[0]
+        payload_start = offset + 8
+        available = max(0, len(content) - payload_start)
+
+        if chunk_id == b"data":
+            if declared_size == 0xFFFFFFFF or declared_size > available:
+                return available
+            return declared_size
+
+        if declared_size == 0xFFFFFFFF:
+            break
+        offset = payload_start + declared_size + (declared_size & 1)
+
+    raise NarrationSynthesisError(f"WAV data chunk not found for {path.name}")
+
+
 def _wav_duration(path: Path) -> float:
     with wave.open(str(path), "rb") as audio:
         frames = audio.getnframes()
         rate = audio.getframerate()
-    if rate <= 0:
-        raise NarrationSynthesisError(f"Invalid WAV sample rate for {path.name}")
-    return round(frames / rate, 3)
+        channels = audio.getnchannels()
+        sample_width = audio.getsampwidth()
+
+    if rate <= 0 or channels <= 0 or sample_width <= 0:
+        raise NarrationSynthesisError(f"Invalid WAV format for {path.name}")
+
+    # Prefer the container's actual data payload. This handles ordinary WAVs
+    # and streamed WAVs whose frame/data sizes use the 0xFFFFFFFF sentinel.
+    try:
+        payload_bytes = _wav_data_bytes(path)
+        duration = payload_bytes / (rate * channels * sample_width)
+    except NarrationSynthesisError:
+        duration = frames / rate
+
+    if duration <= 0:
+        raise NarrationSynthesisError(f"Empty WAV audio for {path.name}")
+    return round(duration, 3)
 
 
 def _checksum(path: Path) -> str:
@@ -129,6 +174,23 @@ def _synthesize_segment(segment: dict[str, Any]) -> tuple[float, str]:
     return _wav_duration(path), _checksum(path)
 
 
+def _refresh_completed_segment(segment: dict[str, Any]) -> bool:
+    """Re-measure an existing file without spending another provider request."""
+    path = _absolute(str(segment["relative_path"]))
+    if not path.is_file():
+        raise NarrationSynthesisError(f"Completed narration file is missing: {path.name}")
+    duration = _wav_duration(path)
+    checksum = _checksum(path)
+    changed = (
+        float(segment.get("actual_duration_seconds") or 0) != duration
+        or str(segment.get("checksum_sha256") or "") != checksum
+    )
+    segment["actual_duration_seconds"] = duration
+    segment["checksum_sha256"] = checksum
+    segment["error"] = None
+    return changed
+
+
 def _retime_project_scenes(project: Project, manifest: dict[str, Any], db: Session) -> None:
     by_number = {
         int(segment.get("scene_number", 0)): segment
@@ -175,14 +237,24 @@ def synthesize_narration(
     if manifest is None:
         raise NarrationSynthesisError("Plan narration before synthesis")
 
-    attempted = completed = failed = skipped = filtered_out = 0
+    attempted = completed = failed = skipped = filtered_out = repaired = 0
     for segment in manifest.get("segments", []):
         scene_number = int(segment.get("scene_number", 0))
         if scene_numbers and scene_number not in scene_numbers:
             filtered_out += 1
             continue
         if segment.get("status") == "complete" and not force:
+            try:
+                if _refresh_completed_segment(segment):
+                    repaired += 1
+            except NarrationSynthesisError as exc:
+                segment["status"] = "failed"
+                segment["error"] = str(exc)
+                failed += 1
+                _write_json(_manifest_path(project.id), manifest)
+                continue
             skipped += 1
+            _write_json(_manifest_path(project.id), manifest)
             continue
 
         attempted += 1
@@ -221,9 +293,10 @@ def synthesize_narration(
         "failed": failed,
         "skipped": skipped,
         "filtered_out": filtered_out,
+        "repaired": repaired,
     }
     _write_json(_manifest_path(project.id), manifest)
 
-    if retime_scenes and completed:
+    if retime_scenes and (completed or repaired):
         _retime_project_scenes(project, manifest, db)
     return load_narration_plan(project.id) or manifest
