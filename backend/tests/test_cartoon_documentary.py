@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import unittest
 
 from app.models import Scene
@@ -107,6 +108,7 @@ class CartoonDocumentaryTests(unittest.TestCase):
         self.assertEqual(frame.size, (1920, 1080))
 
     def test_every_cartoon_template_supports_youtube_and_shorts(self) -> None:
+        shorts_hashes: set[str] = set()
         for template in cartoon.TEMPLATES:
             with self.subTest(template=template.template_id, format="youtube"):
                 source = patch.render_frame(
@@ -137,6 +139,9 @@ class CartoonDocumentaryTests(unittest.TestCase):
                     subtitle=template.subtitle,
                 )
                 self.assertEqual(shorts.size, (1080, 1920))
+                shorts_hashes.add(hashlib.sha256(shorts.tobytes()).hexdigest())
+
+        self.assertEqual(len(shorts_hashes), len(cartoon.TEMPLATES))
 
 
 if __name__ == "__main__":
