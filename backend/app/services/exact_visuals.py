@@ -11,7 +11,7 @@ from . import tech_behavior_route_patch as tech
 FINANCE_FAMILY_ID = "finance_motion"
 CHARACTER_FAMILY_ID = "character_explainer"
 TECH_FAMILY_ID = "tech_behavior_motion"
-DEFAULT_FAMILY_ID = FINANCE_FAMILY_ID
+DEFAULT_FAMILY_ID = TECH_FAMILY_ID
 
 FAMILIES = (
     {
@@ -27,7 +27,7 @@ FAMILIES = (
     {
         "family_id": TECH_FAMILY_ID,
         "label": "Tech & Behavior Motion",
-        "description": "Use recommendation systems, behavioral signals, prediction models, timelines, and digital twins when technology is the story.",
+        "description": "Use recommendation systems, behavioral signals, prediction models, timelines, systems diagrams, and digital twins when technology is the story.",
     },
 )
 
@@ -58,6 +58,10 @@ STRONG_FINANCE_PHRASES = {
     "automatic transfer": 5,
     "growth chart": 5,
     "asset allocation": 6,
+    "paycheck": 6,
+    "savings": 5,
+    "investing": 6,
+    "financial": 5,
     "subscribe": 5,
     "blueprint": 4,
 }
@@ -86,7 +90,42 @@ STRONG_TECH_PHRASES = {
     "what reaches you": 7,
     "change your behavior": 8,
     "help us navigate the world": 7,
+    "mars": 12,
+    "martian": 12,
+    "spacecraft": 11,
+    "off-planet": 10,
+    "interplanetary": 11,
+    "robotic": 9,
+    "robots": 9,
+    "autonomous systems": 10,
+    "artificial systems": 9,
+    "life support": 10,
+    "habitat": 8,
+    "drones": 8,
+    "automation": 7,
+    "nuclear fallout": 8,
+    "nuclear war": 8,
+    "evacuation": 7,
+    "relocation": 6,
 }
+
+SPACE_SYSTEM_PHRASES = (
+    "mars",
+    "martian",
+    "spacecraft",
+    "off-planet",
+    "interplanetary",
+    "robotic fleet",
+    "robotic fleets",
+    "robots",
+    "autonomous systems",
+    "life support",
+    "habitat",
+    "drones",
+    "nuclear fallout",
+    "nuclear war",
+    "evacuation",
+)
 
 REAL_FOOTAGE_PREFERRED_PHRASES = (
     "help us navigate the world",
@@ -147,10 +186,19 @@ def recommend_family(scene: Scene) -> tuple[str, float, str]:
     explicit_character = [phrase for phrase in STRONG_CHARACTER_PHRASES if phrase in context]
     explicit_finance = [phrase for phrase in STRONG_FINANCE_PHRASES if phrase in context]
     explicit_tech = [phrase for phrase in STRONG_TECH_PHRASES if phrase in context]
+    space_signal = next((phrase for phrase in SPACE_SYSTEM_PHRASES if phrase in context), None)
     real_footage_signal = next(
         (phrase for phrase in REAL_FOOTAGE_PREFERRED_PHRASES if phrase in context),
         None,
     )
+
+    if space_signal:
+        confidence = min(0.99, 0.78 + 0.012 * max(tech_score, 1))
+        return (
+            TECH_FAMILY_ID,
+            round(confidence, 2),
+            f"The scene is a space, robotics, or survival-system story: {space_signal}.",
+        )
 
     if real_footage_signal:
         return (
@@ -164,7 +212,7 @@ def recommend_family(scene: Scene) -> tuple[str, float, str]:
         return (
             TECH_FAMILY_ID,
             round(confidence, 2),
-            f"The scene centers on algorithmic behavior: {explicit_tech[0]}.",
+            f"The scene centers on a technology or automated system: {explicit_tech[0]}.",
         )
 
     if explicit_finance and not explicit_character:
@@ -184,19 +232,26 @@ def recommend_family(scene: Scene) -> tuple[str, float, str]:
             f"Human behavior is the visual subject: {signal}.",
         )
 
-    if tech_score > max(finance_score + 1, character_score + 1):
+    if tech_score >= max(finance_score, character_score):
         confidence = min(0.94, 0.58 + 0.025 * max(tech_score, 1))
         return (
             TECH_FAMILY_ID,
             round(confidence, 2),
-            "Technology, prediction, or behavioral data is clearer than a finance system or character action for this scene.",
+            "Technology, systems, evidence, or process diagrams are clearer than a finance system or character action for this scene.",
         )
 
-    confidence = min(0.94, 0.58 + 0.025 * max(finance_score, 1))
+    if explicit_finance:
+        confidence = min(0.94, 0.58 + 0.025 * max(finance_score, 1))
+        return (
+            FINANCE_FAMILY_ID,
+            round(confidence, 2),
+            "The scene contains an explicit financial mechanism.",
+        )
+
     return (
-        FINANCE_FAMILY_ID,
-        round(confidence, 2),
-        "The money flow or financial mechanism is clearer than a character action or technology system for this scene.",
+        TECH_FAMILY_ID,
+        0.56,
+        "No explicit finance mechanism was found, so the neutral systems/documentary visual family is safer than a money template.",
     )
 
 
