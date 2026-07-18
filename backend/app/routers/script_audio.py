@@ -258,7 +258,7 @@ def synthesize_project_narration(project_id: int, payload: NarrationSynthesizeRe
 @router.post("/narration/master")
 def assemble_project_master_narration(project_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     project = _project_or_404(project_id, db)
-    metadata = build_master_narration(project_id)
+    metadata = build_master_narration(project, db)
     project.status = "narrated"
     db.commit()
     invalidate_render_artifacts(project_id)
