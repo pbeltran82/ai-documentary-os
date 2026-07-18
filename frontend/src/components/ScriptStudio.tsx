@@ -38,7 +38,7 @@ type NarrationManifest = {
   voice_id: string;
   speaking_rate: number;
   segments: AudioSegment[];
-  last_run: { completed: number; failed: number; skipped: number; filtered_out?: number };
+  last_run: { completed: number; failed: number; skipped: number; filtered_out?: number; repaired?: number };
 };
 
 type Props = {
@@ -127,20 +127,20 @@ export function ScriptStudio({ project, onBack, onOpenScenes, onProjectChanged }
     setSegments((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   }
 
-  function editPayload(applyToScenes = false) {
+  function editPayload() {
     if (!script) throw new Error("Generate a script first");
     return {
       title: script.title,
       thesis: script.thesis,
       editor_notes: script.editor_notes ?? "",
       segments: segments.map(({ act, narration, visual_intent, search_keywords }) => ({ act, narration, visual_intent, search_keywords })),
-      apply_to_scenes: applyToScenes,
+      replace_scenes: false,
     };
   }
 
   async function saveDraft() {
     await run("save", () => request<DocumentaryScript>(`/projects/${project.id}/production/script`, {
-      method: "PUT", body: JSON.stringify(editPayload(false)),
+      method: "PUT", body: JSON.stringify(editPayload()),
     }), (saved) => {
       setScript(saved);
       setSegments(cloneSegments(saved.segments));
@@ -151,25 +151,17 @@ export function ScriptStudio({ project, onBack, onOpenScenes, onProjectChanged }
   async function approveAndApply() {
     setBusy("approve");
     setError("");
+    setMessage("");
     try {
       const saved = await request<DocumentaryScript>(`/projects/${project.id}/production/script`, {
-        method: "PUT", body: JSON.stringify(editPayload(false)),
+        method: "PUT", body: JSON.stringify(editPayload()),
       });
       const approved = await request<DocumentaryScript>(`/projects/${project.id}/production/script/approve`, {
-        method: "POST", body: JSON.stringify({ notes: "Approved in Script Studio" }),
-      });
-      await request<DocumentaryScript>(`/projects/${project.id}/production/script`, {
-        method: "PUT",
-        body: JSON.stringify({
-          title: saved.title,
-          thesis: saved.thesis,
-          editor_notes: saved.editor_notes ?? "",
-          segments: saved.segments.map(({ act, narration, visual_intent, search_keywords }) => ({ act, narration, visual_intent, search_keywords })),
-          apply_to_scenes: true,
-        }),
+        method: "POST",
+        body: JSON.stringify({ notes: "Approved in Script Studio", replace_scenes: true }),
       });
       setScript(approved);
-      setSegments(cloneSegments(approved.segments));
+      setSegments(cloneSegments(saved.segments));
       await onProjectChanged();
       setMessage("Script approved and applied to project scenes.");
     } catch (err) {
@@ -189,7 +181,8 @@ export function ScriptStudio({ project, onBack, onOpenScenes, onProjectChanged }
     }), (result) => {
       setNarration(result);
       void onProjectChanged();
-      setMessage(`Narration ${result.status}: ${result.last_run.completed} completed, ${result.last_run.failed} failed.`);
+      const repaired = result.last_run.repaired ?? 0;
+      setMessage(`Narration ${result.status}: ${result.last_run.completed} completed, ${repaired} repaired, ${result.last_run.failed} failed.`);
     });
   }
 
@@ -219,7 +212,7 @@ export function ScriptStudio({ project, onBack, onOpenScenes, onProjectChanged }
           <div className="script-segment-list">{segments.map((segment, index) => <article className="script-segment-card" key={segment.segment_id || index}><div className="segment-heading"><span>Scene {index + 1}</span><input value={segment.act} onChange={(event) => updateSegment(index, { act: event.target.value })} /><small>{segment.estimated_duration_seconds.toFixed(1)} sec</small></div><label>Narration<textarea rows={5} value={segment.narration} onChange={(event) => updateSegment(index, { narration: event.target.value })} /></label><label>Visual intent<textarea rows={3} value={segment.visual_intent} onChange={(event) => updateSegment(index, { visual_intent: event.target.value })} /></label></article>)}</div>
         </section>
         <section className="panel studio-grid">
-          <div><p className="eyebrow">03 · NARRATION</p><h3>Choose the voice and synthesize</h3><div className="voice-controls"><label>Voice<select value={voice} onChange={(event) => setVoice(event.target.value)}>{voices.map((item) => <option value={item} key={item}>{item}</option>)}</select></label><label>Speaking rate<input type="number" min={0.5} max={2} step={0.05} value={rate} onChange={(event) => setRate(Number(event.target.value))} /></label></div><div className="studio-actions"><button className="ghost-button" disabled={script.status !== "approved" || Boolean(busy)} onClick={() => void planNarration()}>{busy === "plan" ? "Planning…" : "Plan narration"}</button><button className="primary-button" disabled={!narration || Boolean(busy)} onClick={() => void synthesize(false)}>{busy === "synthesize" ? "Synthesizing…" : "Synthesize pending"}</button><button className="ghost-button" disabled={!narration || Boolean(busy)} onClick={() => void synthesize(true)}>Regenerate all</button></div></div>
+          <div><p className="eyebrow">03 · NARRATION</p><h3>Choose the voice and synthesize</h3><div className="voice-controls"><label>Voice<select value={voice} onChange={(event) => setVoice(event.target.value)}>{voices.map((item) => <option value={item} key={item}>{item}</option>)}</select></label><label>Speaking rate<input type="number" min={0.5} max={2} step={0.05} value={rate} onChange={(event) => setRate(Number(event.target.value))} /></label></div><div className="studio-actions"><button className="ghost-button" disabled={script.status !== "approved" || Boolean(busy)} onClick={() => void planNarration()}>{busy === "plan" ? "Planning…" : "Plan narration"}</button><button className="primary-button" disabled={!narration || script.status !== "approved" || Boolean(busy)} onClick={() => void synthesize(false)}>{busy === "synthesize" ? "Synthesizing…" : "Synthesize pending"}</button><button className="ghost-button" disabled={!narration || script.status !== "approved" || Boolean(busy)} onClick={() => void synthesize(true)}>Regenerate all</button></div></div>
           <div className="narration-progress"><strong>{narration?.status ?? "Not planned"}</strong>{(narration?.segments ?? []).map((item) => <div className={`audio-row ${item.status}`} key={item.segment_id}><span>Scene {item.scene_number}</span><span>{item.status}</span><span>{item.actual_duration_seconds ? `${item.actual_duration_seconds.toFixed(1)}s` : "—"}</span></div>)}</div>
         </section>
       </>}
