@@ -16,3 +16,4 @@ from . import cartoon_documentary_patch as _cartoon_documentary_patch  # noqa: F
 from . import cartoon_documentary_polish as _cartoon_documentary_polish  # noqa: F401,E402
 from . import cartoon_shorts_polish as _cartoon_shorts_polish  # noqa: F401,E402
 from . import cartoon_art_polish_v3 as _cartoon_art_polish_v3  # noqa: F401,E402
+from . import cartoon_art_polish_v4 as _cartoon_art_polish_v4  # noqa: F401,E402
