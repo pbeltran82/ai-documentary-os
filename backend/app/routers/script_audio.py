@@ -14,6 +14,7 @@ from ..services.documentary_script_generation import (
     generate_openai_script,
     update_script_draft,
 )
+from ..services.master_narration import build_master_narration
 from ..services.narration_synthesis import NarrationSynthesisError, synthesize_narration
 from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.script_approval import approve_script, list_script_revisions
@@ -252,6 +253,16 @@ def synthesize_project_narration(project_id: int, payload: NarrationSynthesizeRe
         )
     except NarrationSynthesisError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/narration/master")
+def assemble_project_master_narration(project_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    project = _project_or_404(project_id, db)
+    metadata = build_master_narration(project_id)
+    project.status = "narrated"
+    db.commit()
+    invalidate_render_artifacts(project_id)
+    return metadata
 
 
 @router.post("/visual-beats/plan")
