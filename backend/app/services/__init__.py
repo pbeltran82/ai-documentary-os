@@ -115,3 +115,9 @@ from . import shorts_transition_polish as _shorts_transition_polish  # noqa: F40
 # one abstract route view before arrival and settlement resolution.
 from . import cartoon_shorts_story_v8 as _cartoon_shorts_story_v8  # noqa: F401,E402
 from . import cartoon_visual_overhaul_v65 as _cartoon_visual_overhaul_v65  # noqa: F401,E402
+
+# Fifth-export QA blockers: regular exact visuals cut directly instead of dipping
+# through black, and a second adjacent transport scene becomes cargo logistics
+# rather than restarting the same boarding animation.
+from . import regular_transition_polish as _regular_transition_polish  # noqa: F401,E402
+from . import cartoon_visual_overhaul_v66 as _cartoon_visual_overhaul_v66  # noqa: F401,E402
