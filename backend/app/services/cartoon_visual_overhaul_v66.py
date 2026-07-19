@@ -20,6 +20,11 @@ ROOM = (219, 233, 240)
 FLOOR = (163, 177, 184)
 INK = cartoon.INK
 
+# Preserve the complete v65 route/community/settlement behavior before extending
+# its public renderer contract. Existing callers that import v65 continue to see
+# the final installed renderer, while this module can safely delegate downward.
+_previous_render_planned_frame = v65.render_planned_frame
+
 
 def _ordered_scenes(scene) -> list:
     project = getattr(scene, "project", None)
@@ -187,7 +192,7 @@ def render_planned_frame(
     if _is_consecutive_transport(scene, selected):
         return _logistics_frame(progress, variant)
 
-    return v65.render_planned_frame(
+    return _previous_render_planned_frame(
         scene,
         template_id,
         duration_seconds,
@@ -196,4 +201,6 @@ def render_planned_frame(
     )
 
 
-cartoon.render_planned_frame = render_planned_frame
+# Keep v65 as the public compatibility surface while installing the v66 extension.
+v65.render_planned_frame = render_planned_frame
+cartoon.render_planned_frame = v65.render_planned_frame
