@@ -121,3 +121,7 @@ from . import cartoon_visual_overhaul_v65 as _cartoon_visual_overhaul_v65  # noq
 # rather than restarting the same boarding animation.
 from . import regular_transition_polish as _regular_transition_polish  # noqa: F401,E402
 from . import cartoon_visual_overhaul_v66 as _cartoon_visual_overhaul_v66  # noqa: F401,E402
+
+# Sixth-export release polish: exact-visual documentaries must show authored art
+# on frame one in both delivery formats, with no project fade-in or dark source pad.
+from . import opening_frame_polish as _opening_frame_polish  # noqa: F401,E402
