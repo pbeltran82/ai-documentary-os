@@ -71,3 +71,19 @@ from . import cartoon_art_polish_v50 as _cartoon_art_polish_v50  # noqa: F401,E4
 # Final native 9:16 release polish installs after the general Shorts family so
 # immediate openings, tighter automation beats, and the dedicated CTA win.
 from . import native_shorts_final_polish as _native_shorts_final_polish  # noqa: F401,E402
+
+# Regular 16:9 cleanup: remove construction seams, retime the route, tighten the
+# presenter gesture, sustain the airlock action frame, and lock the final output.
+from . import cartoon_art_polish_v51 as _cartoon_art_polish_v51  # noqa: F401,E402
+from . import cartoon_art_polish_v52 as _cartoon_art_polish_v52  # noqa: F401,E402
+from . import cartoon_art_polish_v53 as _cartoon_art_polish_v53  # noqa: F401,E402
+from . import cartoon_art_polish_v54 as _cartoon_art_polish_v54  # noqa: F401,E402
+from . import cartoon_art_polish_v55 as _cartoon_art_polish_v55  # noqa: F401,E402
+
+# Native 9:16 Mars story pipeline. These imports intentionally follow the older
+# final-polish wrapper so semantic Mars dispatch and renderers remain authoritative.
+from . import cartoon_shorts_story_v2 as _cartoon_shorts_story_v2  # noqa: F401,E402
+from . import cartoon_shorts_story_v3 as _cartoon_shorts_story_v3  # noqa: F401,E402
+from . import cartoon_shorts_story_v4 as _cartoon_shorts_story_v4  # noqa: F401,E402
+from . import cartoon_shorts_story_v5 as _cartoon_shorts_story_v5  # noqa: F401,E402
+from . import cartoon_shorts_story_v6 as _cartoon_shorts_story_v6  # noqa: F401,E402
