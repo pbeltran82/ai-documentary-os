@@ -37,6 +37,10 @@ function formatRuntime(seconds: number): string {
   return `${minutes}:${remaining.toFixed(2).padStart(5, "0")}`;
 }
 
+function formatFps(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
 function statusLabel(status: MediaQACheck["status"]): string {
   if (status === "fail") return "FAIL";
   if (status === "warn") return "REVIEW";
@@ -147,7 +151,7 @@ export function TimelineBuilderWithQA(props: TimelineBuilderWithQAProps) {
                 <article><span>Needs review</span><strong>{report.summary.warnings}</strong></article>
                 <article><span>Failures</span><strong>{report.summary.failures}</strong></article>
                 <article><span>Runtime</span><strong>{formatRuntime(report.render.container_duration_seconds)}</strong></article>
-                <article><span>Delivery</span><strong>{report.render.width}×{report.render.height} · {report.render.fps:g} fps</strong></article>
+                <article><span>Delivery</span><strong>{report.render.width}×{report.render.height} · {formatFps(report.render.fps)} fps</strong></article>
               </div>
 
               <div className={`media-qa-summary-message ${report.verdict.toLowerCase()}`}>
