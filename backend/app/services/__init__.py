@@ -122,6 +122,10 @@ from . import cartoon_visual_overhaul_v65 as _cartoon_visual_overhaul_v65  # noq
 from . import regular_transition_polish as _regular_transition_polish  # noqa: F401,E402
 from . import cartoon_visual_overhaul_v66 as _cartoon_visual_overhaul_v66  # noqa: F401,E402
 
+# Topic-aware generalization: Mars-authored templates are now domain-gated and the
+# Internet/attention test project receives ten dedicated beat-aware compositions.
+from . import internet_attention_visuals as _internet_attention_visuals  # noqa: F401,E402
+
 # Sixth-export release polish: exact-visual documentaries must show authored art
 # on frame one in both delivery formats, with no project fade-in or dark source pad.
 from . import opening_frame_polish as _opening_frame_polish  # noqa: F401,E402
@@ -129,3 +133,7 @@ from . import opening_frame_polish as _opening_frame_polish  # noqa: F401,E402
 # Optional music installs after every timing, transition, and opening guard so the
 # final render graph can add a separate looped bed with fades and narration ducking.
 from . import background_music_timeline as _background_music_timeline  # noqa: F401,E402
+
+# Semantic QA installs last so PASS/HOLD includes topic/template alignment and
+# verifies that long scenes actually resolve into multiple beat-level compositions.
+from . import semantic_visual_quality_assurance as _semantic_visual_quality_assurance  # noqa: F401,E402
