@@ -1,0 +1,238 @@
+.background-music-dock {
+  max-width: 1380px;
+  margin: 0 auto 36px;
+  padding: 0 24px;
+}
+
+.background-music-panel {
+  border-color: rgba(128, 102, 255, 0.34);
+  background:
+    radial-gradient(circle at 92% 8%, rgba(128, 102, 255, 0.15), transparent 30%),
+    linear-gradient(145deg, rgba(39, 30, 74, 0.48), rgba(12, 16, 22, 0.96));
+}
+
+.background-music-panel.active {
+  border-color: rgba(84, 214, 194, 0.48);
+  box-shadow: inset 0 0 0 1px rgba(84, 214, 194, 0.08);
+}
+
+.background-music-heading {
+  align-items: flex-start;
+}
+
+.background-music-intro {
+  max-width: 780px;
+  margin: 8px 0 0;
+  color: #99a0ad;
+  line-height: 1.6;
+}
+
+.background-music-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.music-file-picker {
+  display: grid;
+  gap: 8px;
+  color: #afb3bd;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.music-file-picker input {
+  min-height: 48px;
+  padding: 9px 12px;
+  border: 1px solid #343846;
+  border-radius: 10px;
+  color: #cfd3dc;
+  background: #0a0e14;
+}
+
+.music-selection {
+  margin: 9px 0 0;
+  color: #b9b0ff;
+  font-size: 12px;
+}
+
+.music-track-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 22px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #353947;
+  border-radius: 13px;
+  background: rgba(6, 10, 15, 0.82);
+}
+
+.music-track-card > div {
+  display: grid;
+  gap: 5px;
+}
+
+.music-track-card strong {
+  color: #f0eff6;
+  font-size: 16px;
+}
+
+.music-track-card small {
+  color: #8d95a2;
+}
+
+.music-track-card audio {
+  width: 100%;
+}
+
+.music-enable-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(84, 214, 194, 0.2);
+  border-radius: 12px;
+  background: rgba(24, 74, 67, 0.15);
+}
+
+.music-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e1f8f3;
+  font-weight: 750;
+}
+
+.music-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #54d6c2;
+}
+
+.music-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.music-presets button {
+  padding: 7px 10px;
+  border: 1px solid #47405f;
+  border-radius: 999px;
+  color: #d3cdfd;
+  background: #171329;
+  cursor: pointer;
+}
+
+.music-control-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.music-control-grid label {
+  display: grid;
+  gap: 10px;
+  padding: 15px;
+  border: 1px solid #303541;
+  border-radius: 12px;
+  background: rgba(8, 12, 18, 0.74);
+}
+
+.music-control-grid label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #c6cad2;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.music-control-grid label > span strong {
+  color: #9f91ff;
+}
+
+.music-control-grid input[type="range"] {
+  width: 100%;
+  accent-color: #7c68f7;
+}
+
+.music-control-grid small {
+  color: #7f8793;
+  line-height: 1.45;
+}
+
+.music-control-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid #30343e;
+}
+
+.music-control-footer p {
+  max-width: 760px;
+  margin: 0;
+  color: #9199a5;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.music-control-footer > div {
+  display: flex;
+  gap: 10px;
+}
+
+.background-music-empty {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px dashed #48405f;
+  border-radius: 12px;
+  text-align: center;
+  background: rgba(13, 11, 23, 0.52);
+}
+
+.background-music-empty strong {
+  color: #e5e1ff;
+}
+
+.background-music-empty p {
+  max-width: 720px;
+  margin: 8px auto 0;
+  color: #8d93a0;
+  line-height: 1.55;
+}
+
+@media (max-width: 980px) {
+  .music-track-card,
+  .music-control-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .music-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .music-enable-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  .background-music-upload {
+    grid-template-columns: 1fr;
+  }
+
+  .music-control-footer > div {
+    flex-direction: column;
+  }
+}
