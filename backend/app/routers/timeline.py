@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import TimelinePlanResponse, TimelineStyleUpdate
+from ..services.media_quality_assurance import analyze_timeline_render, load_qa_report
 from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.timeline_playback_polish import render_first_cut, write_timeline_plan
 from ..services.voiceover import remove_voiceover, save_voiceover
@@ -83,3 +84,23 @@ def render_timeline(
 ) -> dict:
     project = get_project_or_404(project_id, db)
     return render_first_cut(project, payload)
+
+
+@router.post("/{project_id}/timeline/qa")
+def run_timeline_quality_assurance(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Inspect the rendered first cut and persist a release QA report."""
+    project = get_project_or_404(project_id, db)
+    return analyze_timeline_render(project)
+
+
+@router.get("/{project_id}/timeline/qa")
+def get_timeline_quality_assurance(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Return the most recently generated release QA report."""
+    get_project_or_404(project_id, db)
+    return load_qa_report(project_id)
