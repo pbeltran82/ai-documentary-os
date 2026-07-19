@@ -3,7 +3,7 @@ import { api } from "./api";
 import { AssetPlanner } from "./components/AssetPlanner";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { ScriptStudio } from "./components/ScriptStudio";
-import { TimelineBuilder } from "./components/TimelineBuilder";
+import { TimelineBuilderWithQA } from "./components/TimelineBuilderWithQA";
 import type { Project, ProjectCreate, ProjectDetail, Scene, SceneUpdate } from "./types";
 
 type WorkspaceMode = "script" | "scenes" | "assets" | "timeline";
@@ -154,9 +154,9 @@ function App() {
         ) : workspaceMode === "assets" ? (
           <AssetPlanner project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenScenes={() => setWorkspaceMode("scenes")} onRefreshProject={() => refreshSelectedProject(selectedProject.id)} />
         ) : workspaceMode === "timeline" ? (
-          <TimelineBuilder project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onOpenScenes={() => setWorkspaceMode("scenes")} onProjectChanged={() => Promise.all([refreshSelectedProject(selectedProject.id), refreshProjects()]).then(() => undefined)} />
+          <TimelineBuilderWithQA project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onOpenScenes={() => setWorkspaceMode("scenes")} onProjectChanged={() => Promise.all([refreshSelectedProject(selectedProject.id), refreshProjects()]).then(() => undefined)} />
         ) : (
-          <ProjectWorkspace project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onGenerate={generateScenes} onUpdateScene={updateScene} onDeleteScene={deleteScene} />
+          <ProjectWorkspace project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onGenerate={generateScenes} onUpdateScene={updateScene} onDelete={deleteScene} />
         )
       ) : (
         <main className="workspace">
