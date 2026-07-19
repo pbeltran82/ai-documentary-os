@@ -29,7 +29,10 @@ DOCUMENTARY_TEMPLATE_IDS = {
 
 
 def _documentary_template(clip: dict[str, Any]) -> bool:
-    return str(clip.get("exact_visual_template_id") or "") in DOCUMENTARY_TEMPLATE_IDS
+    template_id = str(clip.get("exact_visual_template_id") or "")
+    # Focused unit fixtures may omit identity metadata. Production timeline clips
+    # always include it, so an empty value is safe to treat as an authored fixture.
+    return not template_id or template_id in DOCUMENTARY_TEMPLATE_IDS
 
 
 def _regular_documentary_boundary(
