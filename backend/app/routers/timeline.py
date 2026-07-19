@@ -58,6 +58,22 @@ def background_music_state(project_id: int) -> dict:
     }
 
 
+def format_music_defaults(project: Project) -> dict:
+    if str(project.video_format) == "shorts":
+        return {
+            "music_enabled": True,
+            "music_gain_db": -24.0,
+            "music_ducking_db": -9.0,
+            "music_fade_seconds": 0.6,
+        }
+    return {
+        "music_enabled": True,
+        "music_gain_db": -22.0,
+        "music_ducking_db": -8.0,
+        "music_fade_seconds": 1.5,
+    }
+
+
 @router.post(
     "/{project_id}/timeline/plan",
     response_model=TimelinePlanResponse,
@@ -120,10 +136,10 @@ async def upload_timeline_music(
     filename: str = Query(min_length=1, max_length=255),
     db: Session = Depends(get_db),
 ) -> dict:
-    get_project_or_404(project_id, db)
+    project = get_project_or_404(project_id, db)
     content_type = request.headers.get("content-type", "application/octet-stream")
     await save_background_music(project_id, filename, content_type, request.stream())
-    save_timeline_style(project_id, {"music_enabled": True})
+    save_timeline_style(project_id, format_music_defaults(project))
     invalidate_render_artifacts(project_id)
     return background_music_state(project_id)
 
