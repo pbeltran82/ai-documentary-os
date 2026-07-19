@@ -109,3 +109,9 @@ from . import cartoon_visual_overhaul_v63 as _cartoon_visual_overhaul_v63  # noq
 # black flashes between native vertical scenes.
 from . import cartoon_visual_overhaul_v64 as _cartoon_visual_overhaul_v64  # noqa: F401,E402
 from . import shorts_transition_polish as _shorts_transition_polish  # noqa: F401,E402
+
+# Final evidence-driven polish: keep every dome planted on Mars, turn the people
+# beat into an interior community scene, widen doorway-safe motion, and allow only
+# one abstract route view before arrival and settlement resolution.
+from . import cartoon_shorts_story_v8 as _cartoon_shorts_story_v8  # noqa: F401,E402
+from . import cartoon_visual_overhaul_v65 as _cartoon_visual_overhaul_v65  # noqa: F401,E402
