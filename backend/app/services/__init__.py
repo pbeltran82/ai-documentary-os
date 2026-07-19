@@ -87,3 +87,8 @@ from . import cartoon_shorts_story_v3 as _cartoon_shorts_story_v3  # noqa: F401,
 from . import cartoon_shorts_story_v4 as _cartoon_shorts_story_v4  # noqa: F401,E402
 from . import cartoon_shorts_story_v5 as _cartoon_shorts_story_v5  # noqa: F401,E402
 from . import cartoon_shorts_story_v6 as _cartoon_shorts_story_v6  # noqa: F401,E402
+
+# The route clock must be absolute across visual beats, and the Shorts story clock
+# must install last so selected narration, captions, clips, and runtime stay aligned.
+from . import cartoon_art_polish_v61 as _cartoon_art_polish_v61  # noqa: F401,E402
+from . import shorts_story_clock as _shorts_story_clock  # noqa: F401,E402
