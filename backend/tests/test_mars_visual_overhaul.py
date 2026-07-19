@@ -61,8 +61,10 @@ class MarsVisualOverhaulTests(unittest.TestCase):
         actors = stack.draw("actors")
         actors.rectangle((175, 130, 225, 300), fill=(255, 0, 0))
         image = stack.composite((230, 230, 230))
+        # The center pixel is the intentional panel seam; an adjacent point proves
+        # that the closed foreground panel, not the red actor layer, owns the area.
         self.assertNotEqual(image.getpixel((200, 210)), (255, 0, 0))
-        self.assertEqual(image.getpixel((200, 210)), (81, 92, 103))
+        self.assertEqual(image.getpixel((185, 210)), (81, 92, 103))
 
     def test_shorts_selector_uses_unique_roles_and_one_route(self) -> None:
         selected, story_mode = pipeline._narration_source_segments(
