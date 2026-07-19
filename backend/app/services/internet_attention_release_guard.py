@@ -2,10 +2,12 @@ from __future__ import annotations
 
 """Compatibility and delivery guard for the Internet attention visual family."""
 
-from PIL import ImageDraw
+from PIL import Image, ImageDraw
 
 from . import cartoon_documentary as cartoon
+from . import cartoon_visual_overhaul_v62 as v62
 from . import cartoon_visual_overhaul_v63 as v63
+from . import cartoon_visual_overhaul_v64 as v64
 from . import cartoon_visual_overhaul_v65 as v65
 from . import cartoon_visual_overhaul_v66 as v66
 from . import internet_attention_visuals as internet
@@ -70,10 +72,69 @@ def _safe_phone(
         )
 
 
-internet._phone = _safe_phone
+def _legacy_core_renderer(
+    scene,
+    template_id: str | None,
+    duration_seconds: float,
+    time_seconds: float,
+    style_id: str | None = None,
+) -> Image.Image:
+    """Render the seven approved Mars/general templates without wrapper recursion."""
+    selected = v63._selected_template(scene, template_id)
+    progress = v63._absolute_progress(duration_seconds, time_seconds)
+    variant = int(getattr(scene, "scene_number", 1) or 1) % 6
 
-# Preserve the established public identity contract. Non-Internet scenes delegate
-# to the captured v66 renderer, so all Mars release behavior remains unchanged.
+    if selected == "transport_scene":
+        return v62._transport_frame(progress, variant)
+    if selected == "habitat_build":
+        return v62._habitat_frame(progress, variant)
+    if selected == "presenter_desk":
+        return v63._presenter_frame(progress, variant)
+    if selected == "council_scene":
+        return v63._council_frame(progress, variant)
+    if selected == "crowd_focus":
+        return v65._community_frame(progress, variant)
+    if selected == "process_diagram":
+        return v65._settlement_frame(progress, variant)
+    if selected == "route_map":
+        rank, count = v65._route_rank(scene)
+        if v64._is_final_project_scene(scene):
+            return v65._settlement_frame(progress, variant)
+        if count > 1 and rank > 0:
+            return v65._arrival_frame(progress, variant)
+        return v63._route_frame(progress, variant)
+    return v63._process_frame(progress, variant)
+
+
+def _legacy_v66_renderer(
+    scene,
+    template_id: str | None,
+    duration_seconds: float,
+    time_seconds: float,
+    style_id: str | None = None,
+) -> Image.Image:
+    selected = v63._selected_template(scene, template_id)
+    progress = v63._absolute_progress(duration_seconds, time_seconds)
+    variant = int(getattr(scene, "scene_number", 1) or 1) % 6
+    if v66._is_consecutive_transport(scene, selected):
+        return v66._logistics_frame(progress, variant)
+    # Kept as a module-level compatibility seam so existing tests and extensions
+    # can still intercept the pre-v66 renderer without causing import recursion.
+    return v66._previous_render_planned_frame(
+        scene,
+        template_id,
+        duration_seconds,
+        time_seconds,
+        style_id,
+    )
+
+
+internet._phone = _safe_phone
+v66._previous_render_planned_frame = _legacy_core_renderer
+internet._previous_render_planned_frame = _legacy_v66_renderer
+
+# Preserve the established public identity contract. Internet scenes are handled
+# by the new director; every other subject delegates to the explicit legacy core.
 v63.render_planned_frame = internet.render_planned_frame
 v65.render_planned_frame = internet.render_planned_frame
 v66.render_planned_frame = internet.render_planned_frame
