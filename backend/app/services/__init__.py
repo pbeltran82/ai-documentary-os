@@ -93,3 +93,10 @@ from . import cartoon_shorts_story_v6 as _cartoon_shorts_story_v6  # noqa: F401,
 from . import cartoon_art_polish_v61 as _cartoon_art_polish_v61  # noqa: F401,E402
 from . import shorts_story_clock as _shorts_story_clock  # noqa: F401,E402
 from . import release_compat_guard as _release_compat_guard  # noqa: F401,E402
+
+# Visual architecture reset. These imports intentionally run after every legacy
+# polish and compatibility wrapper so the layered source renderers and diverse
+# Shorts contract are the final authorities.
+from . import cartoon_visual_overhaul_v62 as _cartoon_visual_overhaul_v62  # noqa: F401,E402
+from . import cartoon_shorts_story_v7 as _cartoon_shorts_story_v7  # noqa: F401,E402
+from . import shorts_visual_contract_v2 as _shorts_visual_contract_v2  # noqa: F401,E402
