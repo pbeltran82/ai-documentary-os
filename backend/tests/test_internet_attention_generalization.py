@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch as mock_patch
 
 from PIL import Image
 
 from app.services import cartoon_documentary as cartoon
 from app.services import cartoon_documentary_patch as patch
+from app.services import internet_attention_release_guard as release_guard
 from app.services import internet_attention_visuals as internet
 from app.services.semantic_visual_quality_assurance import semantic_checks
 
@@ -141,6 +143,25 @@ class InternetAttentionGeneralizationTests(unittest.TestCase):
         self.assertEqual(second.size, (1920, 1080))
         self.assertNotEqual(first.tobytes(), second.tobytes())
 
+    def test_regeneration_replaces_stale_mars_template_identity(self) -> None:
+        scene = self.scene(number=2, beats=6)
+        sentinel = object()
+        with mock_patch.object(
+            release_guard,
+            "_original_render_cartoon_documentary",
+            return_value=sentinel,
+        ) as original:
+            result = release_guard.render_cartoon_documentary(
+                scene,
+                "habitat_build",
+                "clean_editorial",
+            )
+
+        self.assertIs(result, sentinel)
+        resolved_template_id = original.call_args.args[1]
+        self.assertIn(resolved_template_id, internet.INTERNET_TEMPLATE_IDS)
+        self.assertNotEqual(resolved_template_id, "habitat_build")
+
     def test_semantic_qa_holds_internet_project_with_mars_templates(self) -> None:
         project = self.project()
         self.scene(project=project, beats=6)
@@ -186,6 +207,7 @@ class InternetAttentionGeneralizationTests(unittest.TestCase):
 
     def test_topic_aware_renderer_is_installed_last(self) -> None:
         self.assertIs(cartoon.render_planned_frame, internet.render_planned_frame)
+        self.assertIs(cartoon.render_cartoon_documentary, release_guard.render_cartoon_documentary)
         self.assertIs(cartoon.suggest_template, internet.suggest_template)
         self.assertIs(patch._use_cartoon, internet._use_cartoon)
 
