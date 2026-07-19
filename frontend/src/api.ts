@@ -22,6 +22,7 @@ import type {
   VisualFeedbackReason,
 } from "./types";
 import type { MediaQAReport } from "./mediaQaTypes";
+import type { BackgroundMusicSettingsUpdate, BackgroundMusicState } from "./musicTypes";
 import "./version.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
@@ -91,6 +92,22 @@ export const api = {
     const plan = await request<TimelinePlan>(`/projects/${projectId}/timeline/narration`, { method: "DELETE" });
     dispatchQAInvalidated(projectId);
     return plan;
+  },
+  getBackgroundMusic: (projectId: number) => request<BackgroundMusicState>(`/projects/${projectId}/timeline/music`),
+  uploadBackgroundMusic: async (projectId: number, file: File) => {
+    const state = await request<BackgroundMusicState>(`/projects/${projectId}/timeline/music?filename=${encodeURIComponent(file.name)}`, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    dispatchQAInvalidated(projectId);
+    return state;
+  },
+  updateBackgroundMusic: async (projectId: number, payload: BackgroundMusicSettingsUpdate) => {
+    const state = await request<BackgroundMusicState>(`/projects/${projectId}/timeline/music`, { method: "PATCH", body: JSON.stringify(payload) });
+    dispatchQAInvalidated(projectId);
+    return state;
+  },
+  removeBackgroundMusic: async (projectId: number) => {
+    const state = await request<BackgroundMusicState>(`/projects/${projectId}/timeline/music`, { method: "DELETE" });
+    dispatchQAInvalidated(projectId);
+    return state;
   },
   renderTimeline: async (projectId: number, style?: TimelineStyle) => {
     const plan = await request<TimelinePlanWithQA>(`/projects/${projectId}/timeline/render`, { method: "POST", body: style ? JSON.stringify(style) : undefined });
