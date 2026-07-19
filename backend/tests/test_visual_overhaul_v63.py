@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from app.services import cartoon_documentary as cartoon
 from app.services import cartoon_visual_overhaul_v63 as overhaul
-from app.services import cartoon_visual_overhaul_v64 as release_guard
+from app.services import cartoon_visual_overhaul_v65 as final_overhaul
 
 
 class VisualOverhaulV63Tests(unittest.TestCase):
@@ -55,8 +55,8 @@ class VisualOverhaulV63Tests(unittest.TestCase):
         ]
         self.assertEqual(len(set(frames)), 3)
 
-    def test_release_guard_is_the_installed_regular_renderer(self) -> None:
-        self.assertIs(cartoon.render_planned_frame, release_guard.render_planned_frame)
+    def test_final_overhaul_is_the_installed_regular_renderer(self) -> None:
+        self.assertIs(cartoon.render_planned_frame, final_overhaul.render_planned_frame)
 
 
 if __name__ == "__main__":
