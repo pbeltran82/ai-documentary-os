@@ -125,6 +125,7 @@ from . import cartoon_visual_overhaul_v66 as _cartoon_visual_overhaul_v66  # noq
 # Topic-aware generalization: Mars-authored templates are now domain-gated and the
 # Internet/attention test project receives ten dedicated beat-aware compositions.
 from . import internet_attention_visuals as _internet_attention_visuals  # noqa: F401,E402
+from . import internet_attention_release_guard as _internet_attention_release_guard  # noqa: F401,E402
 
 # Sixth-export release polish: exact-visual documentaries must show authored art
 # on frame one in both delivery formats, with no project fade-in or dark source pad.
