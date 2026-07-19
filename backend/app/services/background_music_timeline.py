@@ -106,22 +106,14 @@ def _music_filter(
     return filters + f"[{output_label}]"
 
 
-def build_filter_graph(
-    clips: list[dict[str, Any]],
+def _extend_graph_with_music(
+    graph: str,
     runtime_seconds: float,
     style: dict[str, Any],
-    voiceover_input_index: int | None = None,
-    music_input_index: int | None = None,
+    voiceover_input_index: int | None,
+    music_input_index: int,
 ) -> str:
-    graph = _original_build_filter_graph(
-        clips,
-        runtime_seconds,
-        style,
-        voiceover_input_index,
-    )
-    if music_input_index is None:
-        return graph
-
+    """Append audio processing without rebuilding the already-polished video graph."""
     music_chain = _music_filter(music_input_index, runtime_seconds, style, "music_bed")
     if voiceover_input_index is None:
         return ";".join(
@@ -144,6 +136,30 @@ def build_filter_graph(
         "alimiter=limit=0.95[outa]"
     )
     return f"{graph};{audio_mix}"
+
+
+def build_filter_graph(
+    clips: list[dict[str, Any]],
+    runtime_seconds: float,
+    style: dict[str, Any],
+    voiceover_input_index: int | None = None,
+    music_input_index: int | None = None,
+) -> str:
+    graph = _original_build_filter_graph(
+        clips,
+        runtime_seconds,
+        style,
+        voiceover_input_index,
+    )
+    if music_input_index is None:
+        return graph
+    return _extend_graph_with_music(
+        graph,
+        runtime_seconds,
+        style,
+        voiceover_input_index,
+        music_input_index,
+    )
 
 
 def build_ffmpeg_command(
@@ -183,8 +199,8 @@ def build_ffmpeg_command(
     filter_flag = command.index("-filter_complex")
     command[filter_flag:filter_flag] = ["-stream_loop", "-1", "-i", music_source]
     filter_value_index = command.index("-filter_complex") + 1
-    command[filter_value_index] = build_filter_graph(
-        clips,
+    command[filter_value_index] = _extend_graph_with_music(
+        str(command[filter_value_index]),
         float(runtime),
         normalized_style,
         voiceover_input_index,
