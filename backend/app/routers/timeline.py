@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import TimelinePlanResponse, TimelineStyleUpdate
-from ..services.media_quality_assurance import analyze_timeline_render, load_qa_report
+from ..services.media_quality_assurance_v2 import analyze_timeline_render, load_qa_report
 from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.timeline_playback_polish import render_first_cut, write_timeline_plan
 from ..services.voiceover import remove_voiceover, save_voiceover
@@ -73,17 +73,17 @@ def delete_narration(
     return write_timeline_plan(project)
 
 
-@router.post(
-    "/{project_id}/timeline/render",
-    response_model=TimelinePlanResponse,
-)
+@router.post("/{project_id}/timeline/render")
 def render_timeline(
     project_id: int,
     payload: TimelineStyleUpdate | None = None,
     db: Session = Depends(get_db),
 ) -> dict:
+    """Render the first cut, then automatically produce its PASS/HOLD report."""
     project = get_project_or_404(project_id, db)
-    return render_first_cut(project, payload)
+    plan = render_first_cut(project, payload)
+    plan["qa_report"] = analyze_timeline_render(project)
+    return plan
 
 
 @router.post("/{project_id}/timeline/qa")
