@@ -156,7 +156,7 @@ function App() {
         ) : workspaceMode === "timeline" ? (
           <TimelineBuilderWithQA project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onOpenScenes={() => setWorkspaceMode("scenes")} onProjectChanged={() => Promise.all([refreshSelectedProject(selectedProject.id), refreshProjects()]).then(() => undefined)} />
         ) : (
-          <ProjectWorkspace project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onGenerate={generateScenes} onUpdateScene={updateScene} onDelete={deleteScene} />
+          <ProjectWorkspace project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onGenerate={generateScenes} onUpdateScene={updateScene} onDeleteScene={deleteScene} />
         )
       ) : (
         <main className="workspace">
