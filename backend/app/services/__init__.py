@@ -125,3 +125,7 @@ from . import cartoon_visual_overhaul_v66 as _cartoon_visual_overhaul_v66  # noq
 # Sixth-export release polish: exact-visual documentaries must show authored art
 # on frame one in both delivery formats, with no project fade-in or dark source pad.
 from . import opening_frame_polish as _opening_frame_polish  # noqa: F401,E402
+
+# Optional music installs after every timing, transition, and opening guard so the
+# final render graph can add a separate looped bed with fades and narration ducking.
+from . import background_music_timeline as _background_music_timeline  # noqa: F401,E402
