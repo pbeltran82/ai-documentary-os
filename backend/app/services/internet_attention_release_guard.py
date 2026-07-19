@@ -13,6 +13,8 @@ from . import cartoon_visual_overhaul_v66 as v66
 from . import internet_attention_visuals as internet
 from . import native_shorts
 
+_original_render_cartoon_documentary = cartoon.render_cartoon_documentary
+
 
 def _safe_phone(
     draw: ImageDraw.ImageDraw,
@@ -129,6 +131,23 @@ def _legacy_v66_renderer(
     )
 
 
+def render_cartoon_documentary(
+    scene,
+    template_id: str | None = None,
+    style_id: str | None = None,
+):
+    """Replace stale Mars identities when an Internet project is regenerated."""
+    resolved_template_id = template_id
+    if internet.is_internet_attention(scene):
+        selected, _confidence, _reason = internet.suggest_template(scene)
+        resolved_template_id = selected.template_id
+    return _original_render_cartoon_documentary(
+        scene,
+        resolved_template_id,
+        style_id,
+    )
+
+
 internet._phone = _safe_phone
 v66._previous_render_planned_frame = _legacy_core_renderer
 internet._previous_render_planned_frame = _legacy_v66_renderer
@@ -139,6 +158,7 @@ v63.render_planned_frame = internet.render_planned_frame
 v65.render_planned_frame = internet.render_planned_frame
 v66.render_planned_frame = internet.render_planned_frame
 cartoon.render_planned_frame = internet.render_planned_frame
+cartoon.render_cartoon_documentary = render_cartoon_documentary
 
 # Every exact visual exposed in the catalog must have a semantic 9:16 route. The
 # first Internet release uses the established native documentary composition; a
