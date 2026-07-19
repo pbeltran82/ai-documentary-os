@@ -3,7 +3,7 @@ import { api } from "./api";
 import { AssetPlanner } from "./components/AssetPlanner";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { ScriptStudio } from "./components/ScriptStudio";
-import { TimelineBuilderWithQA } from "./components/TimelineBuilderWithQA";
+import { TimelineBuilderWithMusic } from "./components/TimelineBuilderWithMusic";
 import type { Project, ProjectCreate, ProjectDetail, Scene, SceneUpdate } from "./types";
 
 type WorkspaceMode = "script" | "scenes" | "assets" | "timeline";
@@ -154,7 +154,7 @@ function App() {
         ) : workspaceMode === "assets" ? (
           <AssetPlanner project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenScenes={() => setWorkspaceMode("scenes")} onRefreshProject={() => refreshSelectedProject(selectedProject.id)} />
         ) : workspaceMode === "timeline" ? (
-          <TimelineBuilderWithQA project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onOpenScenes={() => setWorkspaceMode("scenes")} onProjectChanged={() => Promise.all([refreshSelectedProject(selectedProject.id), refreshProjects()]).then(() => undefined)} />
+          <TimelineBuilderWithMusic project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onOpenScenes={() => setWorkspaceMode("scenes")} onProjectChanged={() => Promise.all([refreshSelectedProject(selectedProject.id), refreshProjects()]).then(() => undefined)} />
         ) : (
           <ProjectWorkspace project={selectedProject} loading={projectLoading} error={error} onBack={returnToMissionControl} onOpenAssets={() => setWorkspaceMode("assets")} onGenerate={generateScenes} onUpdateScene={updateScene} onDeleteScene={deleteScene} />
         )
