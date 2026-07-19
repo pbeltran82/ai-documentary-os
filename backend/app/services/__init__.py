@@ -104,3 +104,8 @@ from . import shorts_visual_contract_v2 as _shorts_visual_contract_v2  # noqa: F
 # Final regular-format art direction. All seven general documentary templates now
 # share one layered renderer, including multi-stage route pacing.
 from . import cartoon_visual_overhaul_v63 as _cartoon_visual_overhaul_v63  # noqa: F401,E402
+
+# Release guards from the fourth Mars export: finish on the settlement and remove
+# black flashes between native vertical scenes.
+from . import cartoon_visual_overhaul_v64 as _cartoon_visual_overhaul_v64  # noqa: F401,E402
+from . import shorts_transition_polish as _shorts_transition_polish  # noqa: F401,E402
