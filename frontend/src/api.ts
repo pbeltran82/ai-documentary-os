@@ -21,9 +21,12 @@ import type {
   VisualFeedback,
   VisualFeedbackReason,
 } from "./types";
+import type { MediaQAReport } from "./mediaQaTypes";
 import "./version.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+
+type TimelinePlanWithQA = TimelinePlan & { qa_report?: MediaQAReport | null };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -36,6 +39,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+function dispatchQAInvalidated(projectId: number): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("atlas:timeline-qa-invalidated", { detail: { projectId } }));
+}
+
+function dispatchRendered(projectId: number, qaReport: MediaQAReport | null): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("atlas:timeline-rendered", { detail: { projectId, qaReport } }));
 }
 
 export const api = {
@@ -64,8 +77,26 @@ export const api = {
   selectAsset: (sceneId: number, candidate: AssetCandidate) => request<SelectedAsset>(`/scenes/${sceneId}/selected-asset`, { method: "PUT", body: JSON.stringify(candidate) }),
   removeSelectedAsset: (sceneId: number) => request<void>(`/scenes/${sceneId}/selected-asset`, { method: "DELETE" }),
   generateTimelineManifest: (projectId: number) => request<TimelineManifestResponse>(`/projects/${projectId}/timeline-manifest`, { method: "POST" }),
-  buildTimelinePlan: (projectId: number, style?: TimelineStyle) => request<TimelinePlan>(`/projects/${projectId}/timeline/plan`, { method: "POST", body: style ? JSON.stringify(style) : undefined }),
-  uploadNarration: (projectId: number, file: File) => request<TimelinePlan>(`/projects/${projectId}/timeline/narration?filename=${encodeURIComponent(file.name)}`, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } }),
-  removeNarration: (projectId: number) => request<TimelinePlan>(`/projects/${projectId}/timeline/narration`, { method: "DELETE" }),
-  renderTimeline: (projectId: number, style?: TimelineStyle) => request<TimelinePlan>(`/projects/${projectId}/timeline/render`, { method: "POST", body: style ? JSON.stringify(style) : undefined }),
+  buildTimelinePlan: async (projectId: number, style?: TimelineStyle) => {
+    const plan = await request<TimelinePlan>(`/projects/${projectId}/timeline/plan`, { method: "POST", body: style ? JSON.stringify(style) : undefined });
+    if (style) dispatchQAInvalidated(projectId);
+    return plan;
+  },
+  uploadNarration: async (projectId: number, file: File) => {
+    const plan = await request<TimelinePlan>(`/projects/${projectId}/timeline/narration?filename=${encodeURIComponent(file.name)}`, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    dispatchQAInvalidated(projectId);
+    return plan;
+  },
+  removeNarration: async (projectId: number) => {
+    const plan = await request<TimelinePlan>(`/projects/${projectId}/timeline/narration`, { method: "DELETE" });
+    dispatchQAInvalidated(projectId);
+    return plan;
+  },
+  renderTimeline: async (projectId: number, style?: TimelineStyle) => {
+    const plan = await request<TimelinePlanWithQA>(`/projects/${projectId}/timeline/render`, { method: "POST", body: style ? JSON.stringify(style) : undefined });
+    dispatchRendered(projectId, plan.qa_report ?? null);
+    return plan;
+  },
+  runTimelineQA: (projectId: number) => request<MediaQAReport>(`/projects/${projectId}/timeline/qa`, { method: "POST" }),
+  getTimelineQA: (projectId: number) => request<MediaQAReport>(`/projects/${projectId}/timeline/qa`),
 };
