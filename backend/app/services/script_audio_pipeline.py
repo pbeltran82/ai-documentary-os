@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from ..models import Project
 from .media_library import MEDIA_ROOT, project_directory, public_media_url
+from .video_format import SHORTS_FORMAT, project_video_format
 
 WORDS_PER_SECOND = 2.45
 SCRIPT_SCHEMA_VERSION = "1.0"
-NARRATION_SCHEMA_VERSION = "1.0"
+NARRATION_SCHEMA_VERSION = "1.1"
+SHORTS_TARGET_RUNTIME_SECONDS = 48.0
+SHORTS_MAX_SCENES = 7
+SHORTS_MIN_SCENES = 5
 
 
 def utc_iso() -> str:
@@ -62,11 +67,7 @@ def build_local_script_draft(
     angle: str = "",
     target_scene_seconds: float = 8.0,
 ) -> dict[str, Any]:
-    """Create a provider-neutral, editable script scaffold.
-
-    The local outline provider lets the workflow operate without a paid API. A later
-    LLM adapter can replace narration while preserving this artifact contract.
-    """
+    """Create a provider-neutral, editable script scaffold."""
     total_seconds = max(60, int(project.target_minutes * 60))
     scene_count = max(len(ACT_BLUEPRINTS), round(total_seconds / target_scene_seconds))
     angle_text = angle.strip() or f"Explain {project.topic} through a clear causal story."
@@ -74,10 +75,7 @@ def build_local_script_draft(
     cursor = 0.0
 
     for index in range(scene_count):
-        act_index = min(
-            len(ACT_BLUEPRINTS) - 1,
-            int(index * len(ACT_BLUEPRINTS) / scene_count),
-        )
+        act_index = min(len(ACT_BLUEPRINTS) - 1, int(index * len(ACT_BLUEPRINTS) / scene_count))
         act_name, act_goal = ACT_BLUEPRINTS[act_index]
         position = index + 1
         narration = (
@@ -97,11 +95,7 @@ def build_local_script_draft(
                 "act": act_name,
                 "narration": narration,
                 "visual_intent": visual_intent,
-                "search_keywords": [
-                    project.topic.lower(),
-                    act_name.lower(),
-                    project.tone.lower(),
-                ],
+                "search_keywords": [project.topic.lower(), act_name.lower(), project.tone.lower()],
                 "estimated_duration_seconds": duration,
                 "start_seconds": round(cursor, 2),
                 "end_seconds": round(cursor + duration, 2),
@@ -147,6 +141,51 @@ def load_script(project_id: int) -> dict[str, Any] | None:
     return payload
 
 
+def _evenly_spaced_segments(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    if len(items) <= limit:
+        return items
+    indexes = {round(index * (len(items) - 1) / (limit - 1)) for index in range(limit)}
+    return [item for index, item in enumerate(items) if index in indexes]
+
+
+def _concise_narration(value: str, target_words: int) -> str:
+    clean = " ".join(str(value or "").split())
+    if not clean:
+        return "The story moves forward."
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", clean) if part.strip()]
+    chosen: list[str] = []
+    count = 0
+    for sentence in sentences:
+        words = sentence.split()
+        if chosen and count + len(words) > target_words:
+            break
+        chosen.extend(words)
+        count += len(words)
+        if count >= max(8, target_words - 4):
+            break
+    if not chosen:
+        chosen = clean.split()[:target_words]
+    if len(chosen) > target_words:
+        chosen = chosen[:target_words]
+    text = " ".join(chosen).rstrip(" ,;:-")
+    if not text.endswith((".", "!", "?")):
+        text += "."
+    return text
+
+
+def _narration_source_segments(project: Project, script: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+    items = [dict(item) for item in script.get("segments", []) if str(item.get("narration") or "").strip()]
+    if project_video_format(project) != SHORTS_FORMAT:
+        return items, "full"
+    selected = _evenly_spaced_segments(items, SHORTS_MAX_SCENES)
+    if len(selected) > SHORTS_MIN_SCENES and len(items) <= SHORTS_MAX_SCENES:
+        selected = items
+    target_words = max(14, round(SHORTS_TARGET_RUNTIME_SECONDS * WORDS_PER_SECOND / max(1, len(selected))))
+    for item in selected:
+        item["narration"] = _concise_narration(str(item.get("narration") or ""), target_words)
+    return selected, "shorts"
+
+
 def build_narration_plan(
     project: Project,
     script: dict[str, Any],
@@ -155,29 +194,30 @@ def build_narration_plan(
     voice_id: str,
     speaking_rate: float,
 ) -> dict[str, Any]:
+    source_segments, story_mode = _narration_source_segments(project, script)
     segments: list[dict[str, Any]] = []
-    for item in script.get("segments", []):
+    for item in source_segments:
         narration = str(item.get("narration") or "").strip()
-        segment_id = str(item.get("segment_id") or _stable_id(narration))
+        scene_number = int(item.get("scene_number", 0))
+        segment_id = _stable_id(f"{story_mode}:{scene_number}:{narration}")
         output_relative = (
             Path(f"project-{project.id:04d}")
             / "production"
             / "narration"
-            / f"segment-{int(item.get('scene_number', 0)):03d}-{segment_id}.wav"
+            / f"segment-{scene_number:03d}-{segment_id}.wav"
         ).as_posix()
         segments.append(
             {
                 "segment_id": segment_id,
-                "scene_number": int(item.get("scene_number", 0)),
+                "source_segment_id": str(item.get("segment_id") or ""),
+                "scene_number": scene_number,
+                "act": str(item.get("act") or ""),
                 "text": narration,
                 "provider": provider,
                 "voice_id": voice_id,
                 "speaking_rate": speaking_rate,
                 "status": "planned",
-                "estimated_duration_seconds": round(
-                    max(1.0, len(narration.split()) / (WORDS_PER_SECOND * speaking_rate)),
-                    2,
-                ),
+                "estimated_duration_seconds": round(max(1.0, len(narration.split()) / (WORDS_PER_SECOND * speaking_rate)), 2),
                 "relative_path": output_relative,
                 "public_url": public_media_url(output_relative),
                 "checksum_sha256": "",
@@ -194,9 +234,13 @@ def build_narration_plan(
         "provider": provider,
         "voice_id": voice_id,
         "speaking_rate": speaking_rate,
+        "story_mode": story_mode,
+        "target_runtime_seconds": SHORTS_TARGET_RUNTIME_SECONDS if story_mode == "shorts" else None,
+        "selected_scene_numbers": [item["scene_number"] for item in segments],
         "status": "planned",
         "generated_at": utc_iso(),
         "segment_count": len(segments),
+        "estimated_runtime_seconds": round(sum(float(item["estimated_duration_seconds"]) for item in segments), 2),
         "segments": segments,
     }
     path = _production_directory(project.id) / "narration" / "manifest.json"
