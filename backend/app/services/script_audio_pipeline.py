@@ -13,10 +13,68 @@ from .video_format import SHORTS_FORMAT, project_video_format
 
 WORDS_PER_SECOND = 2.45
 SCRIPT_SCHEMA_VERSION = "1.0"
-NARRATION_SCHEMA_VERSION = "1.1"
+NARRATION_SCHEMA_VERSION = "1.2"
 SHORTS_TARGET_RUNTIME_SECONDS = 48.0
 SHORTS_MAX_SCENES = 7
 SHORTS_MIN_SCENES = 5
+
+SHORTS_TEMPLATE_ORDER = (
+    "route_map",
+    "transport_scene",
+    "habitat_build",
+    "presenter_desk",
+    "council_scene",
+    "crowd_focus",
+    "process_diagram",
+)
+SHORTS_TEMPLATE_IDEALS = {
+    "route_map": 0.04,
+    "transport_scene": 0.18,
+    "habitat_build": 0.34,
+    "presenter_desk": 0.51,
+    "council_scene": 0.67,
+    "crowd_focus": 0.82,
+    "process_diagram": 0.98,
+}
+SHORTS_ACT_HINTS = {
+    "hook": "route_map",
+    "context": "transport_scene",
+    "mechanism": "habitat_build",
+    "evidence": "presenter_desk",
+    "complication": "council_scene",
+    "consequence": "crowd_focus",
+    "conclusion": "process_diagram",
+}
+SHORTS_TEMPLATE_PHRASES = {
+    "route_map": (
+        "earth to mars", "departure", "launch", "route", "journey", "travel",
+        "spacecraft", "orbit", "cruise", "arrival window",
+    ),
+    "transport_scene": (
+        "evacuation", "boarding", "transport", "move people", "moving people",
+        "relocation", "migration", "vehicle", "corridor", "passengers",
+    ),
+    "habitat_build": (
+        "habitat", "shelter", "life support", "air", "power", "food",
+        "dome", "construction", "build", "colony", "infrastructure",
+    ),
+    "presenter_desk": (
+        "evidence", "research", "report", "data", "scientist", "records",
+        "study", "plan", "proof", "analysis",
+    ),
+    "council_scene": (
+        "governance", "council", "rules", "authority", "law", "ethics",
+        "decide", "decision", "trust", "accountability",
+    ),
+    "crowd_focus": (
+        "people", "families", "community", "population", "ordinary people",
+        "civilization", "survivors", "public", "human consequence",
+    ),
+    "process_diagram": (
+        "system", "requirements", "together", "permanent", "future",
+        "conclusion", "survive", "settlement", "city", "connect",
+    ),
+}
 
 
 def utc_iso() -> str:
@@ -141,13 +199,6 @@ def load_script(project_id: int) -> dict[str, Any] | None:
     return payload
 
 
-def _evenly_spaced_segments(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
-    if len(items) <= limit:
-        return items
-    indexes = {round(index * (len(items) - 1) / (limit - 1)) for index in range(limit)}
-    return [item for index, item in enumerate(items) if index in indexes]
-
-
 def _concise_narration(value: str, target_words: int) -> str:
     clean = " ".join(str(value or "").split())
     if not clean:
@@ -173,13 +224,106 @@ def _concise_narration(value: str, target_words: int) -> str:
     return text
 
 
+def _segment_context(item: dict[str, Any]) -> str:
+    return " ".join(
+        [
+            str(item.get("act") or ""),
+            str(item.get("narration") or ""),
+            str(item.get("visual_intent") or ""),
+            *[str(value) for value in item.get("search_keywords", [])],
+        ]
+    ).lower()
+
+
+def _template_score(
+    item: dict[str, Any],
+    template_id: str,
+    index: int,
+    count: int,
+) -> tuple[int, float]:
+    context = _segment_context(item)
+    score = 0
+    for phrase in SHORTS_TEMPLATE_PHRASES[template_id]:
+        if phrase in context:
+            score += 3 + min(3, phrase.count(" "))
+
+    act = str(item.get("act") or "").strip().lower()
+    if SHORTS_ACT_HINTS.get(act) == template_id:
+        score += 16
+
+    position = index / max(1, count - 1)
+    ideal = SHORTS_TEMPLATE_IDEALS[template_id]
+    distance = abs(position - ideal)
+    score += max(0, 6 - round(distance * 12))
+    if template_id == "route_map" and position > 0.45:
+        score -= 8
+    if template_id == "process_diagram" and position < 0.55:
+        score -= 8
+    return score, distance
+
+
+def _diverse_shorts_segments(
+    items: list[dict[str, Any]],
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Choose one story beat per semantic template, then preserve script order."""
+    if not items:
+        return []
+
+    target = min(max(1, limit), len(items), len(SHORTS_TEMPLATE_ORDER))
+    used: set[int] = set()
+    selected: list[tuple[int, str]] = []
+    count = len(items)
+
+    for template_id in SHORTS_TEMPLATE_ORDER:
+        candidates = [
+            (*_template_score(item, template_id, index, count), index)
+            for index, item in enumerate(items)
+            if index not in used
+        ]
+        if not candidates:
+            break
+        # Highest semantic score, then closest editorial position, then earliest scene.
+        score, distance, index = max(candidates, key=lambda value: (value[0], -value[1], -value[2]))
+        if score < -4 and len(selected) >= SHORTS_MIN_SCENES:
+            continue
+        used.add(index)
+        selected.append((index, template_id))
+        if len(selected) >= target:
+            break
+
+    if len(selected) < min(SHORTS_MIN_SCENES, len(items)):
+        remaining_templates = [value for value in SHORTS_TEMPLATE_ORDER if value not in {template for _, template in selected}]
+        for index, _item in enumerate(items):
+            if index in used or not remaining_templates:
+                continue
+            selected.append((index, remaining_templates.pop(0)))
+            used.add(index)
+            if len(selected) >= min(SHORTS_MIN_SCENES, len(items)):
+                break
+
+    selected.sort(key=lambda value: value[0])
+    result: list[dict[str, Any]] = []
+    for index, template_id in selected[:target]:
+        item = dict(items[index])
+        item["shorts_template_id"] = template_id
+        item["visual_intent"] = (
+            f"Shorts visual role: {template_id.replace('_', ' ')}. "
+            + str(item.get("visual_intent") or "")
+        ).strip()
+        result.append(item)
+
+    # A route may open the story, but it may never be the final selected beat.
+    if result and result[-1].get("shorts_template_id") == "route_map":
+        result[-1]["shorts_template_id"] = "process_diagram"
+    return result
+
+
 def _narration_source_segments(project: Project, script: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
     items = [dict(item) for item in script.get("segments", []) if str(item.get("narration") or "").strip()]
     if project_video_format(project) != SHORTS_FORMAT:
         return items, "full"
-    selected = _evenly_spaced_segments(items, SHORTS_MAX_SCENES)
-    if len(selected) > SHORTS_MIN_SCENES and len(items) <= SHORTS_MAX_SCENES:
-        selected = items
+    selected = _diverse_shorts_segments(items, SHORTS_MAX_SCENES)
     target_words = max(14, round(SHORTS_TARGET_RUNTIME_SECONDS * WORDS_PER_SECOND / max(1, len(selected))))
     for item in selected:
         item["narration"] = _concise_narration(str(item.get("narration") or ""), target_words)
@@ -199,7 +343,8 @@ def build_narration_plan(
     for item in source_segments:
         narration = str(item.get("narration") or "").strip()
         scene_number = int(item.get("scene_number", 0))
-        segment_id = _stable_id(f"{story_mode}:{scene_number}:{narration}")
+        template_id = str(item.get("shorts_template_id") or "")
+        segment_id = _stable_id(f"{story_mode}:{scene_number}:{template_id}:{narration}")
         output_relative = (
             Path(f"project-{project.id:04d}")
             / "production"
@@ -212,6 +357,7 @@ def build_narration_plan(
                 "source_segment_id": str(item.get("segment_id") or ""),
                 "scene_number": scene_number,
                 "act": str(item.get("act") or ""),
+                "template_id": template_id or None,
                 "text": narration,
                 "provider": provider,
                 "voice_id": voice_id,
@@ -237,6 +383,7 @@ def build_narration_plan(
         "story_mode": story_mode,
         "target_runtime_seconds": SHORTS_TARGET_RUNTIME_SECONDS if story_mode == "shorts" else None,
         "selected_scene_numbers": [item["scene_number"] for item in segments],
+        "selected_template_ids": [item.get("template_id") for item in segments],
         "status": "planned",
         "generated_at": utc_iso(),
         "segment_count": len(segments),
