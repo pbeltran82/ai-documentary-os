@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import opening_frame_polish as opening
 from . import timeline_builder as base
 from .background_music import load_background_music
 from .media_library import resolve_media_path
@@ -239,6 +240,11 @@ base.save_timeline_style = save_timeline_style
 base.build_filter_graph = build_filter_graph
 base.build_ffmpeg_command = build_ffmpeg_command
 base.build_timeline_plan = build_timeline_plan
+
+# Opening-frame compatibility tests and callers use the opening module as the named
+# final graph authority. Publish this wrapper there while retaining the captured
+# opening implementation underneath, so frame-one behavior and music both remain active.
+opening.build_filter_graph = build_filter_graph
 
 render_first_cut = base.render_first_cut
 write_timeline_plan = base.write_timeline_plan
