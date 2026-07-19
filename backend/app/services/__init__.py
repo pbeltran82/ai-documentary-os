@@ -100,3 +100,7 @@ from . import release_compat_guard as _release_compat_guard  # noqa: F401,E402
 from . import cartoon_visual_overhaul_v62 as _cartoon_visual_overhaul_v62  # noqa: F401,E402
 from . import cartoon_shorts_story_v7 as _cartoon_shorts_story_v7  # noqa: F401,E402
 from . import shorts_visual_contract_v2 as _shorts_visual_contract_v2  # noqa: F401,E402
+
+# Final regular-format art direction. All seven general documentary templates now
+# share one layered renderer, including multi-stage route pacing.
+from . import cartoon_visual_overhaul_v63 as _cartoon_visual_overhaul_v63  # noqa: F401,E402
