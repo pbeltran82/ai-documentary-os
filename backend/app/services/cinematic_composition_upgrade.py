@@ -66,6 +66,7 @@ def _atmospheric_depth(
         outline=palette["panel_alt"],
         width=18,
     )
+    # Foreground silhouettes overlap the lower frame to remove the slide-deck feel.
     draw.polygon(((0, 960), (360, 820), (690, 1080), (0, 1080)), fill=(3, 7, 17))
     draw.polygon(((1920, 930), (1590, 790), (1320, 1080), (1920, 1080)), fill=(3, 7, 17))
 
@@ -78,6 +79,8 @@ def _cinematic_algorithm_chose_you(
     rank = base._phase(progress, 0.08, 0.62)
     selection = base._phase(progress, 0.52, 0.92)
     _atmospheric_depth(draw, palette, progress, focus_x=1280)
+
+    # Midground recommendation field, intentionally left-heavy and irregular.
     field = ((180, 410), (430, 350), (680, 470), (300, 650), (570, 760), (850, 610), (250, 870))
     target = (1235, 620)
     for index, point in enumerate(field):
@@ -87,6 +90,8 @@ def _cinematic_algorithm_chose_you(
         base._node(draw, point, radius, color)
         if local > 0.18:
             draw.line((*point, *target), fill=palette["accent"], width=2 + index % 3)
+
+    # Dominant foreground phone, cropped slightly off the right edge.
     phone = (1110, 320, 1905, 1010)
     draw.rounded_rectangle(phone, radius=78, fill=(3, 7, 18), outline=palette["accent"], width=8)
     draw.rounded_rectangle((1160, 390, 1855, 945), radius=52, fill=palette["panel"])
@@ -113,18 +118,36 @@ def _cinematic_behavioral_twin(
     transfer = base._phase(progress, 0.10, 0.70)
     _atmospheric_depth(draw, palette, progress, focus_x=980)
     character_palette = truthful.tech_character_palette(palette)
+
+    # Environmental floor and two overlapping subjects instead of two isolated cards.
     draw.polygon(((120, 905), (960, 710), (1820, 905), (1920, 1080), (0, 1080)), fill=palette["panel_alt"])
     draw.ellipse((170, 825, 760, 965), fill=(4, 9, 20))
     draw.ellipse((1110, 810, 1770, 975), fill=(4, 9, 20))
+
     truthful.characters.draw_expressive_person(
-        draw, (530, 920), character_palette, progress=progress, scale=1.48,
-        pose="relaxed", mood="neutral", facing=1,
+        draw,
+        (530, 920),
+        character_palette,
+        progress=progress,
+        scale=1.48,
+        pose="relaxed",
+        mood="neutral",
+        facing=1,
     )
     truthful.characters.draw_expressive_person(
-        draw, (1390, 915), character_palette, progress=progress, scale=1.55,
-        pose="explain", mood="confident", facing=-1, alternate=True,
+        draw,
+        (1390, 915),
+        character_palette,
+        progress=progress,
+        scale=1.55,
+        pose="explain",
+        mood="confident",
+        facing=-1,
+        alternate=True,
         hair_style="curly_crop",
     )
+
+    # Signals cross the shared space at different depths.
     paths = ((650, 430, "SEARCH"), (760, 560, "PAUSE"), (875, 690, "DRAFT"), (1000, 805, "WATCH"))
     for index, (x, y, label) in enumerate(paths):
         local = base._phase(transfer, index * 0.13, min(1.0, index * 0.13 + 0.44))
@@ -142,11 +165,15 @@ def _cinematic_consequence_map(
 ) -> None:
     q = base._phase(progress, 0.04, 0.92)
     _atmospheric_depth(draw, palette, progress, focus_x=790)
+
+    # One dominant ranked object in the foreground.
     draw.rounded_rectangle((120, 380, 760, 930), radius=58, fill=palette["panel"], outline=palette["good"], width=7)
     draw.rounded_rectangle((175, 445, 705, 690), radius=34, fill=palette["panel_alt"])
     draw.ellipse((350, 515, 510, 675), fill=palette["accent"])
     base.engine._text(draw, (430, 595), "1", 64, palette["ink"], bold=True, anchor="mm")
     base.engine._text(draw, (440, 770), "RANKED FIRST", 30, palette["good"], bold=True, anchor="mm")
+
+    # Environmental downstream outcomes use staggered scale and overlap.
     outcomes = (
         (920, 360, 1450, 575, "NEXT FEED", palette["accent"]),
         (1160, 585, 1780, 825, "NEXT CHOICE", palette["accent_alt"]),

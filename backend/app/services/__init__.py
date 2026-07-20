@@ -5,6 +5,7 @@
 from . import documentary_variety_expansion as _documentary_variety_expansion  # noqa: F401,E402
 from . import documentary_variety_guard as _documentary_variety_guard  # noqa: F401,E402
 from . import cinematic_visual_quality as _cinematic_visual_quality  # noqa: F401,E402
+from . import cinematic_composition_upgrade as _cinematic_composition_upgrade  # noqa: F401,E402
 
 # Finance and character-led 16:9 scenes use the shared expressive rig rather
 # than the Tech-only landscape figure. Install its neutral stance correction at
