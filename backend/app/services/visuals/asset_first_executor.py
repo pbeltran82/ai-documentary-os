@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
-
 from ...schemas import ShotBrief, VisualDirectorResponse
 from ..assets import PROVIDERS
 from ..visual_director import director_shortlist, provider_priority, unique_phrases
@@ -110,7 +108,7 @@ def search_architecture_candidates(
     media_type: str,
     per_page: int = 6,
 ) -> VisualDirectorResponse:
-    """Search every configured source using the architecture-owned shot brief."""
+    """Search every configured source while isolating source-specific failures."""
     brief = build_architecture_shot_brief(scene, plan, media_type)
     configured = [
         name
@@ -134,7 +132,9 @@ def search_architecture_candidates(
                     media_type,
                     max(6, per_page),
                 )
-            except HTTPException:
+            except Exception:
+                # Auto mode must keep moving when any remote archive is throttled,
+                # truncated, temporarily unavailable, or returns malformed data.
                 continue
             provider_succeeded = True
             all_candidates.extend(
