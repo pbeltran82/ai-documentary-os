@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -10,9 +11,18 @@ for path in (BACKEND_DIR, SCRIPT_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-resolved_ffmpeg = shutil.which("ffmpeg")
+configured_ffmpeg = os.getenv("FFMPEG_BIN", "").strip()
+configured_path = Path(configured_ffmpeg).expanduser() if configured_ffmpeg else None
+resolved_ffmpeg = (
+    str(configured_path.resolve())
+    if configured_path is not None and configured_path.is_file()
+    else shutil.which(configured_ffmpeg or "ffmpeg")
+)
 if not resolved_ffmpeg:
-    raise RuntimeError("The CI image reports FFmpeg unavailable inside Python")
+    raise RuntimeError(
+        "FFmpeg could not be resolved inside Python; "
+        f"FFMPEG_BIN={configured_ffmpeg!r}, PATH={os.getenv('PATH', '')!r}"
+    )
 
 from app.services import finance_motion as finance_engine  # noqa: E402
 from app.services import finance_motion_art as finance_art  # noqa: E402
