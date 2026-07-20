@@ -3,6 +3,8 @@ name: Asset-First E2E
 on:
   push:
     branches: [feature/visual-architecture-v1]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
