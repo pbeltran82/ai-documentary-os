@@ -25,12 +25,15 @@ from .services import character_pose_stability as _character_pose_stability
 from .services import character_camera_director as _character_camera_director
 from .services import manifest_events as _manifest_events
 from .services.media_library import MEDIA_ROOT
+from .services.visuals import install_visual_architecture
+
+install_visual_architecture()
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "1.9.6"
+VERSION = "2.1.0"
 
 
 @asynccontextmanager
@@ -44,7 +47,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=f"{APP_NAME} API",
     version=VERSION,
-    description="Local-first documentary command center with cinematic character polish, neutral motion art direction, editable animation scripts, and project-wide batch generation.",
+    description="Local-first documentary command center with reusable cinematic visual planning, anti-slide quality rules, narration, editable animation direction, and project-wide batch production.",
     lifespan=lifespan,
 )
 
