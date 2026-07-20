@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -12,7 +13,7 @@ from app.database import Base
 from app.models import Project
 from app.routers.projects import update_project
 from app.schemas import ProjectCreate, ProjectUpdate
-from app.services import exact_visuals
+from app.services import documentary_cross_format_polish, exact_visuals, native_shorts
 from app.services.finance_motion import ffmpeg_encoder_command
 from app.services.native_shorts import COMPOSITIONS, RENDERERS
 from app.services.video_format import (
@@ -62,6 +63,27 @@ class VideoFormatTests(unittest.TestCase):
         self.assertIsNotNone(shorts.crop((58, 130, 946, 380)).getbbox())
         self.assertIsNotNone(shorts.crop((58, 410, 946, 1458)).getbbox())
         self.assertIsNotNone(shorts.crop((58, 1490, 946, 1690)).getbbox())
+
+    def test_cross_format_polish_reload_does_not_recurse(self) -> None:
+        source = self.sample_frame()
+        for _ in range(3):
+            importlib.reload(documentary_cross_format_polish)
+        original = getattr(
+            native_shorts.compose_native_shorts,
+            documentary_cross_format_polish._ORIGINAL_ATTRIBUTE,
+        )
+        self.assertIsNot(original, native_shorts.compose_native_shorts)
+        rendered = format_exact_visual_frame(
+            source,
+            SHORTS_FORMAT,
+            "tech_behavior_motion",
+            "machine_choice_cta",
+            progress=0.90,
+            title="WHO CHOSE THIS MOMENT?",
+            subtitle="You pressed play. The machine ranked the opportunity.",
+        )
+        self.assertEqual(rendered.size, (1080, 1920))
+        self.assertEqual(rendered.mode, "RGB")
 
     def test_encoder_accepts_vertical_raw_frame_dimensions(self) -> None:
         command = ffmpeg_encoder_command("ffmpeg", Path("short.mp4"), 1080, 1920)
