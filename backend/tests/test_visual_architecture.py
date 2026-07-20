@@ -3,7 +3,9 @@ from __future__ import annotations
 from PIL import Image
 
 from app.services.visuals import (
+    ExecutionMode,
     QualityMetrics,
+    SourceMode,
     VisualFamily,
     build_visual_plan,
     choose_visual_strategy,
@@ -11,11 +13,12 @@ from app.services.visuals import (
     install_visual_architecture,
     measure_edge_density,
     visual_architecture_installed,
+    visual_plan_payload,
 )
 from app.services.visuals.scene_intent import analyze_scene_intent
 
 
-def test_human_environment_defaults_to_cinematic_real_world() -> None:
+def test_human_environment_defaults_to_real_asset_first() -> None:
     plan = build_visual_plan(
         narration="A worker checks her phone while walking through a crowded station.",
         visual_intent="Observe the person in a real environment, not a diagram.",
@@ -23,12 +26,16 @@ def test_human_environment_defaults_to_cinematic_real_world() -> None:
     )
 
     assert plan.strategy.family == VisualFamily.CINEMATIC_REAL_WORLD
+    assert plan.strategy.source_mode == SourceMode.REAL_FOOTAGE
+    assert plan.asset.execution_mode == ExecutionMode.ASSET_FIRST
+    assert plan.asset.preferred_media_type == "video"
+    assert plan.asset.fallback_media_type == "photo"
     assert plan.strategy.requires_subject is True
-    assert plan.strategy.text_budget_words <= 6
+    assert plan.strategy.text_budget_words <= 5
     assert plan.shot.depth_layers >= 3
 
 
-def test_interface_scene_uses_observational_family() -> None:
+def test_interface_scene_prefers_observational_real_footage() -> None:
     plan = build_visual_plan(
         narration="The recommendation algorithm ranks the feed after every scroll and click.",
         visual_intent="Over-the-shoulder phone observation.",
@@ -36,7 +43,21 @@ def test_interface_scene_uses_observational_family() -> None:
     )
 
     assert plan.strategy.family == VisualFamily.INTERFACE_OBSERVATIONAL
-    assert plan.strategy.max_labels <= 2
+    assert plan.strategy.source_mode == SourceMode.REAL_FOOTAGE
+    assert plan.asset.execution_mode == ExecutionMode.ASSET_FIRST
+    assert plan.strategy.max_labels <= 1
+
+
+def test_data_explainer_reserves_procedural_rendering() -> None:
+    plan = build_visual_plan(
+        narration="A chart compares the ranking score, probability, rate, and model estimate.",
+        scene_key="scene-data",
+    )
+
+    assert plan.strategy.family == VisualFamily.DATA_EXPLAINER
+    assert plan.strategy.source_mode == SourceMode.PROCEDURAL_GRAPHIC
+    assert plan.asset.execution_mode == ExecutionMode.EXACT_VISUAL
+    assert plan.asset.fallback_media_type is None
 
 
 def test_repeated_data_scene_is_rerouted_away_from_slide_repetition() -> None:
@@ -48,6 +69,7 @@ def test_repeated_data_scene_is_rerouted_away_from_slide_repetition() -> None:
 
     assert first.family == VisualFamily.DATA_EXPLAINER
     assert second.family == VisualFamily.EDITORIAL_SYMBOLIC
+    assert second.source_mode == SourceMode.PHOTOGRAPHY
 
 
 def test_shot_plan_is_deterministic_for_same_scene() -> None:
@@ -61,6 +83,19 @@ def test_shot_plan_is_deterministic_for_same_scene() -> None:
     )
 
     assert first == second
+
+
+def test_visual_plan_payload_is_json_safe() -> None:
+    plan = build_visual_plan(
+        narration="A family watches a phone together in their living room.",
+        scene_key="payload-scene",
+    )
+    payload = visual_plan_payload(plan)
+
+    assert payload["strategy"]["family"] == "cinematic_real_world"
+    assert payload["strategy"]["source_mode"] == "real_footage"
+    assert payload["asset"]["execution_mode"] == "asset_first"
+    assert payload["shot"]["camera_move"]
 
 
 def test_quality_gate_rejects_slide_like_frame() -> None:
