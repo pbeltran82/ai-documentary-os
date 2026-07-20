@@ -8,37 +8,14 @@ from app.services import internet_attention_delivery_v2 as delivery
 from app.services import internet_attention_visuals as internet
 from app.services import media_quality_assurance as media_qa
 from app.services import regular_transition_polish as transitions
+from app.services import release_quality_assurance as release_qa
 from app.services import rendered_semantic_quality_assurance as rendered_qa
 
 
 def scene(number: int = 1, duration: float = 38.4, stored_beats: int = 0):
-    project = SimpleNamespace(
-        id=22,
-        title="How the Internet Changed Human Attention",
-        topic="Internet, smartphones, notifications, algorithms, and attention",
-        audience="General audience",
-        tone="Balanced",
-        visual_style="Technology documentary",
-        scenes=[],
-    )
-    beats = [
-        {
-            "relative_start_seconds": i * duration / max(1, stored_beats),
-            "relative_end_seconds": (i + 1) * duration / max(1, stored_beats),
-            "visual_intent": f"Beat {i + 1}",
-        }
-        for i in range(stored_beats)
-    ]
-    value = SimpleNamespace(
-        project=project,
-        project_id=project.id,
-        scene_number=number,
-        duration_seconds=duration,
-        narration="The internet moved from desktops into smartphones, feeds, and notifications.",
-        visual_intent="Show the early web, search, smartphones, algorithms, and attention.",
-        search_keywords=["internet", "attention", "smartphone"],
-        animation_plan={"visual_beats": beats},
-    )
+    project = SimpleNamespace(id=22, title="How the Internet Changed Human Attention", topic="Internet, smartphones, notifications, algorithms, and attention", audience="General audience", tone="Balanced", visual_style="Technology documentary", scenes=[])
+    beats = [{"relative_start_seconds": i * duration / max(1, stored_beats), "relative_end_seconds": (i + 1) * duration / max(1, stored_beats), "visual_intent": f"Beat {i + 1}"} for i in range(stored_beats)]
+    value = SimpleNamespace(project=project, project_id=project.id, scene_number=number, duration_seconds=duration, narration="The internet moved from desktops into smartphones, feeds, and notifications.", visual_intent="Show the early web, search, smartphones, algorithms, and attention.", search_keywords=["internet", "attention", "smartphone"], animation_plan={"visual_beats": beats})
     project.scenes = [value]
     return value
 
@@ -78,7 +55,8 @@ class InternetDeliveryV2Tests(unittest.TestCase):
         self.assertIs(internet._visual_beats, delivery.effective_visual_beats)
         self.assertIs(internet._beat_state, delivery.beat_state)
         self.assertIs(cartoon.render_planned_frame, internet.render_planned_frame)
-        self.assertIs(media_qa.evaluate_quality, rendered_qa.evaluate_quality)
+        self.assertIs(media_qa.evaluate_quality, release_qa.evaluate_quality)
+        self.assertIs(rendered_qa.evaluate_quality, release_qa.evaluate_quality)
 
 
 if __name__ == "__main__":
