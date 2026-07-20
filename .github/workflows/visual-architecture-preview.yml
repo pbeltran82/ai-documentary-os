@@ -46,6 +46,7 @@ jobs:
     env:
       DATABASE_URL: sqlite:///${{ github.workspace }}/backend/asset-first-e2e.db
       MEDIA_ROOT: ${{ github.workspace }}/backend/asset-first-e2e-media
+      FFMPEG_BIN: ffmpeg
       MAX_ASSET_DOWNLOAD_BYTES: "157286400"
       TIMELINE_RENDER_TIMEOUT_SECONDS: "1200"
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
