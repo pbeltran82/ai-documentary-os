@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import AssetSelect
+from ..services import finance_motion as finance_engine
 from ..services.manifest_events import refresh_project_manifests
 from ..services.visuals import (
     ExecutionMode,
@@ -53,8 +57,24 @@ def _project_plans(project: Project):
     return planned
 
 
-def _candidate_payload(candidate) -> AssetSelect:
-    return AssetSelect.model_validate(candidate.model_dump())
+def _candidate_payload(candidate, *, preview_fallback: bool = False) -> AssetSelect:
+    values = candidate.model_dump()
+    if preview_fallback:
+        values["download_url"] = candidate.preview_url
+    return AssetSelect.model_validate(values)
+
+
+def _candidate_payloads(candidate) -> list[tuple[str, AssetSelect]]:
+    payloads = [("original", _candidate_payload(candidate))]
+    if (
+        candidate.media_type == "photo"
+        and candidate.preview_url.startswith(("https://", "http://"))
+        and candidate.preview_url != candidate.download_url
+    ):
+        payloads.append(
+            ("preview_fallback", _candidate_payload(candidate, preview_fallback=True))
+        )
+    return payloads
 
 
 def _candidate_responses(scene: Scene, plan, per_page: int):
@@ -83,22 +103,21 @@ def _select_asset_first(scene: Scene, plan, per_page: int, db: Session):
                 continue
             attempted.add(identity)
             candidate_count += 1
-            try:
-                asset = select_asset(
-                    scene.id,
-                    _candidate_payload(candidate),
-                    db,
-                )
-            except HTTPException as exc:
-                download_failures.append(
-                    {
-                        "provider": candidate.provider,
-                        "provider_asset_id": candidate.provider_asset_id,
-                        "detail": str(exc.detail),
-                    }
-                )
-                continue
-            return asset, candidate, response, download_failures
+
+            for source_kind, payload in _candidate_payloads(candidate):
+                try:
+                    asset = select_asset(scene.id, payload, db)
+                except HTTPException as exc:
+                    download_failures.append(
+                        {
+                            "provider": candidate.provider,
+                            "provider_asset_id": candidate.provider_asset_id,
+                            "source_kind": source_kind,
+                            "detail": str(exc.detail),
+                        }
+                    )
+                    continue
+                return asset, candidate, response, download_failures
 
     if candidate_count == 0:
         raise HTTPException(
@@ -110,16 +129,42 @@ def _select_asset_first(scene: Scene, plan, per_page: int, db: Session):
         )
 
     last_details = "; ".join(
-        failure["detail"] for failure in download_failures[-3:]
+        (
+            f"{failure['provider']}:{failure['source_kind']} "
+            f"{failure['detail']}"
+        )
+        for failure in download_failures[-4:]
     )
     raise HTTPException(
         status_code=502,
         detail=(
             f"Could not download any of {candidate_count} ranked visual candidates. "
-            f"The executor tried the next candidate and fallback media type automatically. "
-            f"Last errors: {last_details}"
+            "The executor tried alternate candidates, fallback media types, and preview "
+            f"sources automatically. Last errors: {last_details}"
         ),
     )
+
+
+def _resolve_ffmpeg_binary() -> str | None:
+    configured = str(getattr(finance_engine, "FFMPEG_NAME", "") or "").strip()
+    candidates = [
+        configured,
+        shutil.which(configured) if configured else None,
+        shutil.which("ffmpeg"),
+        "/opt/homebrew/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+        "/usr/bin/ffmpeg",
+    ]
+    for value in candidates:
+        if not value:
+            continue
+        path = Path(value).expanduser()
+        if path.is_file():
+            return str(path.resolve())
+        discovered = shutil.which(str(value))
+        if discovered:
+            return discovered
+    return None
 
 
 def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, object]:
@@ -146,6 +191,9 @@ def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, 
             "reason": plan.asset.reason,
         }
 
+    ffmpeg = _resolve_ffmpeg_binary()
+    if ffmpeg is not None:
+        finance_engine.FFMPEG_NAME = ffmpeg
     asset = generate_exact_visual(
         scene_id=scene.id,
         family_id=None,
