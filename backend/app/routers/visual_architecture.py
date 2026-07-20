@@ -13,8 +13,8 @@ from ..services.visuals import (
     build_visual_plan,
     visual_plan_payload,
 )
-from .adaptive_assets import adaptive_visual_search
-from .assets import direct_visual_search, select_asset
+from ..services.visuals.asset_first_executor import search_architecture_candidates
+from .assets import select_asset
 from .finance_motion import generate_exact_visual
 
 router = APIRouter(tags=["visual-architecture"])
@@ -58,27 +58,25 @@ def _candidate_payload(candidate) -> AssetSelect:
 
 
 def _select_asset_first(scene: Scene, plan, per_page: int, db: Session):
-    preferred = plan.asset.preferred_media_type
-    response = adaptive_visual_search(
-        scene_id=scene.id,
-        media_type=preferred,
-        per_page=per_page,
-        db=db,
+    response = search_architecture_candidates(
+        scene,
+        plan,
+        plan.asset.preferred_media_type,
+        per_page,
     )
     if not response.candidates and plan.asset.fallback_media_type:
-        response = direct_visual_search(
-            scene_id=scene.id,
-            media_type=plan.asset.fallback_media_type,
-            provider="auto",
-            per_page=per_page,
-            db=db,
+        response = search_architecture_candidates(
+            scene,
+            plan,
+            plan.asset.fallback_media_type,
+            per_page,
         )
     if not response.candidates:
         raise HTTPException(
             status_code=422,
             detail=(
-                "No defensible real visual survived the provider, rights, concept, "
-                "quality, and diversity gates."
+                "No defensible real visual survived the architecture brief, provider, "
+                "rights, concept, quality, and diversity gates."
             ),
         )
     candidate = response.candidates[0]
@@ -100,6 +98,7 @@ def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, 
             "provider_asset_id": asset.provider_asset_id,
             "director_score": candidate.director_score,
             "providers_searched": response.providers_searched,
+            "search_queries": response.search_queries,
             "reason": plan.asset.reason,
         }
 
