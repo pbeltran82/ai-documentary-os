@@ -10,8 +10,13 @@ from . import tech_behavior_motion
 from . import tech_behavior_route_patch as route
 
 _ACTIVE_FAMILY_ID = ""
-_ORIGINAL_NATIVE_COMPOSE = shorts.compose_native_shorts
-_WRAPPED = False
+_ORIGINAL_ATTRIBUTE = "__ai_documentary_original_native_compose__"
+_CURRENT_NATIVE_COMPOSE = shorts.compose_native_shorts
+_ORIGINAL_NATIVE_COMPOSE = getattr(
+    _CURRENT_NATIVE_COMPOSE,
+    _ORIGINAL_ATTRIBUTE,
+    _CURRENT_NATIVE_COMPOSE,
+)
 
 
 def _blend(
@@ -167,16 +172,16 @@ def _tracked_native_compose(*args, **kwargs):
         _ACTIVE_FAMILY_ID = previous
 
 
+setattr(_tracked_native_compose, _ORIGINAL_ATTRIBUTE, _ORIGINAL_NATIVE_COMPOSE)
+
+
 def install_cross_format_polish() -> None:
-    global _WRAPPED
     polish._landscape_person = _upright_landscape_person
     polish._story_cta = _family_story_cta
     tech_behavior_motion._person_wireframe = _upright_landscape_person
     route.base._person_wireframe = _upright_landscape_person
     route.truthful.base._person_wireframe = _upright_landscape_person
-    if not _WRAPPED:
-        shorts.compose_native_shorts = _tracked_native_compose
-        _WRAPPED = True
+    shorts.compose_native_shorts = _tracked_native_compose
 
 
 install_cross_format_polish()
