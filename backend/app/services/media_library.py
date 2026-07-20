@@ -6,11 +6,13 @@ import mimetypes
 import os
 import re
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
@@ -28,6 +30,12 @@ PUBLIC_BACKEND_URL = os.getenv(
     "PUBLIC_BACKEND_URL", "http://localhost:8000"
 ).rstrip("/")
 MAX_DOWNLOAD_BYTES = int(os.getenv("MAX_ASSET_DOWNLOAD_BYTES", str(500 * 1024 * 1024)))
+DOWNLOAD_ATTEMPTS = max(1, min(5, int(os.getenv("ASSET_DOWNLOAD_ATTEMPTS", "3"))))
+DOWNLOAD_USER_AGENT = os.getenv(
+    "ASSET_DOWNLOAD_USER_AGENT",
+    "AI-Documentary-OS/2.1 (rights-aware documentary media downloader)",
+).strip() or "AI-Documentary-OS/2.1"
+RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
 
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -105,6 +113,37 @@ def extension_for(url: str, content_type: str, media_type: str) -> str:
     return ".mp4" if media_type == "video" else ".jpg"
 
 
+def _retry_delay(error: Exception, attempt: int) -> float:
+    if isinstance(error, HTTPError):
+        retry_after = error.headers.get("Retry-After") if error.headers else None
+        if retry_after:
+            try:
+                return max(0.5, min(12.0, float(retry_after)))
+            except ValueError:
+                pass
+    return min(8.0, 1.25 * (2**attempt))
+
+
+def _open_download(request: Request):
+    last_error: Exception | None = None
+    for attempt in range(DOWNLOAD_ATTEMPTS):
+        try:
+            return urlopen(request, timeout=120)
+        except HTTPError as exc:
+            last_error = exc
+            if exc.code not in RETRYABLE_HTTP_CODES or attempt + 1 >= DOWNLOAD_ATTEMPTS:
+                raise
+            time.sleep(_retry_delay(exc, attempt))
+        except (URLError, TimeoutError) as exc:
+            last_error = exc
+            if attempt + 1 >= DOWNLOAD_ATTEMPTS:
+                raise
+            time.sleep(_retry_delay(exc, attempt))
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Media download did not start")
+
+
 def download_remote_file(
     url: str,
     destination_stem: Path,
@@ -117,13 +156,14 @@ def download_remote_file(
         url,
         headers={
             "Accept": "*/*",
-            "User-Agent": "AI-Documentary-OS/0.5",
+            "Accept-Language": "en-US,en;q=0.8",
+            "User-Agent": DOWNLOAD_USER_AGENT,
         },
     )
     temporary_path: Path | None = None
 
     try:
-        with urlopen(request, timeout=120) as response:
+        with _open_download(request) as response:
             content_type = response.headers.get("Content-Type", "application/octet-stream")
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > MAX_DOWNLOAD_BYTES:
