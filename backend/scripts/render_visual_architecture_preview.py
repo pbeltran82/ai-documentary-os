@@ -3,14 +3,21 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+# Executing this file directly places backend/scripts on sys.path. Add backend so
+# the preview uses the same application package imported by Uvicorn and tests.
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from PIL import Image, ImageDraw
 
 # Importing the application installs the visual architecture exactly as production does.
-from app import main as _app_main  # noqa: F401
-from app.services import tech_behavior_motion as tech
-from app.services.visuals.quality_gate import measure_edge_density
+from app import main as _app_main  # noqa: F401,E402
+from app.services import tech_behavior_motion as tech  # noqa: E402
+from app.services.visuals.quality_gate import measure_edge_density  # noqa: E402
 
 OUTPUT_DIR = Path("visual-architecture-preview")
 TEMPLATES = (
