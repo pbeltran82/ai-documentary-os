@@ -1,0 +1,31 @@
+name: Visual Architecture Preview
+
+on:
+  push:
+    branches: [feature/visual-architecture-v1]
+  workflow_dispatch:
+
+jobs:
+  render-preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Render cinematic visual preview
+        run: python scripts/render_visual_architecture_preview.py
+      - name: Upload cinematic preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-architecture-preview
+          path: backend/visual-architecture-preview
+          if-no-files-found: error
+          retention-days: 14
