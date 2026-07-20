@@ -138,3 +138,10 @@ from . import background_music_timeline as _background_music_timeline  # noqa: F
 # Semantic QA installs last so PASS/HOLD includes topic/template alignment and
 # verifies that long scenes actually resolve into multiple beat-level compositions.
 from . import semantic_visual_quality_assurance as _semantic_visual_quality_assurance  # noqa: F401,E402
+
+# Delivered-pixel generalization guard. This installs after every prior wrapper so
+# long Internet scenes always advance through deterministic composition windows,
+# Internet boundaries cut cleanly, and QA samples the actual MP4 rather than trusting
+# planning metadata alone.
+from . import internet_attention_delivery_v2 as _internet_attention_delivery_v2  # noqa: F401,E402
+from . import rendered_semantic_quality_assurance as _rendered_semantic_quality_assurance  # noqa: F401,E402
