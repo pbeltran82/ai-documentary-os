@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from PIL import Image
 
 from app.services.visuals import (
@@ -15,6 +17,7 @@ from app.services.visuals import (
     visual_architecture_installed,
     visual_plan_payload,
 )
+from app.services.visuals.asset_first_executor import build_architecture_shot_brief
 from app.services.visuals.scene_intent import analyze_scene_intent
 
 
@@ -96,6 +99,31 @@ def test_visual_plan_payload_is_json_safe() -> None:
     assert payload["strategy"]["source_mode"] == "real_footage"
     assert payload["asset"]["execution_mode"] == "asset_first"
     assert payload["shot"]["camera_move"]
+
+
+def test_asset_search_brief_uses_planned_subject_framing_and_real_media() -> None:
+    narration = "A commuter scrolls through a recommendation feed inside a busy station."
+    plan = build_visual_plan(
+        narration=narration,
+        visual_intent="Observe a real commuter using a phone over the shoulder.",
+        search_keywords=["commuter", "smartphone", "train station"],
+        scene_key="asset-brief-scene",
+    )
+    scene = SimpleNamespace(
+        id=12,
+        project_id=4,
+        scene_number=2,
+        narration=narration,
+        visual_intent="Observe a real commuter using a phone over the shoulder.",
+        search_keywords=["commuter", "smartphone", "train station"],
+    )
+
+    brief = build_architecture_shot_brief(scene, plan, "video")
+
+    assert "documentary footage" in " ".join(brief.query_variants)
+    assert plan.shot.shot_type.value.replace("_", " ") in brief.framing
+    assert "presentation slide" in brief.must_avoid
+    assert any("commuter" in query for query in brief.query_variants)
 
 
 def test_quality_gate_rejects_slide_like_frame() -> None:
