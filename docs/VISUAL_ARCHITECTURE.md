@@ -65,11 +65,19 @@ and exact visuals, the planned shot language for each scene, and the execution r
 This makes the source decision reviewable instead of hiding it inside topic-specific
 renderer code.
 
-## Renderer fallback
+## Procedural fallback
 
 `visuals/runtime.py` keeps the cinematic editorial renderer available for explainers
 and explicit manual fallback. Registration is idempotent and does not wrap render
-functions, avoiding the recursive reload failure fixed in PR #42.
+functions, avoiding the recursive reload failure fixed in PR #42. The GitHub preview
+workflow renders this fallback only; it is no longer evidence of the default visual
+path for human or environmental scenes.
+
+## Current milestone
+
+This branch now delivers source planning and project-wide execution. Its next visual
+proof must use selected real assets from configured providers, not the rejected vector
+contact sheet from the first iteration.
 
 ## Next milestones
 
