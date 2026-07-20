@@ -21,10 +21,16 @@ class RealismLevel(str, Enum):
 
 
 class SourceMode(str, Enum):
-    STOCK_OR_GENERATED = "stock_or_generated"
+    REAL_FOOTAGE = "real_footage"
+    PHOTOGRAPHY = "photography"
     HYBRID_COMPOSITE = "hybrid_composite"
     RENDERED_INTERFACE = "rendered_interface"
     PROCEDURAL_GRAPHIC = "procedural_graphic"
+
+
+class ExecutionMode(str, Enum):
+    ASSET_FIRST = "asset_first"
+    EXACT_VISUAL = "exact_visual"
 
 
 class ShotType(str, Enum):
@@ -97,10 +103,23 @@ class ShotPlan:
 
 
 @dataclass(frozen=True)
+class AssetDirective:
+    execution_mode: ExecutionMode
+    preferred_media_type: str
+    fallback_media_type: str | None
+    overlay_mode: str
+    search_terms: tuple[str, ...]
+    avoid_terms: tuple[str, ...]
+    allow_generated_still: bool
+    reason: str
+
+
+@dataclass(frozen=True)
 class VisualPlan:
     intent: SceneIntent
     strategy: VisualStrategy
     shot: ShotPlan
+    asset: AssetDirective
 
 
 @dataclass(frozen=True)
