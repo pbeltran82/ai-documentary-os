@@ -13,6 +13,7 @@ from ..services import finance_motion as finance_engine
 from ..services.manifest_events import refresh_project_manifests
 from ..services.visuals import (
     ExecutionMode,
+    VisualFamily,
     build_scene_visual_plan,
     build_visual_plan,
     visual_plan_payload,
@@ -22,6 +23,28 @@ from .assets import select_asset
 from .finance_motion import generate_exact_visual
 
 router = APIRouter(tags=["visual-architecture"])
+
+_FINANCE_TERMS = {
+    "account",
+    "balance",
+    "budget",
+    "compound",
+    "expense",
+    "finance",
+    "fund",
+    "income",
+    "index",
+    "invest",
+    "investment",
+    "market",
+    "money",
+    "paycheck",
+    "rent",
+    "salary",
+    "saving",
+    "savings",
+    "wealth",
+}
 
 
 def _scene(scene_id: int, db: Session) -> Scene:
@@ -167,6 +190,27 @@ def _resolve_ffmpeg_binary() -> str | None:
     return None
 
 
+def _exact_visual_route(scene: Scene, plan) -> tuple[str, str | None]:
+    """Choose the procedural renderer explicitly; never fall back to topic guessing."""
+    terms = {
+        word
+        for value in (
+            str(scene.narration or ""),
+            str(scene.visual_intent or ""),
+            *[str(item) for item in (scene.search_keywords or ())],
+        )
+        for word in value.lower().replace("/", " ").replace("-", " ").split()
+    }
+
+    if plan.strategy.family == VisualFamily.CONCLUSION_CTA:
+        return "tech_behavior_motion", "machine_choice_cta"
+    if plan.strategy.family == VisualFamily.DATA_EXPLAINER:
+        if terms & _FINANCE_TERMS:
+            return "finance_motion", None
+        return "tech_behavior_motion", "behavior_prediction_engine"
+    return "tech_behavior_motion", None
+
+
 def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, object]:
     if plan.asset.execution_mode == ExecutionMode.ASSET_FIRST:
         asset, candidate, response, download_failures = _select_asset_first(
@@ -194,10 +238,11 @@ def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, 
     ffmpeg = _resolve_ffmpeg_binary()
     if ffmpeg is not None:
         finance_engine.FFMPEG_NAME = ffmpeg
+    family_id, template_id = _exact_visual_route(scene, plan)
     asset = generate_exact_visual(
         scene_id=scene.id,
-        family_id=None,
-        template_id=None,
+        family_id=family_id,
+        template_id=template_id,
         style_id=None,
         defer_manifest=True,
         db=db,
@@ -208,6 +253,8 @@ def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, 
         "status": "completed",
         "execution_mode": plan.asset.execution_mode.value,
         "visual_family": plan.strategy.family.value,
+        "exact_family_id": family_id,
+        "exact_template_id": template_id,
         "provider": asset.provider,
         "media_type": asset.media_type,
         "provider_asset_id": asset.provider_asset_id,
