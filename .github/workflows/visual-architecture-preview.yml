@@ -46,7 +46,6 @@ jobs:
     env:
       DATABASE_URL: sqlite:///${{ github.workspace }}/backend/asset-first-e2e.db
       MEDIA_ROOT: ${{ github.workspace }}/backend/asset-first-e2e-media
-      FFMPEG_BIN: ffmpeg
       MAX_ASSET_DOWNLOAD_BYTES: "157286400"
       TIMELINE_RENDER_TIMEOUT_SECONDS: "1200"
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
@@ -64,10 +63,17 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
-      - name: Confirm FFmpeg
+      - name: Confirm and export FFmpeg
+        shell: bash
         run: |
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+          ffmpeg_path="$(command -v ffmpeg)"
+          ffprobe_path="$(command -v ffprobe)"
+          test -x "$ffmpeg_path"
+          test -x "$ffprobe_path"
+          "$ffmpeg_path" -version | head -n 1
+          "$ffprobe_path" -version | head -n 1
+          echo "FFMPEG_BIN=$ffmpeg_path" >> "$GITHUB_ENV"
+          echo "FFPROBE_BIN=$ffprobe_path" >> "$GITHUB_ENV"
       - name: Execute architecture, download media, and render 16:9 sample
         shell: bash
         run: |
