@@ -19,7 +19,7 @@ from ..services.background_music_timeline import (
     save_timeline_style,
     write_timeline_plan,
 )
-from ..services.media_quality_assurance_v2 import analyze_timeline_render, load_qa_report
+from ..services.release_quality_assurance import analyze_timeline_render, load_qa_report
 from ..services.render_invalidation import invalidate_render_artifacts
 from ..services.voiceover import remove_voiceover, save_voiceover
 
