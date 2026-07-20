@@ -69,29 +69,26 @@ def build_architecture_shot_brief(
     )
     must_avoid = unique_phrases(asset.avoid_terms, 8)
 
-    core = " ".join(explicit_terms).strip()
-    directed_query = " ".join(explicit_terms[:3]).strip()
+    primary = explicit_terms[0] if explicit_terms else ""
+    secondary = explicit_terms[1] if len(explicit_terms) > 1 else ""
     action_query = " ".join(
         [
-            *explicit_terms[:2],
+            primary,
             *action_terms[:1],
             *setting_terms[:1],
         ]
     ).strip()
-    secondary_query = " ".join(
-        [
-            *explicit_terms[:2],
-            *concept_terms[:1],
-        ]
-    ).strip()
+    combined_query = " ".join([primary, secondary]).strip()
+    concept_query = " ".join([primary, *concept_terms[:1]]).strip()
     query_variants = unique_phrases(
         [
-            f"{directed_query} {media_word}" if directed_query else "",
-            f"{core} {media_word}" if core else "",
+            f"{primary} {media_word}" if primary else "",
+            f"{secondary} {media_word}" if secondary else "",
+            f"{combined_query} {media_word}" if combined_query else "",
             f"{action_query} cinematic {media_word}" if action_query else "",
-            f"{secondary_query} {media_word}" if secondary_query else "",
+            f"{concept_query} {media_word}" if concept_query else "",
         ],
-        4,
+        5,
     )
 
     return ShotBrief(
@@ -124,12 +121,12 @@ def search_architecture_candidates(
     all_candidates = []
     remaining_values: list[int] = []
     searched_providers: list[str] = []
-    queries = brief.query_variants[:2]
+    queries = brief.query_variants[:3]
 
     for provider_name in provider_names:
         provider = PROVIDERS[provider_name]
         provider_succeeded = False
-        provider_queries = queries[:1] if provider_name == "wikimedia" else queries
+        provider_queries = queries[:2] if provider_name == "wikimedia" else queries
         for query in provider_queries:
             try:
                 candidates, remaining = provider.search(
