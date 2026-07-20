@@ -1,10 +1,13 @@
+from .asset_director import build_asset_directive
 from .quality_gate import evaluate_visual_quality, measure_edge_density
 from .runtime import install_visual_architecture, visual_architecture_installed
 from .scene_intent import analyze_scene_intent
 from .shot_planner import plan_shot
 from .types import (
+    AssetDirective,
     CameraMove,
     Composition,
+    ExecutionMode,
     QualityDecision,
     QualityMetrics,
     RealismLevel,
@@ -16,12 +19,18 @@ from .types import (
     VisualPlan,
     VisualStrategy,
 )
-from .visual_pipeline import build_scene_visual_plan, build_visual_plan
+from .visual_pipeline import (
+    build_scene_visual_plan,
+    build_visual_plan,
+    visual_plan_payload,
+)
 from .visual_strategy import choose_visual_strategy
 
 __all__ = [
+    "AssetDirective",
     "CameraMove",
     "Composition",
+    "ExecutionMode",
     "QualityDecision",
     "QualityMetrics",
     "RealismLevel",
@@ -33,6 +42,7 @@ __all__ = [
     "VisualPlan",
     "VisualStrategy",
     "analyze_scene_intent",
+    "build_asset_directive",
     "build_scene_visual_plan",
     "build_visual_plan",
     "choose_visual_strategy",
@@ -41,4 +51,5 @@ __all__ = [
     "measure_edge_density",
     "plan_shot",
     "visual_architecture_installed",
+    "visual_plan_payload",
 ]
