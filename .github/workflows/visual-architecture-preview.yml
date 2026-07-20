@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python scripts/run_asset_first_e2e.py 2>&1 | tee asset-first-e2e.log
+          python scripts/run_asset_first_e2e_ci.py 2>&1 | tee asset-first-e2e.log
           status=${PIPESTATUS[0]}
           exit "$status"
       - name: Upload rendered sample and diagnostics
