@@ -14,9 +14,7 @@ class ProjectCreate(BaseModel):
     target_minutes: int = Field(default=8, ge=1, le=180)
     audience: str = Field(default="General audience", min_length=2, max_length=200)
     tone: str = Field(default="Cinematic", min_length=2, max_length=120)
-    visual_style: str = Field(
-        default="Cinematic documentary", min_length=2, max_length=200
-    )
+    visual_style: str = Field(default="Cinematic documentary", min_length=2, max_length=200)
     video_format: VideoFormat = "youtube"
 
 
@@ -85,6 +83,7 @@ class SceneBase(BaseModel):
     duration_seconds: float = Field(default=5, ge=1, le=60)
     visual_intent: str = Field(default="", max_length=2000)
     search_keywords: list[str] = Field(default_factory=list, max_length=20)
+    animation_plan: dict[str, Any] = Field(default_factory=dict)
     preferred_asset_type: str = Field(default="stock_video", max_length=40)
     asset_status: str = Field(default="missing", max_length=40)
 
@@ -203,10 +202,7 @@ class VisualDirectorResponse(BaseModel):
 class VisualFeedbackCreate(BaseModel):
     provider: str = Field(min_length=1, max_length=40)
     provider_asset_id: str = Field(min_length=1, max_length=200)
-    reason: str = Field(
-        default="wrong_concept",
-        pattern="^(wrong_concept|too_generic|repetitive|poor_quality|bad_style)$",
-    )
+    reason: str = Field(default="wrong_concept", pattern="^(wrong_concept|too_generic|repetitive|poor_quality|bad_style)$")
 
 
 class VisualFeedbackRead(VisualFeedbackCreate):

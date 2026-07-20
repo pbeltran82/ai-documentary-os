@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models import Project, Scene
 from ..schemas import ProjectCreate, ProjectDetail, ProjectRead, ProjectUpdate
 from ..services.media_library import remove_project_directory
+from ..services.narration_synthesis import repair_existing_narration_timings
 from ..services.render_invalidation import invalidate_render_artifacts
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -56,6 +57,12 @@ def get_project(project_id: int, db: Session = Depends(get_db)) -> Project:
     project = db.scalar(statement)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Recover projects persisted with the streamed-WAV 0xFFFFFFFF duration bug
+    # before Pydantic validates the response's 60-second per-scene limit.
+    if any(float(scene.duration_seconds) > 60.0 for scene in project.scenes):
+        repair_existing_narration_timings(project, db)
+
     return project
 
 

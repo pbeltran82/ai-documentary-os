@@ -17,7 +17,9 @@ from .routers.finance_motion import router as finance_motion_router
 from .routers.projects import router as projects_router
 from .routers.production import router as production_router
 from .routers.scenes import router as scenes_router
+from .routers.script_audio import router as script_audio_router
 from .routers.timeline import router as timeline_router
+from .routers.voice_previews import router as voice_previews_router
 from .schemas import HealthResponse
 from .services import animation_script_runtime as _animation_script_runtime
 from .services import cinematic_character_polish as _cinematic_character_polish
@@ -30,7 +32,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
 APP_NAME = os.getenv("APP_NAME", "AI Documentary OS")
-VERSION = "1.9.6"
+VERSION = "2.0.0-alpha.2"
 
 
 @asynccontextmanager
@@ -44,7 +46,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=f"{APP_NAME} API",
     version=VERSION,
-    description="Local-first documentary command center with cinematic character polish, neutral motion art direction, editable animation scripts, and project-wide batch generation.",
+    description="Local-first end-to-end documentary production with structured script artifacts, scene-level narration planning, exact visuals, and resumable timeline assembly.",
     lifespan=lifespan,
 )
 
@@ -65,6 +67,8 @@ app.add_middleware(
 app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 app.include_router(projects_router, prefix="/api")
 app.include_router(production_router, prefix="/api")
+app.include_router(script_audio_router, prefix="/api")
+app.include_router(voice_previews_router, prefix="/api")
 app.include_router(scenes_router, prefix="/api")
 app.include_router(animation_plans_router, prefix="/api")
 app.include_router(assets_router, prefix="/api")
