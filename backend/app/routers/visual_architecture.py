@@ -57,21 +57,50 @@ def _candidate_payload(candidate) -> AssetSelect:
     return AssetSelect.model_validate(candidate.model_dump())
 
 
+def _candidate_responses(scene: Scene, plan, per_page: int):
+    media_types = [plan.asset.preferred_media_type]
+    if (
+        plan.asset.fallback_media_type
+        and plan.asset.fallback_media_type not in media_types
+    ):
+        media_types.append(plan.asset.fallback_media_type)
+    return [
+        search_architecture_candidates(scene, plan, media_type, per_page)
+        for media_type in media_types
+    ]
+
+
 def _select_asset_first(scene: Scene, plan, per_page: int, db: Session):
-    response = search_architecture_candidates(
-        scene,
-        plan,
-        plan.asset.preferred_media_type,
-        per_page,
-    )
-    if not response.candidates and plan.asset.fallback_media_type:
-        response = search_architecture_candidates(
-            scene,
-            plan,
-            plan.asset.fallback_media_type,
-            per_page,
-        )
-    if not response.candidates:
+    responses = _candidate_responses(scene, plan, per_page)
+    attempted: set[tuple[str, str]] = set()
+    download_failures: list[dict[str, str]] = []
+    candidate_count = 0
+
+    for response in responses:
+        for candidate in response.candidates:
+            identity = (candidate.provider, candidate.provider_asset_id)
+            if identity in attempted:
+                continue
+            attempted.add(identity)
+            candidate_count += 1
+            try:
+                asset = select_asset(
+                    scene.id,
+                    _candidate_payload(candidate),
+                    db,
+                )
+            except HTTPException as exc:
+                download_failures.append(
+                    {
+                        "provider": candidate.provider,
+                        "provider_asset_id": candidate.provider_asset_id,
+                        "detail": str(exc.detail),
+                    }
+                )
+                continue
+            return asset, candidate, response, download_failures
+
+    if candidate_count == 0:
         raise HTTPException(
             status_code=422,
             detail=(
@@ -79,14 +108,28 @@ def _select_asset_first(scene: Scene, plan, per_page: int, db: Session):
                 "rights, concept, quality, and diversity gates."
             ),
         )
-    candidate = response.candidates[0]
-    asset = select_asset(scene.id, _candidate_payload(candidate), db)
-    return asset, candidate, response
+
+    last_details = "; ".join(
+        failure["detail"] for failure in download_failures[-3:]
+    )
+    raise HTTPException(
+        status_code=502,
+        detail=(
+            f"Could not download any of {candidate_count} ranked visual candidates. "
+            f"The executor tried the next candidate and fallback media type automatically. "
+            f"Last errors: {last_details}"
+        ),
+    )
 
 
 def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, object]:
     if plan.asset.execution_mode == ExecutionMode.ASSET_FIRST:
-        asset, candidate, response = _select_asset_first(scene, plan, per_page, db)
+        asset, candidate, response, download_failures = _select_asset_first(
+            scene,
+            plan,
+            per_page,
+            db,
+        )
         return {
             "scene_id": scene.id,
             "scene_number": scene.scene_number,
@@ -99,6 +142,7 @@ def _execute_scene(scene: Scene, plan, per_page: int, db: Session) -> dict[str, 
             "director_score": candidate.director_score,
             "providers_searched": response.providers_searched,
             "search_queries": response.search_queries,
+            "download_failures_before_success": download_failures,
             "reason": plan.asset.reason,
         }
 
