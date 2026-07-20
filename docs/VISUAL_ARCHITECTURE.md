@@ -1,20 +1,35 @@
-# Visual Architecture v1
+# Visual Architecture v2
 
-AI Documentary OS now plans visuals from scene meaning before selecting a renderer.
-The goal is to prevent future documentaries from falling back to repeated slides,
-primitive diagrams, or topic-specific rescue patches.
+AI Documentary OS now plans visuals from scene meaning before selecting either a
+real asset or a procedural renderer. The goal is to prevent future documentaries
+from falling back to repeated slides, primitive diagrams, or topic-specific rescue
+patches.
 
 ## Pipeline
 
 1. `scene_intent.py` extracts human subjects, environments, interfaces, data,
    comparisons, history, tone, and closing intent from narration and direction.
-2. `visual_strategy.py` chooses a reusable visual family and sets hard text,
-   label, subject, realism, source, and depth requirements.
+2. `visual_strategy.py` chooses a reusable visual family and source mode.
 3. `shot_planner.py` assigns shot size, composition, camera move, focal subject,
    foreground, background, atmosphere, and minimum depth.
-4. A renderer or asset provider executes the provider-neutral `VisualPlan`.
-5. `quality_gate.py` rejects frames that are too textual, panel-heavy, centered,
-   empty, flat, static, or missing a subject.
+4. `asset_director.py` converts the plan into an executable source decision:
+   `asset_first` or `exact_visual`.
+5. The project executor uses the rights-aware Visual Director for real footage and
+   photography, or Exact Visual Studio only when a controlled explainer is justified.
+6. `quality_gate.py` rejects generated frames that are too textual, panel-heavy,
+   centered, empty, flat, static, or missing a subject.
+
+## Source policy
+
+The default hierarchy is:
+
+1. defensible stock video
+2. defensible documentary photography with editorial motion
+3. generated cinematic stills when a provider is added behind the same contract
+4. procedural graphics only for true data/process explanation and the final CTA
+
+Human, environmental, device-use, historical, comparison, and metaphor scenes are
+asset-first. This is the central anti-slide rule.
 
 ## Visual families
 
@@ -26,25 +41,39 @@ primitive diagrams, or topic-specific rescue patches.
 - `comparison_contrast`
 - `conclusion_cta`
 
-Real-world and subject-led scenes are preferred. `data_explainer` is intentionally
-restricted to narration that truly depends on quantities, ranking, process, or a
-timeline. Consecutive explainer scenes are automatically rerouted for variety.
+`data_explainer` is intentionally restricted to narration that truly depends on
+quantities, ranking, or process. Consecutive explainers are rerouted to asset-led
+metaphors for pacing variety.
 
-## Current renderer integration
+## API
 
-`visuals/runtime.py` registers the first cinematic editorial renderer family with
-Tech & Behavior Motion. It replaces the old grid, repeated panels, and large
-instructional headings with full-frame environments, human-scale subjects,
-foreground framing, atmospheric depth, observational phone shots, perspective
-roads, physical data trails, mirror metaphors, and a thesis-led ending.
+- `GET /api/scenes/{scene_id}/visual-architecture-plan`
+- `GET /api/projects/{project_id}/visual-architecture-plan`
+- `POST /api/scenes/{scene_id}/visual-architecture-execute`
+- `POST /api/projects/{project_id}/visual-architecture-execute`
 
-Registration is idempotent and does not wrap render functions, avoiding the
-recursive reload failure fixed in PR #42.
+The project executor preserves existing visuals unless `replace_existing=true`.
+Asset-first scenes search all configured providers, apply rights, evidence, quality,
+and diversity gates, then download and attach the highest-ranked surviving asset.
+Procedural scenes use the existing exact-visual renderer and refresh project manifests
+once execution completes.
 
-## Next renderer milestones
+## App control
 
-- Execute `stock_or_generated` plans with rights-safe real-world media.
-- Add generated-image provider adapters behind the same `VisualPlan` contract.
-- Persist quality metrics and retry decisions per scene.
-- Track recent families and compositions project-wide during batch production.
-- Add contact-sheet review and automatic low-score regeneration.
+The **Visual Architecture** launcher shows the project-wide split between real assets
+and exact visuals, the planned shot language for each scene, and the execution result.
+This makes the source decision reviewable instead of hiding it inside topic-specific
+renderer code.
+
+## Renderer fallback
+
+`visuals/runtime.py` keeps the cinematic editorial renderer available for explainers
+and explicit manual fallback. Registration is idempotent and does not wrap render
+functions, avoiding the recursive reload failure fixed in PR #42.
+
+## Next milestones
+
+- Add a cinematic generated-image provider behind `AssetDirective`.
+- Persist visual plans and quality decisions with scene history.
+- Add automatic contact sheets using selected real assets and exact-visual frames.
+- Add scene-to-scene color, lens, and motion continuity scoring.
