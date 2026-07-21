@@ -1,0 +1,224 @@
+.visual-architecture-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 204px;
+  z-index: 40;
+  border: 1px solid rgba(79, 210, 255, 0.38);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(8, 20, 35, 0.96), rgba(25, 44, 67, 0.96));
+  color: #eaf8ff;
+  padding: 12px 18px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.visual-architecture-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(2, 8, 16, 0.82);
+  backdrop-filter: blur(16px);
+}
+
+.visual-architecture-modal {
+  width: min(1180px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  border: 1px solid rgba(127, 177, 214, 0.24);
+  border-radius: 28px;
+  background: linear-gradient(180deg, #09131f 0%, #0d1a28 100%);
+  color: #eef7ff;
+  box-shadow: 0 36px 110px rgba(0, 0, 0, 0.6);
+  padding: 28px;
+}
+
+.visual-architecture-header,
+.visual-architecture-controls,
+.visual-architecture-summary,
+.visual-architecture-scene,
+.visual-architecture-result-list > div {
+  display: flex;
+  align-items: center;
+}
+
+.visual-architecture-header {
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.visual-architecture-header h2 {
+  margin: 4px 0 8px;
+  font-size: clamp(28px, 4vw, 46px);
+}
+
+.visual-architecture-header p {
+  max-width: 760px;
+  color: #a9bdcf;
+}
+
+.visual-architecture-close {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: #dceaf5;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.visual-architecture-controls {
+  align-items: end;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.visual-architecture-controls label {
+  display: grid;
+  gap: 7px;
+  color: #a9bdcf;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.visual-architecture-controls select {
+  min-width: 260px;
+  border: 1px solid rgba(127, 177, 214, 0.25);
+  border-radius: 12px;
+  background: #08131f;
+  color: #eef7ff;
+  padding: 11px 13px;
+}
+
+.visual-architecture-checkbox {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-self: center;
+}
+
+.visual-architecture-summary {
+  gap: 14px;
+  margin: 22px 0;
+}
+
+.visual-architecture-summary article {
+  flex: 1;
+  min-width: 160px;
+  border: 1px solid rgba(127, 177, 214, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 18px;
+}
+
+.visual-architecture-summary strong {
+  display: block;
+  font-size: 30px;
+}
+
+.visual-architecture-summary span,
+.visual-architecture-scene p,
+.visual-architecture-result p {
+  color: #9fb4c7;
+}
+
+.visual-architecture-scenes {
+  display: grid;
+  gap: 12px;
+}
+
+.visual-architecture-scene {
+  align-items: flex-start;
+  gap: 18px;
+  border: 1px solid rgba(127, 177, 214, 0.14);
+  border-radius: 18px;
+  background: rgba(3, 10, 18, 0.45);
+  padding: 16px;
+}
+
+.visual-architecture-scene-number {
+  min-width: 88px;
+  color: #56d7ff;
+  font-weight: 800;
+}
+
+.visual-architecture-scene p {
+  margin: 6px 0 10px;
+}
+
+.visual-architecture-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.visual-architecture-tags span {
+  border-radius: 999px;
+  background: rgba(86, 215, 255, 0.1);
+  color: #bfefff;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.visual-architecture-loading,
+.visual-architecture-result,
+.error-banner {
+  margin-top: 18px;
+}
+
+.visual-architecture-result {
+  border-top: 1px solid rgba(127, 177, 214, 0.18);
+  padding-top: 22px;
+}
+
+.visual-architecture-result-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.visual-architecture-result-list > div {
+  justify-content: space-between;
+  gap: 14px;
+  border-radius: 12px;
+  padding: 11px 13px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.visual-result-completed {
+  border-left: 4px solid #48d19d;
+}
+
+.visual-result-skipped {
+  border-left: 4px solid #e7bd62;
+}
+
+.visual-result-failed {
+  border-left: 4px solid #ef7c7c;
+}
+
+@media (max-width: 720px) {
+  .visual-architecture-backdrop {
+    padding: 10px;
+  }
+
+  .visual-architecture-modal {
+    padding: 18px;
+  }
+
+  .visual-architecture-header,
+  .visual-architecture-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .visual-architecture-result-list > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

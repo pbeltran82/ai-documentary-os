@@ -5,6 +5,7 @@ import { AnimationScriptLauncher } from "./components/AnimationScriptLauncher";
 import { BatchExitGuard } from "./components/BatchExitGuard";
 import { FinanceMotionLauncher } from "./components/FinanceMotionLauncher";
 import { ProductionPipelineLauncher } from "./components/ProductionPipelineLauncher";
+import { VisualArchitectureLauncher } from "./components/VisualArchitectureLauncher";
 import "./styles.css";
 import "./asset-planner.css";
 import "./provider-hub.css";
@@ -18,6 +19,7 @@ import "./release-v150.css";
 import "./release-v160.css";
 import "./release-v170.css";
 import "./cinematic-polish.css";
+import "./visual-architecture.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,6 +27,7 @@ createRoot(document.getElementById("root")!).render(
     <AnimationScriptLauncher />
     <FinanceMotionLauncher />
     <ProductionPipelineLauncher />
+    <VisualArchitectureLauncher />
     <BatchExitGuard />
   </StrictMode>,
 );

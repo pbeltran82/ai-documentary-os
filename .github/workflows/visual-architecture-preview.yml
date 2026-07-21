@@ -1,0 +1,98 @@
+name: Visual Architecture Preview
+
+on:
+  push:
+    branches: [feature/visual-architecture-v1]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  render-preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Render procedural fallback preview
+        shell: bash
+        run: |
+          set +e
+          python scripts/render_visual_architecture_preview.py 2>&1 | tee visual-preview.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+      - name: Upload fallback preview and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-architecture-preview
+          path: |
+            backend/visual-architecture-preview
+            backend/visual-preview.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  asset-first-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      DATABASE_URL: sqlite:///${{ github.workspace }}/backend/asset-first-e2e.db
+      MEDIA_ROOT: ${{ github.workspace }}/backend/asset-first-e2e-media
+      MAX_ASSET_DOWNLOAD_BYTES: "157286400"
+      TIMELINE_RENDER_TIMEOUT_SECONDS: "1200"
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Install FFmpeg
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Confirm and export FFmpeg
+        shell: bash
+        run: |
+          ffmpeg_path="$(command -v ffmpeg)"
+          ffprobe_path="$(command -v ffprobe)"
+          test -x "$ffmpeg_path"
+          test -x "$ffprobe_path"
+          "$ffmpeg_path" -version | head -n 1
+          "$ffprobe_path" -version | head -n 1
+          echo "FFMPEG_BIN=$ffmpeg_path" >> "$GITHUB_ENV"
+          echo "FFPROBE_BIN=$ffprobe_path" >> "$GITHUB_ENV"
+      - name: Execute architecture, download media, and render 16:9 sample
+        shell: bash
+        run: |
+          set +e
+          python scripts/run_asset_first_e2e_ci.py 2>&1 | tee asset-first-e2e.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+      - name: Upload rendered sample and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-first-e2e
+          path: |
+            backend/asset-first-e2e-output
+            backend/asset-first-e2e.log
+          if-no-files-found: warn
+          retention-days: 14

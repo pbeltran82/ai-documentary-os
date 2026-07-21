@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
 from typing import Any
 
 from . import timeline_subject_motion as subject
@@ -15,6 +17,34 @@ NARRATION_LRA = 11
 _original_normalized_video_filter = base.normalized_video_filter
 _original_build_filter_graph = base.build_filter_graph
 _original_build_timeline_plan = base.build_timeline_plan
+_original_ffmpeg_executable = base.ffmpeg_executable
+
+
+def ffmpeg_executable() -> str | None:
+    """Resolve FFmpeg even when a runner or packaged app has a minimal PATH."""
+    original = _original_ffmpeg_executable()
+    if original:
+        return original
+
+    configured = str(getattr(base, "FFMPEG_NAME", "") or "").strip()
+    candidates = (
+        configured,
+        shutil.which(configured) if configured else None,
+        shutil.which("ffmpeg"),
+        "/opt/homebrew/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+        "/usr/bin/ffmpeg",
+    )
+    for value in candidates:
+        if not value:
+            continue
+        candidate = Path(value).expanduser()
+        if candidate.is_file():
+            return str(candidate.resolve())
+        discovered = shutil.which(str(value))
+        if discovered:
+            return discovered
+    return None
 
 
 def generated_edge_trim_seconds(clip: dict[str, Any]) -> float:
@@ -153,6 +183,7 @@ def build_timeline_plan(project, style=None) -> dict[str, Any]:
     return plan
 
 
+base.ffmpeg_executable = ffmpeg_executable
 base.normalized_video_filter = normalized_video_filter
 base.build_filter_graph = build_filter_graph
 base.build_timeline_plan = build_timeline_plan
