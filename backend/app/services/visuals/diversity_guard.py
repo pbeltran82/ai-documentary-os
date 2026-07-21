@@ -31,29 +31,37 @@ class VisualDiversityGuard:
             asset = scene.selected_asset
             if asset is None:
                 continue
-            guard.register_asset(asset.provider, asset.provider_asset_id, asset.download_url, asset.media_type)
-            if asset.provider == "generated":
-                route = str(asset.source_url or "").split("/exact-visual/", 1)
+            guard.register_asset(
+                asset.provider,
+                asset.provider_asset_id,
+                asset.download_url,
+                asset.media_type,
+            )
+            source = str(asset.source_url or "")
+            for marker in ("/exact-visual/", "local://hyperframes/"):
+                route = source.split(marker, 1)
                 if len(route) == 2:
                     parts = route[1].split("/")
                     if len(parts) >= 2:
                         guard.exact_templates.add((parts[0], parts[1]))
+                    break
         return guard
 
     def rejects_candidate(self, candidate) -> bool:
+        """Reject exact reuse; sequence variety remains a planner preference, not a blocker."""
         identity = (candidate.provider, candidate.provider_asset_id)
         if identity in self.asset_ids:
             return True
         media_url = canonical_url(candidate.download_url or candidate.preview_url)
-        if media_url and media_url in self.media_urls:
-            return True
-        if len(self.recent_providers) >= 2 and self.recent_providers[-2:] == [candidate.provider] * 2:
-            return True
-        if len(self.recent_media_types) >= 2 and self.recent_media_types[-2:] == [candidate.media_type] * 2:
-            return True
-        return False
+        return bool(media_url and media_url in self.media_urls)
 
-    def register_asset(self, provider: str, provider_asset_id: str, media_url: str, media_type: str) -> None:
+    def register_asset(
+        self,
+        provider: str,
+        provider_asset_id: str,
+        media_url: str,
+        media_type: str,
+    ) -> None:
         self.asset_ids.add((provider, provider_asset_id))
         normalized = canonical_url(media_url)
         if normalized:
@@ -88,7 +96,11 @@ TECH_TEMPLATE_ROTATION = (
 )
 
 
-def choose_unused_exact_template(family_id: str, preferred: str | None, guard: VisualDiversityGuard) -> str | None:
+def choose_unused_exact_template(
+    family_id: str,
+    preferred: str | None,
+    guard: VisualDiversityGuard,
+) -> str | None:
     if family_id != "tech_behavior_motion":
         return preferred
     candidates = [preferred, *TECH_TEMPLATE_ROTATION]
