@@ -31,6 +31,17 @@ class ProviderSpec:
         return self.env_key is None or bool(os.getenv(self.env_key, "").strip())
 
 
+def _provider_timeout(default: int) -> int:
+    raw = os.getenv("ASSET_PROVIDER_TIMEOUT_SECONDS", "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(3, min(value, 60))
+
+
 def json_request(
     url: str,
     *,
@@ -46,8 +57,9 @@ def json_request(
             **(headers or {}),
         },
     )
+    effective_timeout = _provider_timeout(timeout)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with urlopen(request, timeout=effective_timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
             return payload, dict(response.headers.items())
     except HTTPError as exc:
@@ -60,7 +72,9 @@ def json_request(
         reason = getattr(exc, "reason", str(exc))
         raise HTTPException(
             status_code=502,
-            detail=f"Could not reach {provider_label}: {reason}",
+            detail=(
+                f"Could not reach {provider_label} within {effective_timeout}s: {reason}"
+            ),
         ) from exc
 
 
