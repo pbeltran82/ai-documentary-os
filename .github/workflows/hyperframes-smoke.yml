@@ -87,12 +87,12 @@ jobs:
 
       - name: Probe rendered video
         run: |
-          VIDEO=$(find backend/data/media/project-9999 -name '*hyperframes*.mp4' -print -quit)
+          VIDEO=$(find backend/data/projects/project-9999 -name '*hyperframes*.mp4' -print -quit)
           test -n "$VIDEO"
           ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json "$VIDEO"
 
       - uses: actions/upload-artifact@v4
         with:
           name: hyperframes-smoke-video
-          path: backend/data/media/project-9999/assets/*.mp4
+          path: backend/data/projects/project-9999/assets/*.mp4
           if-no-files-found: error
