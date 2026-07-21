@@ -11,10 +11,12 @@ for path in (BACKEND_DIR, SCRIPT_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-# Keep validation deterministic and fast. Production keeps the full provider set.
+# Keep validation bounded while allowing two public archives that match the
+# deterministic Earth/Apollo fixture scenes. Slow or unavailable sources fail
+# independently and the executor continues to the next source.
 os.environ.setdefault("ASSET_PROVIDER_TIMEOUT_SECONDS", "5")
-os.environ.setdefault("ASSET_PROVIDER_ALLOWLIST", "nasa")
-os.environ.setdefault("ASSET_PROVIDER_QUERY_LIMIT", "1")
+os.environ.setdefault("ASSET_PROVIDER_ALLOWLIST", "nasa,open_archives")
+os.environ.setdefault("ASSET_PROVIDER_QUERY_LIMIT", "2")
 os.environ.setdefault("PYTHONUNBUFFERED", "1")
 
 configured_ffmpeg = os.getenv("FFMPEG_BIN", "").strip()
@@ -55,4 +57,5 @@ print(
     },
     flush=True,
 )
+print("[asset-first-e2e] planning scenes and searching bounded public providers", flush=True)
 main()
