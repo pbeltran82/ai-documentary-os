@@ -16,6 +16,13 @@ for path in (BACKEND_DIR, SCRIPT_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
+# This must be set before app.database is imported. The E2E harness is destructive
+# by design, so it receives an isolated database that can never be the user's app DB.
+E2E_DATA_DIR = BACKEND_DIR / "data" / "e2e"
+E2E_DATA_DIR.mkdir(parents=True, exist_ok=True)
+E2E_DATABASE_PATH = E2E_DATA_DIR / "asset-first-e2e.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{E2E_DATABASE_PATH}"
+
 # The E2E test must validate the complete asset-first path without depending on
 # third-party uptime, API keys, archive throttling, or changing search results.
 os.environ.setdefault("ASSET_PROVIDER_TIMEOUT_SECONDS", "5")
@@ -129,6 +136,7 @@ print(
         "resolved_ffmpeg": resolved_ffmpeg,
         "timeline_ffmpeg": timeline_builder.ffmpeg_executable(),
         "finance_ffmpeg": finance_engine.FFMPEG_NAME,
+        "database_url": os.environ["DATABASE_URL"],
         "asset_provider_timeout_seconds": os.environ["ASSET_PROVIDER_TIMEOUT_SECONDS"],
         "asset_provider_allowlist": os.environ["ASSET_PROVIDER_ALLOWLIST"],
         "asset_provider_query_limit": os.environ["ASSET_PROVIDER_QUERY_LIMIT"],
@@ -143,3 +151,4 @@ finally:
     _server.shutdown()
     _server.server_close()
     shutil.rmtree(FIXTURE_DIR, ignore_errors=True)
+    E2E_DATABASE_PATH.unlink(missing_ok=True)
