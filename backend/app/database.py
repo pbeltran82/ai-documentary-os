@@ -10,6 +10,8 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
+from .services.database_safety import backup_sqlite_database
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -18,6 +20,11 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_DATABASE_URL = f"sqlite:///{DATA_DIR / 'documentary_os.db'}"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+
+# A local-first creative system should make recovery cheap. Create a sidecar copy
+# before the process can apply schema changes. Test/e2e databases may opt out.
+if os.getenv("AUTO_BACKUP_DATABASE", "1").strip().lower() not in {"0", "false", "no"}:
+    backup_sqlite_database(DATABASE_URL, label="startup")
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
