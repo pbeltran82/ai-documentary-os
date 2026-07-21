@@ -1,0 +1,91 @@
+name: HyperFrames smoke
+
+on:
+  push:
+    branches:
+      - visuals-asset-first-integration
+    paths:
+      - "backend/app/services/hyperframes_renderer.py"
+      - "backend/app/services/media_library.py"
+      - "backend/scripts/smoke_test_hyperframes.py"
+      - ".github/workflows/hyperframes-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HYPERFRAMES_ENABLED: "1"
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install HyperFrames and browser
+        run: |
+          npm install --global hyperframes@0.7.64
+          hyperframes browser ensure
+          hyperframes doctor || true
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Render synthetic scene through app adapter
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from types import SimpleNamespace
+
+          from app.services import hyperframes_renderer
+          from app.services.media_library import MEDIA_ROOT
+
+          scene = SimpleNamespace(
+              project_id=9999,
+              scene_number=1,
+              duration_seconds=2.0,
+              narration="Every signal changes what the algorithm recommends next.",
+              visual_intent="A cinematic behavioral model showing signals converging on a recommendation.",
+          )
+          rendered = hyperframes_renderer.render_scene(
+              scene,
+              "tech_behavior_motion",
+              "behavior_prediction_engine",
+          )
+          output = MEDIA_ROOT / rendered.media_relative_path
+          assert output.is_file(), output
+          assert output.stat().st_size > 10_000, output.stat().st_size
+          print(json.dumps({
+              "status": "passed",
+              "output": str(output),
+              "size_bytes": output.stat().st_size,
+              "command": list(rendered.command),
+              "stdout": rendered.stdout[-1000:],
+              "stderr": rendered.stderr[-1000:],
+          }, indent=2))
+          PY
+
+      - name: Probe rendered video
+        run: |
+          VIDEO=$(find backend/data/media/project-9999 -name '*hyperframes*.mp4' -print -quit)
+          test -n "$VIDEO"
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json "$VIDEO"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hyperframes-smoke-video
+          path: backend/data/media/project-9999/assets/*.mp4
+          if-no-files-found: error
