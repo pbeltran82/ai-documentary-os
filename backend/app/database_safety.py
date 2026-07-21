@@ -8,7 +8,7 @@ from urllib.parse import unquote
 from sqlalchemy.engine import Engine
 
 
-SAFE_MARKERS = ("test", "tests", "e2e", "fixture", "tmp", "temporary")
+SAFE_MARKERS = ("test", "tests", "e2e", "fixture", "fixtures")
 
 
 def sqlite_path_from_url(database_url: str) -> Path | None:
@@ -21,6 +21,16 @@ def sqlite_path_from_url(database_url: str) -> Path | None:
     return Path(raw).expanduser().resolve()
 
 
+def _has_explicit_safety_marker(path: Path) -> bool:
+    """Require an intentional test/e2e marker, not a generic OS temp directory."""
+    components = [part.lower() for part in path.parts]
+    filename = path.name.lower()
+    return any(
+        marker in filename or any(marker in component for component in components)
+        for marker in SAFE_MARKERS
+    )
+
+
 def assert_destructive_database_is_safe(database_url: str, *, purpose: str) -> Path:
     """Only permit destructive resets against explicitly marked test/e2e SQLite files."""
     path = sqlite_path_from_url(database_url)
@@ -30,11 +40,10 @@ def assert_destructive_database_is_safe(database_url: str, *, purpose: str) -> P
             "test/e2e SQLite database is allowed."
         )
 
-    searchable = " ".join(part.lower() for part in path.parts)
-    if not any(marker in searchable for marker in SAFE_MARKERS):
+    if not _has_explicit_safety_marker(path):
         raise RuntimeError(
             f"Refusing destructive database operation for {purpose}: {path} does not "
-            "contain a test/e2e safety marker."
+            "contain an explicit test/e2e safety marker."
         )
     return path
 
