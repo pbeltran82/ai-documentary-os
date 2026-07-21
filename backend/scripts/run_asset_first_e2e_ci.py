@@ -23,8 +23,6 @@ E2E_DATA_DIR.mkdir(parents=True, exist_ok=True)
 E2E_DATABASE_PATH = E2E_DATA_DIR / "asset-first-e2e.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{E2E_DATABASE_PATH}"
 
-# The E2E test must validate the complete asset-first path without depending on
-# third-party uptime, API keys, archive throttling, or changing search results.
 os.environ.setdefault("ASSET_PROVIDER_TIMEOUT_SECONDS", "5")
 os.environ["ASSET_PROVIDER_ALLOWLIST"] = "e2e_fixture"
 os.environ["ASSET_PROVIDER_QUERY_LIMIT"] = "1"
@@ -50,6 +48,11 @@ from app.services import timeline_builder as timeline_builder  # noqa: E402
 from app.services import timeline_playback_polish as timeline_polish  # noqa: E402
 from app.services.assets import PROVIDERS  # noqa: E402
 from app.services.assets.common import ProviderSpec  # noqa: E402
+from app.services.database_safety import assert_destructive_database_is_safe  # noqa: E402
+
+assert_destructive_database_is_safe(
+    os.environ["DATABASE_URL"], purpose="asset-first end-to-end validation"
+)
 
 finance_engine.FFMPEG_NAME = resolved_ffmpeg
 finance_art.engine.FFMPEG_NAME = resolved_ffmpeg
@@ -84,7 +87,11 @@ def _build_fixture() -> None:
 def _fixture_search(query: str, media_type: str, per_page: int):
     if media_type != "photo":
         return [], None
-    url = f"{_fixture_base_url}/documentary-source.jpg"
+    identity = abs(hash(query))
+    unique_path = FIXTURE_DIR / f"documentary-source-{identity}.jpg"
+    if not unique_path.exists():
+        shutil.copy2(FIXTURE_PATH, unique_path)
+    url = f"{_fixture_base_url}/{unique_path.name}"
     description = (
         "Earth at night city lights satellite orbit Apollo 11 astronaut moon NASA archive "
         "historical photograph person smartphone phone screen dark room over shoulder "
@@ -92,7 +99,7 @@ def _fixture_search(query: str, media_type: str, per_page: int):
     )
     candidate = AssetCandidate(
         provider="e2e_fixture",
-        provider_asset_id=f"fixture-{abs(hash(query))}",
+        provider_asset_id=f"fixture-{identity}",
         media_type="photo",
         source_url=url,
         preview_url=url,
