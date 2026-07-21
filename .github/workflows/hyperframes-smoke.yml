@@ -9,6 +9,14 @@ on:
       - "backend/app/services/media_library.py"
       - "backend/scripts/smoke_test_hyperframes.py"
       - ".github/workflows/hyperframes-smoke.yml"
+  pull_request:
+    branches:
+      - visuals-cinematic-pass
+    paths:
+      - "backend/app/services/hyperframes_renderer.py"
+      - "backend/app/services/media_library.py"
+      - "backend/scripts/smoke_test_hyperframes.py"
+      - ".github/workflows/hyperframes-smoke.yml"
   workflow_dispatch:
 
 jobs:
@@ -47,7 +55,6 @@ jobs:
         run: |
           python - <<'PY'
           import json
-          from pathlib import Path
           from types import SimpleNamespace
 
           from app.services import hyperframes_renderer
