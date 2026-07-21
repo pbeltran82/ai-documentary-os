@@ -8,6 +8,7 @@ on:
       - "backend/app/services/hyperframes_renderer.py"
       - "backend/app/services/media_library.py"
       - "backend/scripts/smoke_test_hyperframes.py"
+      - "backend/tests/test_visual_pipeline_phase123.py"
       - ".github/workflows/hyperframes-smoke.yml"
   pull_request:
     branches:
@@ -16,13 +17,14 @@ on:
       - "backend/app/services/hyperframes_renderer.py"
       - "backend/app/services/media_library.py"
       - "backend/scripts/smoke_test_hyperframes.py"
+      - "backend/tests/test_visual_pipeline_phase123.py"
       - ".github/workflows/hyperframes-smoke.yml"
   workflow_dispatch:
 
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       HYPERFRAMES_ENABLED: "1"
       PYTHONPATH: backend
@@ -51,48 +53,94 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements.txt
 
-      - name: Render synthetic scene through app adapter
+      - name: Run Phase 1-3 regression suite
+        run: python -m unittest tests.test_visual_pipeline_phase123 -v
+        working-directory: backend
+
+      - name: Render three cinematic systems through the app adapter
         run: |
           python - <<'PY'
+          import hashlib
           import json
+          from pathlib import Path
           from types import SimpleNamespace
 
           from app.services import hyperframes_renderer
           from app.services.media_library import MEDIA_ROOT
 
-          scene = SimpleNamespace(
-              project_id=9999,
-              scene_number=1,
-              duration_seconds=2.0,
-              narration="Every signal changes what the algorithm recommends next.",
-              visual_intent="A cinematic behavioral model showing signals converging on a recommendation.",
+          templates = (
+              (4, "machine_choice_cta"),
+              (8, "behavior_prediction_engine"),
+              (12, "algorithm_chose_you"),
           )
-          rendered = hyperframes_renderer.render_scene(
-              scene,
-              "tech_behavior_motion",
-              "behavior_prediction_engine",
+          results = []
+          hashes = set()
+          for scene_number, template_id in templates:
+              scene = SimpleNamespace(
+                  project_id=9999,
+                  scene_number=scene_number,
+                  duration_seconds=3.0,
+                  narration="Every signal changes what the algorithm recommends next.",
+                  visual_intent="A cinematic behavioral model showing signals converging on a recommendation.",
+              )
+              rendered = hyperframes_renderer.render_scene(
+                  scene,
+                  "tech_behavior_motion",
+                  template_id,
+              )
+              output = MEDIA_ROOT / rendered.media_relative_path
+              assert output.is_file(), output
+              assert output.stat().st_size > 10_000, output.stat().st_size
+              digest = hashlib.sha256(output.read_bytes()).hexdigest()
+              hashes.add(digest)
+              results.append({
+                  "scene_number": scene_number,
+                  "template_id": template_id,
+                  "output": str(output),
+                  "size_bytes": output.stat().st_size,
+                  "sha256": digest,
+                  "command": list(rendered.command),
+                  "stdout": rendered.stdout[-700:],
+                  "stderr": rendered.stderr[-700:],
+              })
+
+          assert len(hashes) == len(templates), "HyperFrames templates rendered identical MP4s"
+          report = {"status": "passed", "distinct_render_count": len(hashes), "renders": results}
+          Path("backend/data/projects/project-9999/hyperframes-report.json").write_text(
+              json.dumps(report, indent=2), encoding="utf-8"
           )
-          output = MEDIA_ROOT / rendered.media_relative_path
-          assert output.is_file(), output
-          assert output.stat().st_size > 10_000, output.stat().st_size
-          print(json.dumps({
-              "status": "passed",
-              "output": str(output),
-              "size_bytes": output.stat().st_size,
-              "command": list(rendered.command),
-              "stdout": rendered.stdout[-1000:],
-              "stderr": rendered.stderr[-1000:],
-          }, indent=2))
+          print(json.dumps(report, indent=2))
           PY
 
-      - name: Probe rendered video
+      - name: Probe all rendered videos
         run: |
-          VIDEO=$(find backend/data/projects/project-9999 -name '*hyperframes*.mp4' -print -quit)
-          test -n "$VIDEO"
-          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json "$VIDEO"
+          set -euo pipefail
+          count=0
+          for VIDEO in backend/data/projects/project-9999/assets/*hyperframes*.mp4; do
+            test -f "$VIDEO"
+            ffprobe -v error \
+              -show_entries stream=codec_name,width,height,r_frame_rate \
+              -show_entries format=duration,size \
+              -of json "$VIDEO"
+            count=$((count + 1))
+          done
+          test "$count" -eq 3
+
+      - name: Extract visual verification frames
+        run: |
+          mkdir -p backend/data/projects/project-9999/verification
+          for VIDEO in backend/data/projects/project-9999/assets/*hyperframes*.mp4; do
+            NAME=$(basename "$VIDEO" .mp4)
+            ffmpeg -y -hide_banner -loglevel error -ss 1.6 -i "$VIDEO" \
+              -frames:v 1 -q:v 2 "backend/data/projects/project-9999/verification/${NAME}.jpg"
+          done
+          test "$(find backend/data/projects/project-9999/verification -name '*.jpg' | wc -l)" -eq 3
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hyperframes-smoke-video
-          path: backend/data/projects/project-9999/assets/*.mp4
+          name: hyperframes-cinematic-three-scene-proof
+          path: |
+            backend/data/projects/project-9999/assets/*.mp4
+            backend/data/projects/project-9999/verification/*.jpg
+            backend/data/projects/project-9999/hyperframes-report.json
           if-no-files-found: error
