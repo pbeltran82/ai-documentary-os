@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from ...schemas import ShotBrief, VisualDirectorResponse
 from ..assets import PROVIDERS
 from ..visual_director import director_shortlist, provider_priority, unique_phrases
@@ -102,24 +104,35 @@ def build_architecture_shot_brief(
     )
 
 
+def _provider_allowlist() -> set[str] | None:
+    raw = os.getenv("ASSET_PROVIDER_ALLOWLIST", "").strip()
+    if not raw:
+        return None
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
 def search_architecture_candidates(
     scene,
     plan: VisualPlan,
     media_type: str,
     per_page: int = 6,
 ) -> VisualDirectorResponse:
-    """Search every configured source while isolating source-specific failures."""
+    """Search configured sources while isolating source-specific failures."""
     brief = build_architecture_shot_brief(scene, plan, media_type)
+    allowlist = _provider_allowlist()
     configured = [
         name
         for name, spec in PROVIDERS.items()
-        if spec.configured and media_type in spec.media_types
+        if spec.configured
+        and media_type in spec.media_types
+        and (allowlist is None or name in allowlist)
     ]
     provider_names = provider_priority(media_type, brief, configured)
     all_candidates = []
     remaining_values: list[int] = []
     searched_providers: list[str] = []
-    queries = brief.query_variants[:3]
+    query_limit = max(1, int(os.getenv("ASSET_PROVIDER_QUERY_LIMIT", "3")))
+    queries = brief.query_variants[:query_limit]
 
     for provider_name in provider_names:
         provider = PROVIDERS[provider_name]
@@ -133,8 +146,6 @@ def search_architecture_candidates(
                     max(6, per_page),
                 )
             except Exception:
-                # Auto mode must keep moving when any remote archive is throttled,
-                # truncated, temporarily unavailable, or returns malformed data.
                 continue
             provider_succeeded = True
             all_candidates.extend(
