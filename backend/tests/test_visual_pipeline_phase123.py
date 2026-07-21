@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from app.database_safety import assert_destructive_database_is_safe
-from app.services.hyperframes_renderer import supports
+from app.services.hyperframes_renderer import _composition_html, supports
 from app.services.visuals.diversity_guard import (
     VisualDiversityGuard,
     canonical_url,
@@ -60,7 +60,34 @@ class Phase123VisualPipelineTests(unittest.TestCase):
         self.assertTrue(
             supports("tech_behavior_motion", "behavior_prediction_engine")
         )
+        self.assertTrue(supports("tech_behavior_motion", "machine_choice_cta"))
         self.assertFalse(supports("finance_motion", "compound_growth"))
+
+    def test_hyperframes_templates_are_visually_distinct_and_unbranded(self) -> None:
+        scene = SimpleNamespace(
+            narration="The system predicts what will keep your attention.",
+            visual_intent="A cinematic explanation of an algorithm ranking behavior.",
+        )
+        templates = (
+            "machine_choice_cta",
+            "behavior_prediction_engine",
+            "algorithm_chose_you",
+        )
+        documents = {
+            template: _composition_html(scene, template, 5.0, 1920, 1080)
+            for template in templates
+        }
+
+        self.assertEqual(len(set(documents.values())), len(templates))
+        for template, document in documents.items():
+            self.assertIn(f'data-template="{template}"', document)
+            self.assertNotIn("Exact Visual · HyperFrames", document)
+            self.assertNotIn("deterministic HTML motion", document)
+            self.assertLess(document.count("<h1>"), 2)
+
+        self.assertIn("forecast-orb", documents["behavior_prediction_engine"])
+        self.assertIn("rank-card", documents["algorithm_chose_you"])
+        self.assertIn("choice-path", documents["machine_choice_cta"])
 
 
 if __name__ == "__main__":
