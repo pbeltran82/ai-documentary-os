@@ -11,8 +11,10 @@ for path in (BACKEND_DIR, SCRIPT_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-# CI and local validation must not appear frozen when a public archive stalls.
-os.environ.setdefault("ASSET_PROVIDER_TIMEOUT_SECONDS", "8")
+# Keep validation deterministic and fast. Production keeps the full provider set.
+os.environ.setdefault("ASSET_PROVIDER_TIMEOUT_SECONDS", "5")
+os.environ.setdefault("ASSET_PROVIDER_ALLOWLIST", "nasa")
+os.environ.setdefault("ASSET_PROVIDER_QUERY_LIMIT", "1")
 os.environ.setdefault("PYTHONUNBUFFERED", "1")
 
 configured_ffmpeg = os.getenv("FFMPEG_BIN", "").strip()
@@ -48,6 +50,8 @@ print(
         "timeline_ffmpeg": timeline_builder.ffmpeg_executable(),
         "finance_ffmpeg": finance_engine.FFMPEG_NAME,
         "asset_provider_timeout_seconds": os.environ["ASSET_PROVIDER_TIMEOUT_SECONDS"],
+        "asset_provider_allowlist": os.environ["ASSET_PROVIDER_ALLOWLIST"],
+        "asset_provider_query_limit": os.environ["ASSET_PROVIDER_QUERY_LIMIT"],
     },
     flush=True,
 )
