@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.services.database_safety import assert_destructive_database_is_safe
+from app.database_safety import assert_destructive_database_is_safe
 from app.services.hyperframes_renderer import supports
 from app.services.visuals.diversity_guard import (
     VisualDiversityGuard,
