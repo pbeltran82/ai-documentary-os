@@ -11,6 +11,10 @@ for path in (BACKEND_DIR, SCRIPT_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
+# CI and local validation must not appear frozen when a public archive stalls.
+os.environ.setdefault("ASSET_PROVIDER_TIMEOUT_SECONDS", "8")
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+
 configured_ffmpeg = os.getenv("FFMPEG_BIN", "").strip()
 configured_path = Path(configured_ffmpeg).expanduser() if configured_ffmpeg else None
 resolved_ffmpeg = (
@@ -43,6 +47,8 @@ print(
         "resolved_ffmpeg": resolved_ffmpeg,
         "timeline_ffmpeg": timeline_builder.ffmpeg_executable(),
         "finance_ffmpeg": finance_engine.FFMPEG_NAME,
-    }
+        "asset_provider_timeout_seconds": os.environ["ASSET_PROVIDER_TIMEOUT_SECONDS"],
+    },
+    flush=True,
 )
 main()
