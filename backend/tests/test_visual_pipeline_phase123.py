@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from fastapi import HTTPException
 
@@ -17,6 +18,7 @@ from app.services.visuals.diversity_guard import (
 )
 from app.services.visuals.runtime import (
     _eligible_for_hyperframes_rescue,
+    _execute_scene_with_hyperframes_rescue,
     _render_exact_visual_preserving_hyperframes,
     _rescue_template_for_scene,
 )
@@ -162,6 +164,58 @@ class Phase123VisualPipelineTests(unittest.TestCase):
             _rescue_template_for_scene(ranking_scene, ranking_plan),
             "machine_choice_explainer",
         )
+
+    def test_execution_wrapper_rescues_failed_tech_search_with_hyperframes(self) -> None:
+        scene = SimpleNamespace(
+            id=2,
+            scene_number=2,
+            narration="Each prediction changes the next signal.",
+            visual_intent="Show behavioral feedback inside an algorithm.",
+            search_keywords=(),
+            project=SimpleNamespace(scenes=[]),
+        )
+        plan = build_visual_plan(
+            narration=scene.narration,
+            visual_intent=scene.visual_intent,
+            scene_key="rescue-execution",
+        )
+        guard = VisualDiversityGuard()
+        asset = SimpleNamespace(
+            provider="hyperframes",
+            media_type="video",
+            provider_asset_id="hyperframes-consequence-map-scene-2",
+        )
+
+        def fail_asset_search(*_args, **_kwargs):
+            raise HTTPException(
+                status_code=422,
+                detail="No defensible real visual survived the quality gates.",
+            )
+
+        with (
+            patch("app.services.visuals.runtime._ORIGINAL_EXECUTE_SCENE", fail_asset_search),
+            patch("app.services.hyperframes_renderer.enabled", return_value=True),
+            patch("app.services.hyperframes_renderer.supports", return_value=True),
+            patch(
+                "app.routers.visual_architecture._store_hyperframes_asset",
+                return_value=asset,
+            ) as store,
+        ):
+            result = _execute_scene_with_hyperframes_rescue(
+                scene,
+                plan,
+                6,
+                SimpleNamespace(),
+                guard,
+            )
+
+        store.assert_called_once()
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["execution_mode"], "exact_visual")
+        self.assertEqual(result["fallback_from"], "asset_first")
+        self.assertEqual(result["exact_renderer"], "hyperframes_rescue")
+        self.assertEqual(result["exact_template_id"], "consequence_map")
+        self.assertEqual(result["provider"], "hyperframes")
 
     def test_legacy_renderer_cannot_overwrite_hyperframes_by_default(self) -> None:
         scene = SimpleNamespace(
