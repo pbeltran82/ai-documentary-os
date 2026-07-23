@@ -139,6 +139,72 @@ def _rescue_template_for_scene(scene, plan) -> str:
     return "consequence_map"
 
 
+def _is_legacy_tech_visual(scene) -> bool:
+    selected = getattr(scene, "selected_asset", None)
+    provider = str(getattr(selected, "provider", "") or "").lower()
+    source_url = str(getattr(selected, "source_url", "") or "").lower()
+    return provider == "generated" and source_url.startswith(
+        "local://exact-visual/tech_behavior_motion/"
+    )
+
+
+def _run_hyperframes_rescue(
+    scene,
+    plan,
+    db,
+    guard,
+    *,
+    original_status: int,
+    original_detail: str,
+) -> dict[str, object]:
+    from ...routers import visual_architecture as visual_router
+    from .. import hyperframes_renderer
+    from .diversity_guard import VisualDiversityGuard, choose_unused_exact_template
+
+    active_guard = guard or VisualDiversityGuard.from_project(scene.project)
+    family_id = "tech_behavior_motion"
+    preferred_template = _rescue_template_for_scene(scene, plan)
+    template_id = choose_unused_exact_template(family_id, preferred_template, active_guard)
+    if (
+        not hyperframes_renderer.enabled()
+        or template_id is None
+        or not hyperframes_renderer.supports(family_id, template_id)
+    ):
+        raise HTTPException(status_code=original_status, detail=original_detail)
+
+    try:
+        asset = visual_router._store_hyperframes_asset(scene, family_id, template_id, db)
+    except Exception as rescue_error:
+        raise HTTPException(
+            status_code=original_status,
+            detail=(
+                f"{original_detail} HyperFrames rescue also failed: "
+                f"{type(rescue_error).__name__}: {rescue_error}"
+            ),
+        ) from rescue_error
+
+    active_guard.register_exact(family_id, template_id)
+    return {
+        "scene_id": scene.id,
+        "scene_number": scene.scene_number,
+        "status": "completed",
+        "execution_mode": ExecutionMode.EXACT_VISUAL.value,
+        "fallback_from": ExecutionMode.ASSET_FIRST.value,
+        "visual_family": plan.strategy.family.value,
+        "exact_family_id": family_id,
+        "exact_template_id": template_id,
+        "exact_renderer": "hyperframes_rescue",
+        "provider": asset.provider,
+        "media_type": asset.media_type,
+        "provider_asset_id": asset.provider_asset_id,
+        "reason": (
+            "A legacy tech diagram or failed real-asset search was redirected to a "
+            "distinct project-owned HyperFrames composition."
+        ),
+        "asset_first_failure": original_detail,
+    }
+
+
 def _execute_scene_with_hyperframes_rescue(
     scene,
     plan,
@@ -149,56 +215,32 @@ def _execute_scene_with_hyperframes_rescue(
     if _ORIGINAL_EXECUTE_SCENE is None:
         raise RuntimeError("Visual Architecture execution wrapper is not installed")
 
+    if _is_legacy_tech_visual(scene) and _eligible_for_hyperframes_rescue(scene, plan):
+        return _run_hyperframes_rescue(
+            scene,
+            plan,
+            db,
+            guard,
+            original_status=422,
+            original_detail=(
+                "Existing legacy Tech & Behavior Motion diagram scheduled for a "
+                "HyperFrames cinematic upgrade."
+            ),
+        )
+
     try:
         return _ORIGINAL_EXECUTE_SCENE(scene, plan, per_page, db, guard)
     except HTTPException as original_error:
         if original_error.status_code not in {422, 502} or not _eligible_for_hyperframes_rescue(scene, plan):
             raise
-
-        from ...routers import visual_architecture as visual_router
-        from .. import hyperframes_renderer
-        from .diversity_guard import VisualDiversityGuard, choose_unused_exact_template
-
-        if not hyperframes_renderer.enabled():
-            raise
-        active_guard = guard or VisualDiversityGuard.from_project(scene.project)
-        family_id = "tech_behavior_motion"
-        preferred_template = _rescue_template_for_scene(scene, plan)
-        template_id = choose_unused_exact_template(family_id, preferred_template, active_guard)
-        if template_id is None or not hyperframes_renderer.supports(family_id, template_id):
-            raise
-
-        try:
-            asset = visual_router._store_hyperframes_asset(scene, family_id, template_id, db)
-        except Exception as rescue_error:
-            raise HTTPException(
-                status_code=original_error.status_code,
-                detail=(
-                    f"{original_error.detail} HyperFrames rescue also failed: "
-                    f"{type(rescue_error).__name__}: {rescue_error}"
-                ),
-            ) from rescue_error
-
-        active_guard.register_exact(family_id, template_id)
-        return {
-            "scene_id": scene.id,
-            "scene_number": scene.scene_number,
-            "status": "completed",
-            "execution_mode": ExecutionMode.EXACT_VISUAL.value,
-            "fallback_from": ExecutionMode.ASSET_FIRST.value,
-            "visual_family": plan.strategy.family.value,
-            "exact_family_id": family_id,
-            "exact_template_id": template_id,
-            "exact_renderer": "hyperframes_rescue",
-            "provider": asset.provider,
-            "media_type": asset.media_type,
-            "provider_asset_id": asset.provider_asset_id,
-            "reason": (
-                "No defensible real asset survived the quality gates, so the scene was "
-                "rescued with a distinct project-owned HyperFrames composition."
-            ),
-            "asset_first_failure": str(original_error.detail),
-        }
+        return _run_hyperframes_rescue(
+            scene,
+            plan,
+            db,
+            guard,
+            original_status=original_error.status_code,
+            original_detail=str(original_error.detail),
+        )
 
 
 def _render_exact_visual_preserving_hyperframes(scene, *args, **kwargs):
