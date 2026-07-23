@@ -7,6 +7,10 @@ on:
     paths:
       - "backend/app/services/hyperframes_renderer.py"
       - "backend/app/services/media_library.py"
+      - "backend/app/services/visuals/asset_director.py"
+      - "backend/app/services/visuals/runtime.py"
+      - "backend/app/routers/visual_architecture.py"
+      - "backend/app/routers/finance_motion.py"
       - "backend/scripts/smoke_test_hyperframes.py"
       - "backend/tests/test_visual_pipeline_phase123.py"
       - ".github/workflows/hyperframes-smoke.yml"
@@ -16,6 +20,10 @@ on:
     paths:
       - "backend/app/services/hyperframes_renderer.py"
       - "backend/app/services/media_library.py"
+      - "backend/app/services/visuals/asset_director.py"
+      - "backend/app/services/visuals/runtime.py"
+      - "backend/app/routers/visual_architecture.py"
+      - "backend/app/routers/finance_motion.py"
       - "backend/scripts/smoke_test_hyperframes.py"
       - "backend/tests/test_visual_pipeline_phase123.py"
       - ".github/workflows/hyperframes-smoke.yml"
@@ -24,7 +32,7 @@ on:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       HYPERFRAMES_ENABLED: "1"
       PYTHONPATH: backend
@@ -57,7 +65,7 @@ jobs:
         run: python -m unittest tests.test_visual_pipeline_phase123 -v
         working-directory: backend
 
-      - name: Render three cinematic systems through the app adapter
+      - name: Render five cinematic systems through the app adapter
         run: |
           python - <<'PY'
           import hashlib
@@ -69,8 +77,10 @@ jobs:
           from app.services.media_library import MEDIA_ROOT
 
           templates = (
+              (2, "consequence_map"),
               (4, "machine_choice_cta"),
               (8, "behavior_prediction_engine"),
+              (10, "machine_choice_explainer"),
               (12, "algorithm_chose_you"),
           )
           results = []
@@ -124,7 +134,7 @@ jobs:
               -of json "$VIDEO"
             count=$((count + 1))
           done
-          test "$count" -eq 3
+          test "$count" -eq 5
 
       - name: Extract visual verification frames
         run: |
@@ -134,11 +144,11 @@ jobs:
             ffmpeg -y -hide_banner -loglevel error -ss 1.6 -i "$VIDEO" \
               -frames:v 1 -q:v 2 "backend/data/projects/project-9999/verification/${NAME}.jpg"
           done
-          test "$(find backend/data/projects/project-9999/verification -name '*.jpg' | wc -l)" -eq 3
+          test "$(find backend/data/projects/project-9999/verification -name '*.jpg' | wc -l)" -eq 5
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hyperframes-cinematic-three-scene-proof
+          name: hyperframes-cinematic-five-scene-proof
           path: |
             backend/data/projects/project-9999/assets/*.mp4
             backend/data/projects/project-9999/verification/*.jpg
