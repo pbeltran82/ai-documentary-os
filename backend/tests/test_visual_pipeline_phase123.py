@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi import HTTPException
 
@@ -172,6 +172,7 @@ class Phase123VisualPipelineTests(unittest.TestCase):
             narration="Each prediction changes the next signal.",
             visual_intent="Show behavioral feedback inside an algorithm.",
             search_keywords=(),
+            selected_asset=None,
             project=SimpleNamespace(scenes=[]),
         )
         plan = build_visual_plan(
@@ -216,6 +217,57 @@ class Phase123VisualPipelineTests(unittest.TestCase):
         self.assertEqual(result["exact_renderer"], "hyperframes_rescue")
         self.assertEqual(result["exact_template_id"], "consequence_map")
         self.assertEqual(result["provider"], "hyperframes")
+
+    def test_existing_legacy_tech_diagram_upgrades_before_stock_search(self) -> None:
+        scene = SimpleNamespace(
+            id=10,
+            scene_number=10,
+            narration="Rankings shape what appears next in the recommendation feed.",
+            visual_intent="Reveal a machine scoring and selecting one result.",
+            search_keywords=(),
+            selected_asset=SimpleNamespace(
+                provider="generated",
+                source_url=(
+                    "local://exact-visual/tech_behavior_motion/"
+                    "signal_feedback_loop/premium_motion/youtube"
+                ),
+            ),
+            project=SimpleNamespace(scenes=[]),
+        )
+        plan = build_visual_plan(
+            narration=scene.narration,
+            visual_intent=scene.visual_intent,
+            scene_key="legacy-upgrade",
+        )
+        guard = VisualDiversityGuard()
+        original = Mock(side_effect=AssertionError("stock search should not run"))
+        asset = SimpleNamespace(
+            provider="hyperframes",
+            media_type="video",
+            provider_asset_id="hyperframes-machine-choice-explainer-scene-10",
+        )
+
+        with (
+            patch("app.services.visuals.runtime._ORIGINAL_EXECUTE_SCENE", original),
+            patch("app.services.hyperframes_renderer.enabled", return_value=True),
+            patch("app.services.hyperframes_renderer.supports", return_value=True),
+            patch(
+                "app.routers.visual_architecture._store_hyperframes_asset",
+                return_value=asset,
+            ),
+        ):
+            result = _execute_scene_with_hyperframes_rescue(
+                scene,
+                plan,
+                6,
+                SimpleNamespace(),
+                guard,
+            )
+
+        original.assert_not_called()
+        self.assertEqual(result["exact_renderer"], "hyperframes_rescue")
+        self.assertEqual(result["exact_template_id"], "machine_choice_explainer")
+        self.assertIn("legacy Tech & Behavior Motion", result["asset_first_failure"])
 
     def test_legacy_renderer_cannot_overwrite_hyperframes_by_default(self) -> None:
         scene = SimpleNamespace(
