@@ -69,12 +69,16 @@ _AUCTION_TERMS = {"attention", "auction", "bid", "bids", "advertiser", "advertis
 
 
 def _scene_terms(scene) -> set[str]:
+    selected = getattr(scene, "selected_asset", None)
     values = [
         str(getattr(scene, "narration", "") or ""),
         str(getattr(scene, "visual_intent", "") or ""),
         *[str(item) for item in (getattr(scene, "search_keywords", ()) or ())],
+        str(getattr(selected, "provider_asset_id", "") or ""),
+        str(getattr(selected, "source_url", "") or ""),
+        str(getattr(selected, "local_path", "") or ""),
     ]
-    return set(_WORD_RE.findall(" ".join(values).lower()))
+    return set(_WORD_RE.findall(" ".join(values).lower().replace("_", " ")))
 
 
 def _template_for_plan(plan) -> str:
@@ -215,7 +219,10 @@ def _execute_scene_with_hyperframes_rescue(
     if _ORIGINAL_EXECUTE_SCENE is None:
         raise RuntimeError("Visual Architecture execution wrapper is not installed")
 
-    if _is_legacy_tech_visual(scene) and _eligible_for_hyperframes_rescue(scene, plan):
+    # A legacy Tech & Behavior Motion asset is already positive evidence that the
+    # scene needs a controlled explainer. Upgrade it directly, even when the current
+    # narration classifier is too sparse to produce technology keywords.
+    if _is_legacy_tech_visual(scene):
         return _run_hyperframes_rescue(
             scene,
             plan,
