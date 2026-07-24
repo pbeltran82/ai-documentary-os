@@ -232,9 +232,20 @@ def _execute_scene_with_hyperframes_rescue(
     if _ORIGINAL_EXECUTE_SCENE is None:
         raise RuntimeError("Visual Architecture execution wrapper is not installed")
 
-    # Existing controlled technology visuals remain on the controlled rendering
-    # path. They should never be sent back through stock search during a redirect.
-    if _is_legacy_tech_visual(scene) or (
+    if _is_legacy_tech_visual(scene):
+        return _run_hyperframes_rescue(
+            scene,
+            plan,
+            db,
+            guard,
+            original_status=422,
+            original_detail=(
+                "Existing legacy Tech & Behavior Motion diagram scheduled for a "
+                "HyperFrames cinematic upgrade."
+            ),
+        )
+
+    if (
         _is_hyperframes_visual(scene)
         and plan.asset.execution_mode == ExecutionMode.ASSET_FIRST
     ):
@@ -245,8 +256,8 @@ def _execute_scene_with_hyperframes_rescue(
             guard,
             original_status=422,
             original_detail=(
-                "Existing Tech & Behavior Motion scene scheduled for a distinct "
-                "HyperFrames cinematic redirect."
+                "Existing HyperFrames Tech & Behavior Motion scene scheduled for a "
+                "distinct cinematic redirect."
             ),
         )
 
