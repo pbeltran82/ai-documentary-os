@@ -127,6 +127,40 @@ class HyperFramesRescueRegressionTests(unittest.TestCase):
             guard.asset_ids,
         )
 
+    def test_supported_rotation_skips_unimplemented_templates(self) -> None:
+        guard = VisualDiversityGuard()
+        for template_id in (
+            "consequence_map",
+            "machine_choice_cta",
+            "behavior_prediction_engine",
+            "algorithm_chose_you",
+        ):
+            guard.register_exact("tech_behavior_motion", template_id)
+
+        renderer = SimpleNamespace(
+            supports=lambda family_id, template_id: (
+                family_id == "tech_behavior_motion"
+                and template_id
+                in {
+                    "behavior_prediction_engine",
+                    "algorithm_chose_you",
+                    "attention_auction",
+                    "machine_choice_explainer",
+                    "machine_choice_cta",
+                    "consequence_map",
+                }
+            )
+        )
+
+        selected = runtime._choose_supported_rescue_template(
+            "tech_behavior_motion",
+            "consequence_map",
+            guard,
+            renderer,
+        )
+
+        self.assertEqual(selected, "machine_choice_explainer")
+
     def test_legacy_asset_identity_guides_distinct_rescue_template(self) -> None:
         ranking_scene = SimpleNamespace(
             narration="",
