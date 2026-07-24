@@ -152,6 +152,13 @@ def _is_legacy_tech_visual(scene) -> bool:
     )
 
 
+def _is_hyperframes_visual(scene) -> bool:
+    selected = getattr(scene, "selected_asset", None)
+    provider = str(getattr(selected, "provider", "") or "").lower()
+    source_url = str(getattr(selected, "source_url", "") or "").lower()
+    return provider == "hyperframes" and source_url.startswith("local://hyperframes/")
+
+
 def _run_hyperframes_rescue(
     scene,
     plan,
@@ -165,7 +172,13 @@ def _run_hyperframes_rescue(
     from .. import hyperframes_renderer
     from .diversity_guard import VisualDiversityGuard, choose_unused_exact_template
 
-    active_guard = guard or VisualDiversityGuard.from_project(scene.project)
+    active_guard = guard or VisualDiversityGuard()
+    project = getattr(scene, "project", None)
+    if project is not None:
+        active_guard.merge(
+            VisualDiversityGuard.from_project(project, ignore_scene_id=scene.id)
+        )
+
     family_id = "tech_behavior_motion"
     preferred_template = _rescue_template_for_scene(scene, plan)
     template_id = choose_unused_exact_template(family_id, preferred_template, active_guard)
@@ -219,10 +232,12 @@ def _execute_scene_with_hyperframes_rescue(
     if _ORIGINAL_EXECUTE_SCENE is None:
         raise RuntimeError("Visual Architecture execution wrapper is not installed")
 
-    # A legacy Tech & Behavior Motion asset is already positive evidence that the
-    # scene needs a controlled explainer. Upgrade it directly, even when the current
-    # narration classifier is too sparse to produce technology keywords.
-    if _is_legacy_tech_visual(scene):
+    # Existing controlled technology visuals remain on the controlled rendering
+    # path. They should never be sent back through stock search during a redirect.
+    if _is_legacy_tech_visual(scene) or (
+        _is_hyperframes_visual(scene)
+        and plan.asset.execution_mode == ExecutionMode.ASSET_FIRST
+    ):
         return _run_hyperframes_rescue(
             scene,
             plan,
@@ -230,8 +245,8 @@ def _execute_scene_with_hyperframes_rescue(
             guard,
             original_status=422,
             original_detail=(
-                "Existing legacy Tech & Behavior Motion diagram scheduled for a "
-                "HyperFrames cinematic upgrade."
+                "Existing Tech & Behavior Motion scene scheduled for a distinct "
+                "HyperFrames cinematic redirect."
             ),
         )
 
