@@ -24,10 +24,20 @@ _STOP_WORDS = {
     "every", "time", "only", "need", "needs", "result", "whether",
     "designed", "like", "just", "then", "next", "comes", "thing",
     "skip", "replay", "watch", "look", "make", "made", "gets", "using",
+    "open", "invisible", "predicts", "pause", "even", "moments", "slows",
+    "down", "feed", "feels", "compete", "important", "choosing", "deserves",
+    "recognize", "patterns",
 }
 _GENERIC_SINGLE_WORDS = {
     "person", "people", "human", "system", "world", "moment", "subject",
     "choice", "future", "power", "technology", "digital", "attention",
+}
+_CONCRETE_SINGLE_WORDS = {
+    "app", "calendar", "camera", "child", "city", "commuter", "computer",
+    "crowd", "dashboard", "document", "driver", "factory", "family", "graph",
+    "hospital", "laptop", "market", "office", "parent", "phone", "platform",
+    "researcher", "screen", "smartphone", "station", "student", "teacher",
+    "viewer", "worker",
 }
 
 
@@ -53,7 +63,7 @@ def _meaningful_phrase(value: str) -> str:
         words.append(cleaned)
     if not words:
         return ""
-    if len(words) == 1 and words[0] in _GENERIC_SINGLE_WORDS:
+    if len(words) == 1 and words[0] not in _CONCRETE_SINGLE_WORDS:
         return ""
     return " ".join(words[:5])
 
@@ -143,7 +153,7 @@ def build_asset_directive(
     visual_semantic = _keywords(visual_intent, 6)
     narration_semantic = _keywords(narration, 8)
     search_terms = _unique(
-        [*supplied, *anchors, *visual_semantic, *narration_semantic],
+        [*anchors, *supplied, *visual_semantic, *narration_semantic],
         8,
     )
 
