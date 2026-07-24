@@ -11,6 +11,7 @@ from .cinematic_renderer import (
     cinematic_beat_indicator,
     cinematic_common,
 )
+from .editorial_overrides import exact_template_override, forces_asset_first
 from .types import ExecutionMode, VisualFamily
 from .visual_pipeline import build_scene_visual_plan
 
@@ -20,50 +21,17 @@ _ORIGINAL_RENDER_EXACT_VISUAL: Callable[..., Any] | None = None
 _WORD_RE = re.compile(r"[a-z0-9']+")
 
 _TECH_RESCUE_TERMS = {
-    "algorithm",
-    "attention",
-    "behavior",
-    "behaviour",
-    "choice",
-    "click",
-    "control",
-    "data",
-    "feed",
-    "model",
-    "predict",
-    "prediction",
-    "profile",
-    "rank",
-    "ranking",
-    "recommend",
-    "recommendation",
-    "scroll",
-    "signal",
-    "system",
+    "algorithm", "attention", "behavior", "behaviour", "choice", "click",
+    "control", "data", "feed", "model", "predict", "prediction", "profile",
+    "rank", "ranking", "recommend", "recommendation", "scroll", "signal", "system",
 }
 _RANKING_TERMS = {
-    "rank",
-    "ranks",
-    "ranked",
-    "ranking",
-    "rankings",
-    "recommend",
-    "recommends",
-    "recommended",
-    "recommendation",
-    "feed",
+    "rank", "ranks", "ranked", "ranking", "rankings", "recommend", "recommends",
+    "recommended", "recommendation", "feed",
 }
 _SIGNAL_TERMS = {
-    "signal",
-    "signals",
-    "feedback",
-    "change",
-    "changes",
-    "changed",
-    "prediction",
-    "predict",
-    "behavior",
-    "behaviour",
+    "signal", "signals", "feedback", "change", "changes", "changed", "prediction",
+    "predict", "behavior", "behaviour",
 }
 _AUCTION_TERMS = {"attention", "auction", "bid", "bids", "advertiser", "advertising"}
 _SUPPORTED_RESCUE_ROTATION = (
@@ -113,7 +81,7 @@ def _architectural_suggest_template(scene):
     from .. import tech_behavior_motion as tech
 
     plan = build_scene_visual_plan(scene)
-    template_id = _template_for_plan(plan)
+    template_id = exact_template_override(scene) or _template_for_plan(plan)
     template = tech.TEMPLATE_BY_ID[template_id]
     confidence = 0.9 if plan.intent.human_score + plan.intent.interface_score + plan.intent.data_score >= 2 else 0.78
     reason = (
@@ -138,7 +106,9 @@ def _eligible_for_hyperframes_rescue(scene, plan) -> bool:
 
 
 def _rescue_template_for_scene(scene, plan) -> str:
-    """Choose the semantically preferred cinematic system for a rescued scene."""
+    approved = exact_template_override(scene)
+    if approved:
+        return approved
     terms = _scene_terms(scene)
     if terms & _RANKING_TERMS:
         return "machine_choice_explainer"
@@ -156,13 +126,16 @@ def _choose_supported_rescue_template(
     preferred_template: str | None,
     guard,
     hyperframes_renderer,
+    *,
+    force_preferred: bool = False,
 ) -> str | None:
-    """Choose an unused template that the active HyperFrames adapter can render.
+    if (
+        force_preferred
+        and preferred_template
+        and hyperframes_renderer.supports(family_id, preferred_template)
+    ):
+        return preferred_template
 
-    The generic diversity rotation also contains future cinematic templates that
-    are not yet implemented by HyperFrames. Rescue routing must skip those rather
-    than selecting one and returning the original 422 error.
-    """
     seen: set[str] = set()
     for template_id in (preferred_template, *_SUPPORTED_RESCUE_ROTATION):
         if not template_id or template_id in seen:
@@ -212,12 +185,14 @@ def _run_hyperframes_rescue(
         )
 
     family_id = "tech_behavior_motion"
-    preferred_template = _rescue_template_for_scene(scene, plan)
+    approved_template = exact_template_override(scene)
+    preferred_template = approved_template or _rescue_template_for_scene(scene, plan)
     template_id = _choose_supported_rescue_template(
         family_id,
         preferred_template,
         active_guard,
         hyperframes_renderer,
+        force_preferred=approved_template is not None,
     )
     if not hyperframes_renderer.enabled() or template_id is None:
         raise HTTPException(status_code=original_status, detail=original_detail)
@@ -248,8 +223,8 @@ def _run_hyperframes_rescue(
         "media_type": asset.media_type,
         "provider_asset_id": asset.provider_asset_id,
         "reason": (
-            "A legacy tech diagram or failed real-asset search was redirected to a "
-            "distinct project-owned HyperFrames composition."
+            "An approved editorial map or failed real-asset search redirected this scene "
+            "to a project-owned HyperFrames composition."
         ),
         "asset_first_failure": original_detail,
     }
@@ -264,6 +239,21 @@ def _execute_scene_with_hyperframes_rescue(
 ) -> dict[str, object]:
     if _ORIGINAL_EXECUTE_SCENE is None:
         raise RuntimeError("Visual Architecture execution wrapper is not installed")
+
+    approved_template = exact_template_override(scene)
+    if approved_template:
+        return _run_hyperframes_rescue(
+            scene,
+            plan,
+            db,
+            guard,
+            original_status=422,
+            original_detail=f"Approved editorial map selected {approved_template}.",
+        )
+
+    # Approved stock briefs are allowed to replace an existing HyperFrames scene.
+    if forces_asset_first(scene):
+        return _ORIGINAL_EXECUTE_SCENE(scene, plan, per_page, db, guard)
 
     if _is_legacy_tech_visual(scene):
         return _run_hyperframes_rescue(
@@ -310,13 +300,10 @@ def _execute_scene_with_hyperframes_rescue(
 
 
 def _render_exact_visual_preserving_hyperframes(scene, *args, **kwargs):
-    """Prevent the legacy Exact Visual renderer from silently replacing HyperFrames."""
     selected = getattr(scene, "selected_asset", None)
     provider = str(getattr(selected, "provider", "") or "").lower()
     allow_override = os.getenv("ALLOW_LEGACY_REPLACE_HYPERFRAMES", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
+        "1", "true", "yes",
     }
     if provider == "hyperframes" and not allow_override:
         raise HTTPException(
@@ -332,7 +319,6 @@ def _render_exact_visual_preserving_hyperframes(scene, *args, **kwargs):
 
 
 def install_visual_architecture() -> None:
-    """Install the shared cinematic system and safe HyperFrames integration hooks."""
     global _INSTALLED, _ORIGINAL_EXECUTE_SCENE, _ORIGINAL_RENDER_EXACT_VISUAL
 
     from .. import tech_behavior_motion as tech
