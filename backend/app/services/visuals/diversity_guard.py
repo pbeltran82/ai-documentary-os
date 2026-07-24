@@ -23,11 +23,19 @@ class VisualDiversityGuard:
     recent_modes: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_project(cls, project, *, ignore_existing: bool = False) -> "VisualDiversityGuard":
+    def from_project(
+        cls,
+        project,
+        *,
+        ignore_existing: bool = False,
+        ignore_scene_id: int | None = None,
+    ) -> "VisualDiversityGuard":
         guard = cls()
         if ignore_existing:
             return guard
         for scene in project.scenes:
+            if ignore_scene_id is not None and scene.id == ignore_scene_id:
+                continue
             asset = scene.selected_asset
             if asset is None:
                 continue
@@ -46,6 +54,12 @@ class VisualDiversityGuard:
                         guard.exact_templates.add((parts[0], parts[1]))
                     break
         return guard
+
+    def merge(self, other: "VisualDiversityGuard") -> None:
+        """Merge a project snapshot into an active sequential execution guard."""
+        self.asset_ids.update(other.asset_ids)
+        self.media_urls.update(other.media_urls)
+        self.exact_templates.update(other.exact_templates)
 
     def rejects_candidate(self, candidate) -> bool:
         """Reject exact reuse; sequence variety remains a planner preference, not a blocker."""
