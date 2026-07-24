@@ -66,6 +66,14 @@ _SIGNAL_TERMS = {
     "behaviour",
 }
 _AUCTION_TERMS = {"attention", "auction", "bid", "bids", "advertiser", "advertising"}
+_SUPPORTED_RESCUE_ROTATION = (
+    "machine_choice_explainer",
+    "consequence_map",
+    "attention_auction",
+    "behavior_prediction_engine",
+    "algorithm_chose_you",
+    "machine_choice_cta",
+)
 
 
 def _scene_terms(scene) -> set[str]:
@@ -130,7 +138,7 @@ def _eligible_for_hyperframes_rescue(scene, plan) -> bool:
 
 
 def _rescue_template_for_scene(scene, plan) -> str:
-    """Choose a distinct cinematic system when real-media search cannot defend a result."""
+    """Choose the semantically preferred cinematic system for a rescued scene."""
     terms = _scene_terms(scene)
     if terms & _RANKING_TERMS:
         return "machine_choice_explainer"
@@ -141,6 +149,30 @@ def _rescue_template_for_scene(scene, plan) -> str:
     if plan.intent.interface_score:
         return "machine_choice_explainer"
     return "consequence_map"
+
+
+def _choose_supported_rescue_template(
+    family_id: str,
+    preferred_template: str | None,
+    guard,
+    hyperframes_renderer,
+) -> str | None:
+    """Choose an unused template that the active HyperFrames adapter can render.
+
+    The generic diversity rotation also contains future cinematic templates that
+    are not yet implemented by HyperFrames. Rescue routing must skip those rather
+    than selecting one and returning the original 422 error.
+    """
+    seen: set[str] = set()
+    for template_id in (preferred_template, *_SUPPORTED_RESCUE_ROTATION):
+        if not template_id or template_id in seen:
+            continue
+        seen.add(template_id)
+        if not guard.template_available(family_id, template_id):
+            continue
+        if hyperframes_renderer.supports(family_id, template_id):
+            return template_id
+    return None
 
 
 def _is_legacy_tech_visual(scene) -> bool:
@@ -170,7 +202,7 @@ def _run_hyperframes_rescue(
 ) -> dict[str, object]:
     from ...routers import visual_architecture as visual_router
     from .. import hyperframes_renderer
-    from .diversity_guard import VisualDiversityGuard, choose_unused_exact_template
+    from .diversity_guard import VisualDiversityGuard
 
     active_guard = guard or VisualDiversityGuard()
     project = getattr(scene, "project", None)
@@ -181,12 +213,13 @@ def _run_hyperframes_rescue(
 
     family_id = "tech_behavior_motion"
     preferred_template = _rescue_template_for_scene(scene, plan)
-    template_id = choose_unused_exact_template(family_id, preferred_template, active_guard)
-    if (
-        not hyperframes_renderer.enabled()
-        or template_id is None
-        or not hyperframes_renderer.supports(family_id, template_id)
-    ):
+    template_id = _choose_supported_rescue_template(
+        family_id,
+        preferred_template,
+        active_guard,
+        hyperframes_renderer,
+    )
+    if not hyperframes_renderer.enabled() or template_id is None:
         raise HTTPException(status_code=original_status, detail=original_detail)
 
     try:
